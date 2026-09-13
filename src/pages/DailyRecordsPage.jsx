@@ -546,8 +546,9 @@ export const DailyRecordsPage = () => {
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-xs font-bold text-slate-700">Feed Bags Used (Whole Bags) *</label>
-              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                Target Day {formFlockAgeDay}: ~{recommendedBags} Bags ({targetGramPerBird}g/bird)
+              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200 flex flex-col items-end text-right leading-tight">
+                <span>Target Day {formFlockAgeDay}: ~{recommendedBags} Bags</span>
+                <span className="text-[10px] font-medium text-emerald-600">({targetGramPerBird}g/bird)</span>
               </span>
             </div>
             <input
@@ -694,7 +695,6 @@ export const DailyRecordsPage = () => {
             {/* Additional Info Footer */}
             <div className="flex items-center justify-between text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
               <span>Recorded By: <strong className="text-slate-700">{viewingRecord.recordedBy || 'Farmer'}</strong></span>
-              <span>Feed Type: <strong className="text-slate-700">{viewingRecord.feedType || 'Auto'}</strong></span>
             </div>
 
             {/* Modal Actions */}
