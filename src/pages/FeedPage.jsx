@@ -83,6 +83,18 @@ export const FeedPage = () => {
     return acc;
   }, { 'Pre-Starter': 0, 'Starter': 0, 'Finisher': 0 });
 
+  const preAvailableBags = kgToBags(Number(feedStock['Pre-Starter'] || 0), KG_PER_BAG);
+  const starterAvailableBags = kgToBags(Number(feedStock['Starter'] || 0), KG_PER_BAG);
+  const finisherAvailableBags = kgToBags(Number(feedStock['Finisher'] || 0), KG_PER_BAG);
+
+  const preArrivedBags = Math.max(totalArrivedBags['Pre-Starter'] || 0, preAvailableBags);
+  const starterArrivedBags = Math.max(totalArrivedBags['Starter'] || 0, starterAvailableBags);
+  const finisherArrivedBags = Math.max(totalArrivedBags['Finisher'] || 0, finisherAvailableBags);
+
+  const preConsumedBags = Math.max(0, parseFloat((preArrivedBags - preAvailableBags).toFixed(1)));
+  const starterConsumedBags = Math.max(0, parseFloat((starterArrivedBags - starterAvailableBags).toFixed(1)));
+  const finisherConsumedBags = Math.max(0, parseFloat((finisherArrivedBags - finisherAvailableBags).toFixed(1)));
+
   const handleEditArrival = (arrival) => {
     setEditingFeedId(arrival.id);
     setShowForm(true);
@@ -183,24 +195,30 @@ export const FeedPage = () => {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
           title="1. Pre-Starter Stock"
-          value={formatFeedStock(feedStock['Pre-Starter'] || 0)}
-          secondaryValue={formatFeedStock(totalArrivedBags['Pre-Starter'] || 0)}
+          value={`${preAvailableBags} Bags`}
+          availableValue={`${preAvailableBags} Bags`}
+          consumedValue={`${preConsumedBags} Bags`}
+          arrivedValue={`${preArrivedBags} Bags`}
           subtext="First deduction priority (Blue Bag)"
           icon={Package}
           color="blue"
         />
         <StatCard
           title="2. Starter Stock"
-          value={formatFeedStock(feedStock['Starter'] || 0)}
-          secondaryValue={formatFeedStock(totalArrivedBags['Starter'] || 0)}
+          value={`${starterAvailableBags} Bags`}
+          availableValue={`${starterAvailableBags} Bags`}
+          consumedValue={`${starterConsumedBags} Bags`}
+          arrivedValue={`${starterArrivedBags} Bags`}
           subtext="Second deduction priority (Green Bag)"
           icon={Package}
           color="emerald"
         />
         <StatCard
           title="3. Finisher Stock"
-          value={formatFeedStock(feedStock['Finisher'] || 0)}
-          secondaryValue={formatFeedStock(totalArrivedBags['Finisher'] || 0)}
+          value={`${finisherAvailableBags} Bags`}
+          availableValue={`${finisherAvailableBags} Bags`}
+          consumedValue={`${finisherConsumedBags} Bags`}
+          arrivedValue={`${finisherArrivedBags} Bags`}
           subtext="Third deduction priority (Orange Bag)"
           icon={Package}
           color="orange"

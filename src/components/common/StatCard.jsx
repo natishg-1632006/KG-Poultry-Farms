@@ -4,6 +4,9 @@ export const StatCard = ({
   title,
   value,
   subtext,
+  availableValue,
+  consumedValue,
+  arrivedValue,
   secondaryValue,
   secondaryLabel = "Total Arrived",
   icon: Icon,
@@ -52,21 +55,38 @@ export const StatCard = ({
           </div>
         )}
       </div>
-      <div className="mt-3">
-        <div className="flex items-baseline justify-between gap-2">
-          <div>
-            {secondaryValue && <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Available</span>}
-            <div className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">{value}</div>
+      <div className="mt-3 space-y-3">
+        <div>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Available Stock</span>
+          <div className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">{availableValue || value}</div>
+        </div>
+
+        {consumedValue !== undefined && arrivedValue !== undefined ? (
+          <div className="grid grid-cols-3 gap-1 text-center rounded-xl bg-slate-50 p-2 border border-slate-100/90">
+            <div className="px-1 py-0.5">
+              <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-600 block">Available</span>
+              <span className="text-xs font-black text-slate-900">{availableValue || value}</span>
+            </div>
+            <div className="border-x border-slate-200/80 px-1 py-0.5">
+              <span className="text-[9px] font-extrabold uppercase tracking-wider text-amber-600 block">Consumed</span>
+              <span className="text-xs font-black text-amber-700">{consumedValue}</span>
+            </div>
+            <div className="px-1 py-0.5">
+              <span className="text-[9px] font-extrabold uppercase tracking-wider text-blue-600 block">Arrived</span>
+              <span className="text-xs font-black text-blue-700">{arrivedValue}</span>
+            </div>
           </div>
-          {secondaryValue && (
+        ) : secondaryValue ? (
+          <div className="flex items-baseline justify-between gap-2">
             <div className="text-right bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-100">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">{secondaryLabel}</span>
               <div className="text-xs font-black text-slate-800">{secondaryValue}</div>
             </div>
-          )}
-        </div>
+          </div>
+        ) : null}
+
         {subtext && (
-          <div className="mt-2.5 flex items-center gap-1.5 border-t border-slate-100/80 pt-2">
+          <div className="flex items-center gap-1.5 border-t border-slate-100/80 pt-2">
             <span className={`inline-block h-1.5 w-1.5 rounded-full ${currentStyle.dot}`} />
             <p className="text-xs font-medium text-slate-500">{subtext}</p>
           </div>
