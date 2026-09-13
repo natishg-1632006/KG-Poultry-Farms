@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { dbGetBatches, dbGetUsers, dbGetDispatches, dbGetAuditLogs } from '../services/dbService';
 import { StatCard } from '../components/common/StatCard';
 import { Badge } from '../components/common/Badge';
-import { WeatherWidget } from '../components/common/WeatherWidget';
 import { Layers, Users, Truck, AlertCircle, PlusCircle, ArrowRight, ShieldCheck, Activity } from 'lucide-react';
 
 export const AdminDashboard = () => {
@@ -69,10 +68,7 @@ export const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* Farm Village Weather Widget */}
-      <WeatherWidget />
-
-      {/* KPI Cards Grid */}
+      {/* Metrics Grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Active Batches"

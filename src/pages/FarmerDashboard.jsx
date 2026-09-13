@@ -6,7 +6,6 @@ import { formatFeedStock, kgToBags } from '../utils/calculations';
 import { KG_PER_BAG } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
 import { Badge } from '../components/common/Badge';
-import { WeatherWidget } from '../components/common/WeatherWidget';
 import { ClipboardList, Wheat, Syringe, Truck, Activity, ArrowRight, Layers, AlertCircle, Scale, Calendar } from 'lucide-react';
 
 export const FarmerDashboard = () => {
@@ -86,9 +85,6 @@ export const FarmerDashboard = () => {
           </div>
         )}
       </div>
-
-      {/* Live Village Weather & Poultry Advisories */}
-      <WeatherWidget />
 
       {!activeBatch ? (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-8 text-center text-emerald-900">
