@@ -11,16 +11,32 @@ import {
   dbSaveInvoice,
   dbLogAuditEvent
 } from '../services/dbService';
-import { calculateTotalChickenCount, calculateBoxSetWeights } from '../utils/calculations';
+import { calculateBoxSetWeights } from '../utils/calculations';
 import { Badge } from '../components/common/Badge';
 import { Modal } from '../components/common/Modal';
-import { Truck, Save, Scale, CheckCircle2, Edit, Trash2, Plus, FileText, Printer } from 'lucide-react';
+import {
+  Truck,
+  Save,
+  Scale,
+  CheckCircle2,
+  Edit,
+  Trash2,
+  Plus,
+  FileText,
+  Printer,
+  ChevronRight,
+  UserCheck,
+  Phone,
+  Calendar,
+  Layers
+} from 'lucide-react';
 
 export const DispatchPage = () => {
   const { userProfile, isFarmer } = useAuth();
   const [batches, setBatches] = useState([]);
   const [selectedBatchId, setSelectedBatchId] = useState('');
   const [dispatches, setDispatches] = useState([]);
+  const [allBoxSetsMap, setAllBoxSetsMap] = useState({}); // { [dispatchId]: BoxSet[] }
   const [activeDispatch, setActiveDispatch] = useState(null);
   const [boxSets, setBoxSets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,6 +44,7 @@ export const DispatchPage = () => {
   const [successMsg, setSuccessMsg] = useState('');
   const [editingBoxSetId, setEditingBoxSetId] = useState(null);
   const [showHeaderForm, setShowHeaderForm] = useState(false);
+  const [showWeighingModal, setShowWeighingModal] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [ratePerKg, setRatePerKg] = useState(135);
 
@@ -59,12 +76,6 @@ export const DispatchPage = () => {
     }
   }, [selectedBatchId]);
 
-  useEffect(() => {
-    if (activeDispatch) {
-      loadBoxSetsForDispatch(activeDispatch.id);
-    }
-  }, [activeDispatch]);
-
   async function loadBatches() {
     try {
       const all = await dbGetBatches();
@@ -94,32 +105,43 @@ export const DispatchPage = () => {
       const list = await dbGetDispatches();
       const filtered = list.filter(d => d.batchId === bId);
       setDispatches(filtered);
-      if (filtered.length > 0) {
-        if (!activeDispatch || !filtered.some(d => d.id === activeDispatch.id)) {
-          setActiveDispatch(filtered[0]);
+
+      const setsMap = {};
+      for (const d of filtered) {
+        const sets = await dbGetBoxSets(d.id);
+        setsMap[d.id] = sets || [];
+      }
+      setAllBoxSetsMap(setsMap);
+
+      if (activeDispatch) {
+        const updatedActive = filtered.find(d => d.id === activeDispatch.id);
+        if (updatedActive) {
+          setActiveDispatch(updatedActive);
+          setBoxSets(setsMap[updatedActive.id] || []);
         }
-      } else {
-        setActiveDispatch(null);
-        setBoxSets([]);
       }
     } catch (err) {
       console.error('Failed loading dispatches:', err);
     }
   }
 
-  async function loadBoxSetsForDispatch(dId) {
+  async function loadBoxSetsForDispatch(dId, targetDispatch = null) {
     try {
       const list = await dbGetBoxSets(dId);
-      setBoxSets(list || []);
+      const currentSets = list || [];
+      setBoxSets(currentSets);
 
-      const currentWeighedBoxes = (list || []).reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
-      const totalHeaderBoxes = activeDispatch?.totalBoxCount || 20;
+      setAllBoxSetsMap(prev => ({ ...prev, [dId]: currentSets }));
+
+      const disp = targetDispatch || activeDispatch;
+      const currentWeighedBoxes = currentSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
+      const totalHeaderBoxes = disp?.totalBoxCount || 20;
       const remainingBoxes = Math.max(0, totalHeaderBoxes - currentWeighedBoxes);
       const defaultBoxesInSet = remainingBoxes > 0 ? Math.min(5, remainingBoxes) : 5;
-      const perBoxCount = activeDispatch?.chickenCountPerBox || 12;
+      const perBoxCount = disp?.chickenCountPerBox || 12;
 
       setSetForm({
-        boxSetNumber: (list || []).length + 1,
+        boxSetNumber: currentSets.length + 1,
         boxesInSet: defaultBoxesInSet,
         emptyBoxWeight: defaultBoxesInSet * 5,
         loadedWeight: '',
@@ -144,6 +166,35 @@ export const DispatchPage = () => {
       chickenCountPerBox: 12
     });
     setShowHeaderForm(true);
+  };
+
+  const handleOpenWeighingModal = async (dispatch) => {
+    setActiveDispatch(dispatch);
+    setShowWeighingModal(true);
+    await loadBoxSetsForDispatch(dispatch.id, dispatch);
+  };
+
+  const handleDeleteDispatch = async (dId, e) => {
+    e.stopPropagation();
+    if (!confirm('Are you sure you want to delete this vehicle dispatch card and all its box sets?')) return;
+    try {
+      await dbDeleteDispatch(dId);
+      if (activeDispatch?.id === dId) {
+        setActiveDispatch(null);
+        setShowWeighingModal(false);
+      }
+      await dbLogAuditEvent(
+        'DISPATCH_DELETED',
+        `Deleted vehicle dispatch ${dId}`,
+        userProfile?.name
+      );
+      setSuccessMsg('Vehicle dispatch card deleted.');
+      if (selectedBatchId) {
+        loadDispatchesForBatch(selectedBatchId);
+      }
+    } catch (err) {
+      alert('Failed deleting dispatch: ' + err.message);
+    }
   };
 
   const handleSaveDispatchHeader = async (e) => {
@@ -172,10 +223,14 @@ export const DispatchPage = () => {
         userProfile?.name
       );
 
-      setSuccessMsg(`Vehicle ${payload.vehicleNumber} saved! You can now log set weights below.`);
+      setSuccessMsg(`Vehicle card for ${payload.vehicleNumber} saved successfully!`);
       setActiveDispatch(saved);
       setShowHeaderForm(false);
-      loadDispatchesForBatch(selectedBatch.id);
+      await loadDispatchesForBatch(selectedBatch.id);
+      
+      // Auto open weighing modal for newly created/edited dispatch
+      setShowWeighingModal(true);
+      await loadBoxSetsForDispatch(saved.id, saved);
     } catch (err) {
       alert('Failed saving dispatch details: ' + err.message);
     } finally {
@@ -262,7 +317,8 @@ export const DispatchPage = () => {
       setSuccessMsg(`Box Set #${setPayload.boxSetNumber} saved instantly to database!`);
       setEditingBoxSetId(null);
       setActiveDispatch(updatedDispatch);
-      loadBoxSetsForDispatch(activeDispatch.id);
+      await loadDispatchesForBatch(selectedBatch.id);
+      await loadBoxSetsForDispatch(activeDispatch.id, updatedDispatch);
     } catch (err) {
       alert('Failed saving box set: ' + err.message);
     } finally {
@@ -291,7 +347,8 @@ export const DispatchPage = () => {
 
       await dbSaveDispatch(updatedDispatch);
       setActiveDispatch(updatedDispatch);
-      loadBoxSetsForDispatch(activeDispatch.id);
+      await loadDispatchesForBatch(selectedBatch.id);
+      await loadBoxSetsForDispatch(activeDispatch.id, updatedDispatch);
     } catch (err) {
       alert('Failed deleting box set.');
     }
@@ -313,7 +370,7 @@ export const DispatchPage = () => {
   const totalNetWeight = boxSets.reduce((acc, s) => acc + (Number(s.totalChickenWeight) || 0), 0);
   const avgBirdWeight = totalDispatchedBirds > 0 ? parseFloat((totalNetWeight / totalDispatchedBirds).toFixed(3)) : 0;
 
-  if (loading) return <div className="p-8 text-center text-slate-500">Loading Dispatch Management...</div>;
+  if (loading) return <div className="p-8 text-center text-slate-500 font-semibold">Loading Dispatch Management...</div>;
 
   return (
     <div className="space-y-6">
@@ -321,15 +378,32 @@ export const DispatchPage = () => {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-slate-900">Chicken Dispatch & Weighing</h1>
-          <p className="text-sm font-medium text-slate-500">Manage vehicle dispatches, set-by-set weighing, and trader invoices.</p>
+          <p className="text-sm font-medium text-slate-500">Manage vehicle dispatch cards, empty/load set weighing, and trader invoices.</p>
         </div>
-        <button
-          onClick={handleOpenNewDispatch}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95 shrink-0"
-        >
-          <Plus className="h-4 w-4" />
-          <span>+ Add New Vehicle Dispatch</span>
-        </button>
+        
+        <div className="flex items-center gap-3">
+          {batches.length > 1 && (
+            <select
+              value={selectedBatchId}
+              onChange={(e) => setSelectedBatchId(e.target.value)}
+              className="rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-700 shadow-sm focus:border-emerald-600"
+            >
+              {batches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  Batch #{b.batchNumber}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <button
+            onClick={handleOpenNewDispatch}
+            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95 shrink-0"
+          >
+            <Plus className="h-4 w-4" />
+            <span>+ Add New Vehicle Dispatch</span>
+          </button>
+        </div>
       </div>
 
       {successMsg && (
@@ -339,390 +413,489 @@ export const DispatchPage = () => {
         </div>
       )}
 
-      {/* Concurrent Active Vehicles Bar */}
-      {dispatches.length > 0 && (
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
-          <span className="text-xs font-bold text-slate-500 shrink-0">Active Vehicles:</span>
-          {dispatches.map((d) => (
-            <button
-              key={d.id}
-              onClick={() => setActiveDispatch(d)}
-              className={`flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-bold transition-all shrink-0 ${
-                activeDispatch?.id === d.id
-                  ? 'border-emerald-600 bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm ring-2 ring-emerald-500/20'
-                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300'
-              }`}
-            >
-              <Truck className="h-3.5 w-3.5" />
-              <span>{d.vehicleNumber} ({d.vehicleName || 'Vehicle'})</span>
-              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded ${
-                activeDispatch?.id === d.id ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
-              }`}>
-                {d.status || 'In Progress'}
-              </span>
-            </button>
-          ))}
+      {/* Vehicle Cards Grid View */}
+      {dispatches.length === 0 ? (
+        <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white p-12 text-center space-y-4">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+            <Truck className="h-8 w-8" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-slate-900">No Vehicle Dispatches Created Yet</h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+              Create a vehicle dispatch card for your trader or transport truck. Once created, click on the card to log set-by-set box weighing.
+            </p>
+          </div>
+          <button
+            onClick={handleOpenNewDispatch}
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-all"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Create First Vehicle Card</span>
+          </button>
+        </div>
+      ) : (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+              <Truck className="h-4 w-4 text-emerald-600" />
+              <span>Active Vehicle Cards ({dispatches.length})</span>
+            </h2>
+            <span className="text-xs text-slate-400 font-medium">Click any vehicle card to enter set weights</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {dispatches.map((d) => {
+              const dSets = allBoxSetsMap[d.id] || [];
+              const weighedBoxes = dSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
+              const totalWeight = dSets.reduce((acc, s) => acc + (Number(s.totalChickenWeight) || 0), 0);
+              const totalBirds = dSets.reduce((acc, s) => acc + (Number(s.chickenCount) || 0), 0);
+              const avgWeight = totalBirds > 0 ? (totalWeight / totalBirds).toFixed(3) : '0.000';
+              const progressPct = Math.min(100, Math.round((weighedBoxes / (d.totalBoxCount || 1)) * 100));
+              const isCompleted = d.status === 'Completed' || weighedBoxes >= d.totalBoxCount;
+
+              return (
+                <div
+                  key={d.id}
+                  onClick={() => handleOpenWeighingModal(d)}
+                  className="group relative flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-emerald-500 hover:shadow-md cursor-pointer"
+                >
+                  {/* Top Bar */}
+                  <div>
+                    <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                          <Truck className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h3 className="font-extrabold text-sm text-slate-900 group-hover:text-emerald-700 transition-colors">
+                            {d.vehicleNumber}
+                          </h3>
+                          <p className="text-xs font-semibold text-slate-500">{d.vehicleName || 'Vehicle'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Badge variant={isCompleted ? 'Completed' : 'In Progress'}>
+                          {isCompleted ? 'Completed' : 'In Progress'}
+                        </Badge>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveDispatch(d);
+                            setDispatchHeader({
+                              vehicleName: d.vehicleName || '',
+                              vehicleNumber: d.vehicleNumber || '',
+                              driverName: d.driverName || '',
+                              driverMobileNumber: d.driverMobileNumber || '',
+                              dispatchDate: d.dispatchDate || new Date().toISOString().split('T')[0],
+                              totalBoxCount: d.totalBoxCount || 20,
+                              chickenCountPerBox: d.chickenCountPerBox || 12
+                            });
+                            setShowHeaderForm(true);
+                          }}
+                          className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                          title="Edit Vehicle Details"
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => handleDeleteDispatch(d.id, e)}
+                          className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                          title="Delete Dispatch Card"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Driver & Date Details */}
+                    <div className="py-3 space-y-1.5 text-xs text-slate-600">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 font-medium flex items-center gap-1">
+                          <UserCheck className="h-3.5 w-3.5" /> Driver:
+                        </span>
+                        <span className="font-bold text-slate-800">{d.driverName || '—'}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 font-medium flex items-center gap-1">
+                          <Phone className="h-3.5 w-3.5" /> Phone:
+                        </span>
+                        <span className="font-semibold text-slate-700">{d.driverMobileNumber || '—'}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 font-medium flex items-center gap-1">
+                          <Calendar className="h-3.5 w-3.5" /> Date:
+                        </span>
+                        <span className="font-medium text-slate-700">{d.dispatchDate}</span>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="rounded-xl bg-slate-50 p-3 border border-slate-100 space-y-1.5 my-1">
+                      <div className="flex justify-between text-xs font-bold">
+                        <span className="text-slate-600">Weighing Progress</span>
+                        <span className="text-emerald-700">{weighedBoxes} / {d.totalBoxCount} Boxes ({progressPct}%)</span>
+                      </div>
+                      <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-emerald-600 transition-all duration-300"
+                          style={{ width: `${progressPct}%` }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    {/* Key Metrics Grid */}
+                    <div className="grid grid-cols-3 gap-2 text-center py-2 border-t border-slate-100">
+                      <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                        <span className="text-[10px] uppercase font-extrabold text-slate-400 block">Net Wt</span>
+                        <span className="text-xs font-black text-slate-900">{totalWeight.toFixed(1)} kg</span>
+                      </div>
+                      <div className="bg-emerald-50 p-2 rounded-xl border border-emerald-100">
+                        <span className="text-[10px] uppercase font-extrabold text-emerald-700 block">Birds</span>
+                        <span className="text-xs font-black text-emerald-900">{totalBirds}</span>
+                      </div>
+                      <div className="bg-teal-50 p-2 rounded-xl border border-teal-100">
+                        <span className="text-[10px] uppercase font-extrabold text-teal-700 block">Avg Wt</span>
+                        <span className="text-xs font-black text-teal-900">{avgWeight} kg</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CTA Button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenWeighingModal(d);
+                    }}
+                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 py-2.5 text-xs font-bold text-white shadow-sm hover:from-emerald-700 hover:to-teal-700 transition-all"
+                  >
+                    <Scale className="h-4 w-4" />
+                    <span>Enter Empty & Load Weight ({dSets.length} Sets)</span>
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      {/* Main Grid: Vehicle Info & Weighing Form */}
+      {/* WEIGHING WORKSPACE MODAL (Opened by clicking a Vehicle Card) */}
       {activeDispatch && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* Vehicle Setup Info Card */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm lg:col-span-1">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <Modal
+          isOpen={showWeighingModal}
+          onClose={() => setShowWeighingModal(false)}
+          title={`Weighing Workspace: ${activeDispatch.vehicleNumber} (${activeDispatch.vehicleName || 'Vehicle'})`}
+          maxWidth="max-w-4xl"
+        >
+          <div className="space-y-6">
+            {/* Quick Vehicle Info Strip */}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 p-3.5 border border-slate-200 text-xs">
+              <div className="flex items-center gap-4">
+                <div>
+                  <span className="text-slate-400 font-medium block">Driver & Phone</span>
+                  <span className="font-bold text-slate-900">{activeDispatch.driverName} ({activeDispatch.driverMobileNumber || '—'})</span>
+                </div>
+                <div className="hidden sm:block border-l border-slate-200 pl-4">
+                  <span className="text-slate-400 font-medium block">Target Boxes</span>
+                  <span className="font-bold text-slate-900">{activeDispatch.totalBoxCount} Boxes ({activeDispatch.chickenCountPerBox} Birds/Box)</span>
+                </div>
+                <div className="hidden sm:block border-l border-slate-200 pl-4">
+                  <span className="text-slate-400 font-medium block">Date</span>
+                  <span className="font-bold text-slate-900">{activeDispatch.dispatchDate}</span>
+                </div>
+              </div>
+
               <div className="flex items-center gap-2">
-                <Truck className="h-5 w-5 text-emerald-600" />
-                <h2 className="text-sm font-bold text-slate-900">Vehicle & Trader Setup</h2>
-              </div>
-              <button
-                onClick={() => {
-                  setDispatchHeader({
-                    vehicleName: activeDispatch.vehicleName || '',
-                    vehicleNumber: activeDispatch.vehicleNumber || '',
-                    driverName: activeDispatch.driverName || '',
-                    driverMobileNumber: activeDispatch.driverMobileNumber || '',
-                    dispatchDate: activeDispatch.dispatchDate || new Date().toISOString().split('T')[0],
-                    totalBoxCount: activeDispatch.totalBoxCount || 20,
-                    chickenCountPerBox: activeDispatch.chickenCountPerBox || 12
-                  });
-                  setShowHeaderForm(true);
-                }}
-                className="text-xs text-emerald-600 hover:underline font-bold flex items-center gap-1"
-              >
-                <Edit className="h-3.5 w-3.5" /> Edit
-              </button>
-            </div>
-
-            <div className="space-y-2.5 text-xs">
-              <div className="flex justify-between border-b border-slate-100 pb-2">
-                <span className="text-slate-500 font-medium">Trader / Vehicle Name:</span>
-                <span className="font-bold text-slate-900">{activeDispatch.vehicleName || '—'}</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-100 pb-2">
-                <span className="text-slate-500 font-medium">Vehicle Number:</span>
-                <span className="font-extrabold text-emerald-700">{activeDispatch.vehicleNumber}</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-100 pb-2">
-                <span className="text-slate-500 font-medium">Driver Details:</span>
-                <span className="font-bold text-slate-900">{activeDispatch.driverName} ({activeDispatch.driverMobileNumber || '—'})</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-100 pb-2">
-                <span className="text-slate-500 font-medium">Dispatch Date:</span>
-                <span className="font-bold text-slate-900">{activeDispatch.dispatchDate}</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-100 pb-2">
-                <span className="text-slate-500 font-medium">Target Total Boxes:</span>
-                <span className="font-bold text-slate-900">{activeDispatch.totalBoxCount} Boxes</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-medium">Default Birds / Box:</span>
-                <span className="font-bold text-slate-900">{activeDispatch.chickenCountPerBox} Birds</span>
-              </div>
-            </div>
-
-            {/* Overall Live Weighing Progress */}
-            <div className="rounded-xl bg-slate-50 p-3 border border-slate-200 space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                <span>Boxes Weighed Progress</span>
-                <span className="text-emerald-700">{totalWeighedBoxes} / {activeDispatch.totalBoxCount} Boxes</span>
-              </div>
-              <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
-                <div
-                  className="h-full bg-emerald-600 transition-all duration-300"
-                  style={{ width: `${Math.min(100, (totalWeighedBoxes / (activeDispatch.totalBoxCount || 1)) * 100)}%` }}
-                ></div>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setShowInvoiceModal(true)}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-slate-800 transition-colors"
-            >
-              <FileText className="h-4 w-4 text-emerald-400" />
-              <span>Generate Trader Invoice</span>
-            </button>
-          </div>
-
-          {/* Weighing Entry Form (Tare & Gross) */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm lg:col-span-2">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <Scale className="h-5 w-5 text-emerald-600" />
-                <h2 className="text-sm font-bold text-slate-900">
-                  {editingBoxSetId ? `Edit Box Set #${setForm.boxSetNumber}` : `Set Weighing Entry (Box Set #${setForm.boxSetNumber})`}
-                </h2>
-              </div>
-              <span className="text-xs font-semibold text-slate-400">Data saves instantly to DB ✓</span>
-            </div>
-
-            <form onSubmit={handleSaveBoxSet} className="space-y-4">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Set Number *</label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    value={setForm.boxSetNumber}
-                    onChange={(e) => setSetForm({ ...setForm, boxSetNumber: Number(e.target.value) })}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-slate-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Boxes in Set (Default 5) *</label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    value={setForm.boxesInSet}
-                    onChange={(e) => handleBoxesInSetChange(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Chickens in Set *</label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    value={setForm.chickenCount}
-                    onChange={(e) => setSetForm({ ...setForm, chickenCount: Number(e.target.value) })}
-                    className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-emerald-700 focus:border-emerald-600"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Empty Box Tare Weight (kg) *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    step="0.1"
-                    placeholder="e.g. 25.0 kg"
-                    value={setForm.emptyBoxWeight}
-                    onChange={(e) => setSetForm({ ...setForm, emptyBoxWeight: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
-                  />
-                  <span className="text-[10px] text-slate-400 font-medium">Auto-calculated: 5kg × {setForm.boxesInSet} boxes</span>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Loaded Gross Weight (kg) *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min="0.1"
-                    step="0.1"
-                    placeholder="e.g. 145.0 kg"
-                    value={setForm.loadedWeight}
-                    onChange={(e) => setSetForm({ ...setForm, loadedWeight: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-black text-slate-900 focus:border-emerald-600"
-                  />
-                </div>
-              </div>
-
-              {/* Live Preview Box */}
-              {(() => {
-                const preview = calculateBoxSetWeights(setForm.loadedWeight, setForm.emptyBoxWeight, setForm.chickenCount);
-                return (
-                  <div className="rounded-xl bg-emerald-50/60 border border-emerald-100 p-3 grid grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-700 block">Net Chicken Weight</span>
-                      <span className="text-base font-black text-emerald-900">{preview.totalChickenWeight} kg</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-700 block">Average Weight / Bird</span>
-                      <span className="text-base font-black text-emerald-900">{preview.averageChickenWeight} kg</span>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              <div className="flex gap-2">
-                {editingBoxSetId && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingBoxSetId(null);
-                      setSetForm({
-                        boxSetNumber: boxSets.length + 1,
-                        boxesInSet: 5,
-                        emptyBoxWeight: 25,
-                        loadedWeight: '',
-                        chickenCount: 60
-                      });
-                    }}
-                    className="w-1/3 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
-                  >
-                    Cancel
-                  </button>
-                )}
+                <Badge variant={activeDispatch.status}>{activeDispatch.status}</Badge>
                 <button
-                  type="submit"
-                  disabled={saving}
-                  className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                  onClick={() => setShowInvoiceModal(true)}
+                  className="flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-slate-800 transition-colors"
                 >
-                  <Save className="h-4 w-4" />
-                  {saving ? 'Saving Set...' : editingBoxSetId ? 'Update Set Weight' : `Save Box Set #${setForm.boxSetNumber} (Instantly)`}
+                  <FileText className="h-3.5 w-3.5 text-emerald-400" />
+                  <span>Trader Invoice</span>
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+            </div>
 
-      {/* Live Dispatched KPI Summary Cards */}
-      {activeDispatch && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
-            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Total Net Weight</span>
-            <span className="text-xl font-black text-slate-900">{totalNetWeight} <span className="text-xs font-medium text-slate-500">kg</span></span>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
-            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Birds Dispatched</span>
-            <span className="text-xl font-black text-emerald-700">{totalDispatchedBirds} <span className="text-xs font-medium text-slate-500">birds</span></span>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
-            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Average Bird Weight</span>
-            <span className="text-xl font-black text-teal-700">{avgBirdWeight} <span className="text-xs font-medium text-slate-500">kg/bird</span></span>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
-            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Sets Weighed</span>
-            <span className="text-xl font-black text-slate-900">{boxSets.length} <span className="text-xs font-medium text-slate-500">sets ({totalWeighedBoxes} boxes)</span></span>
-          </div>
-        </div>
-      )}
-
-      {/* Box Sets History - Mobile Cards & Desktop Table */}
-      {activeDispatch && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
-            <h2 className="text-base font-bold text-slate-900">
-              Box Sets History ({activeDispatch.vehicleNumber})
-            </h2>
-            <Badge variant={activeDispatch.status}>{activeDispatch.status}</Badge>
-          </div>
-
-          {/* Mobile Card View */}
-          <div className="sm:hidden space-y-3">
-            {boxSets.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-400">
-                No box sets recorded for this vehicle yet. Use the weighing form above to enter set weights.
+            {/* Weighing Entry Form (Tare & Gross) */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Scale className="h-5 w-5 text-emerald-600" />
+                  <h3 className="text-sm font-bold text-slate-900">
+                    {editingBoxSetId ? `Edit Box Set #${setForm.boxSetNumber}` : `Set Weighing Entry (Box Set #${setForm.boxSetNumber})`}
+                  </h3>
+                </div>
+                <span className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
+                  <CheckCircle2 className="h-4 w-4" /> Saves instantly to DB
+                </span>
               </div>
-            ) : (
-              boxSets.map((s) => (
-                <div key={s.id} className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-2.5 shadow-2xs">
-                  <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
-                    <span className="text-xs font-black text-slate-900">Box Set #{s.boxSetNumber} ({s.boxesInSet || 5} Boxes)</span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => handleEditBoxSet(s)}
-                        className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-200/60"
-                        title="Edit Box Set"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteBoxSet(s.id)}
-                        className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-100/60"
-                        title="Delete Box Set"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
+
+              <form onSubmit={handleSaveBoxSet} className="space-y-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Set Number *</label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      value={setForm.boxSetNumber}
+                      onChange={(e) => setSetForm({ ...setForm, boxSetNumber: Number(e.target.value) })}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-slate-900"
+                    />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="bg-white p-2 rounded-lg border border-slate-100">
-                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Tare / Loaded Wt</span>
-                      <span className="font-bold text-slate-700">{s.emptyBoxWeight} kg / {s.loadedWeight} kg</span>
-                    </div>
-                    <div className="bg-emerald-50 p-2 rounded-lg border border-emerald-100">
-                      <span className="text-[10px] text-emerald-700 font-bold block uppercase">Net Chicken Wt</span>
-                      <span className="font-black text-emerald-900">{s.totalChickenWeight} kg</span>
-                    </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Boxes in Set (Default 5) *</label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      value={setForm.boxesInSet}
+                      onChange={(e) => handleBoxesInSetChange(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600"
+                    />
                   </div>
 
-                  <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-200/60 text-slate-600 font-medium">
-                    <span>Birds: <strong className="text-slate-900">{s.chickenCount}</strong></span>
-                    <span>Avg: <strong className="text-slate-900">{s.averageChickenWeight} kg/bird</strong></span>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Chickens in Set *</label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      value={setForm.chickenCount}
+                      onChange={(e) => setSetForm({ ...setForm, chickenCount: Number(e.target.value) })}
+                      className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-emerald-700 focus:border-emerald-600"
+                    />
                   </div>
                 </div>
-              ))
-            )}
-          </div>
 
-          {/* Desktop Table View */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
-                  <th className="pb-3 px-2">Set #</th>
-                  <th className="pb-3 px-2">Boxes in Set</th>
-                  <th className="pb-3 px-2">Empty Box Wt</th>
-                  <th className="pb-3 px-2">Loaded Wt</th>
-                  <th className="pb-3 px-2">Birds Count</th>
-                  <th className="pb-3 px-2">Total Net Wt</th>
-                  <th className="pb-3 px-2">Avg Weight</th>
-                  <th className="pb-3 px-2 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-medium">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Empty Box Tare Weight (kg) *
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      step="0.1"
+                      placeholder="e.g. 25.0 kg"
+                      value={setForm.emptyBoxWeight}
+                      onChange={(e) => setSetForm({ ...setForm, emptyBoxWeight: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
+                    />
+                    <span className="text-[10px] text-slate-400 font-medium">Auto-calculated: 5kg × {setForm.boxesInSet} boxes</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Loaded Gross Weight (kg) *
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="0.1"
+                      step="0.1"
+                      placeholder="e.g. 145.0 kg"
+                      value={setForm.loadedWeight}
+                      onChange={(e) => setSetForm({ ...setForm, loadedWeight: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-black text-slate-900 focus:border-emerald-600"
+                    />
+                  </div>
+                </div>
+
+                {/* Live Preview Box */}
+                {(() => {
+                  const preview = calculateBoxSetWeights(setForm.loadedWeight, setForm.emptyBoxWeight, setForm.chickenCount);
+                  return (
+                    <div className="rounded-xl bg-emerald-50/70 border border-emerald-100 p-3 grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-700 block">Net Chicken Weight</span>
+                        <span className="text-base font-black text-emerald-900">{preview.totalChickenWeight} kg</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-700 block">Average Weight / Bird</span>
+                        <span className="text-base font-black text-emerald-900">{preview.averageChickenWeight} kg</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="flex gap-2">
+                  {editingBoxSetId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingBoxSetId(null);
+                        setSetForm({
+                          boxSetNumber: boxSets.length + 1,
+                          boxesInSet: 5,
+                          emptyBoxWeight: 25,
+                          loadedWeight: '',
+                          chickenCount: 60
+                        });
+                      }}
+                      className="w-1/3 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
+                    >
+                      Cancel Edit
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                  >
+                    <Save className="h-4 w-4" />
+                    {saving ? 'Saving Set...' : editingBoxSetId ? 'Update Set Weight' : `Save Box Set #${setForm.boxSetNumber} (Instantly)`}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Live Dispatched KPI Summary Cards */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs">
+                <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Total Net Weight</span>
+                <span className="text-lg font-black text-slate-900">{totalNetWeight} <span className="text-xs font-medium text-slate-500">kg</span></span>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs">
+                <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Birds Dispatched</span>
+                <span className="text-lg font-black text-emerald-700">{totalDispatchedBirds} <span className="text-xs font-medium text-slate-500">birds</span></span>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs">
+                <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Average Bird Weight</span>
+                <span className="text-lg font-black text-teal-700">{avgBirdWeight} <span className="text-xs font-medium text-slate-500">kg/bird</span></span>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs">
+                <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Sets Weighed</span>
+                <span className="text-lg font-black text-slate-900">{boxSets.length} <span className="text-xs font-medium text-slate-500">sets ({totalWeighedBoxes} boxes)</span></span>
+              </div>
+            </div>
+
+            {/* Box Sets History - Mobile Cards & Desktop Table */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-emerald-600" />
+                  <span>Box Sets History ({activeDispatch.vehicleNumber})</span>
+                </h3>
+                <span className="text-xs font-semibold text-slate-500">{boxSets.length} Sets Recorded</span>
+              </div>
+
+              {/* Mobile View */}
+              <div className="sm:hidden space-y-3">
                 {boxSets.length === 0 ? (
-                  <tr>
-                    <td colSpan="8" className="py-6 text-center text-slate-400">No box sets recorded for this vehicle yet.</td>
-                  </tr>
+                  <div className="py-6 text-center text-xs text-slate-400">
+                    No box sets recorded for this vehicle yet. Use the weighing form above to enter set weights.
+                  </div>
                 ) : (
                   boxSets.map((s) => (
-                    <tr key={s.id} className="hover:bg-slate-50">
-                      <td className="py-3 px-2 font-bold text-slate-900">Box Set #{s.boxSetNumber}</td>
-                      <td className="py-3 px-2 text-slate-700 font-bold">{s.boxesInSet || 5} Boxes</td>
-                      <td className="py-3 px-2 text-slate-600">{s.emptyBoxWeight} kg</td>
-                      <td className="py-3 px-2 text-slate-900 font-bold">{s.loadedWeight} kg</td>
-                      <td className="py-3 px-2 text-emerald-700 font-bold">{s.chickenCount}</td>
-                      <td className="py-3 px-2 text-emerald-600 font-black">{s.totalChickenWeight} kg</td>
-                      <td className="py-3 px-2 font-bold text-slate-900">{s.averageChickenWeight} kg</td>
-                      <td className="py-3 px-2 text-right">
-                        <div className="flex items-center justify-end gap-1">
+                    <div key={s.id} className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 space-y-2 shadow-2xs">
+                      <div className="flex items-center justify-between border-b border-slate-200/60 pb-1.5">
+                        <span className="text-xs font-black text-slate-900">Box Set #{s.boxSetNumber} ({s.boxesInSet || 5} Boxes)</span>
+                        <div className="flex items-center gap-1">
                           <button
                             onClick={() => handleEditBoxSet(s)}
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                            className="rounded-lg p-1 text-slate-500 hover:bg-slate-200/60"
                             title="Edit Box Set"
                           >
                             <Edit className="h-3.5 w-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteBoxSet(s.id)}
-                            className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
+                            className="rounded-lg p-1 text-rose-500 hover:bg-rose-100/60"
                             title="Delete Box Set"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
-                      </td>
-                    </tr>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="bg-white p-2 rounded-lg border border-slate-100">
+                          <span className="text-[10px] text-slate-400 font-bold block uppercase">Tare / Loaded Wt</span>
+                          <span className="font-bold text-slate-700">{s.emptyBoxWeight} kg / {s.loadedWeight} kg</span>
+                        </div>
+                        <div className="bg-emerald-50 p-2 rounded-lg border border-emerald-100">
+                          <span className="text-[10px] text-emerald-700 font-bold block uppercase">Net Chicken Wt</span>
+                          <span className="font-black text-emerald-900">{s.totalChickenWeight} kg</span>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-200/60 text-slate-600 font-medium">
+                        <span>Birds: <strong className="text-slate-900">{s.chickenCount}</strong></span>
+                        <span>Avg: <strong className="text-slate-900">{s.averageChickenWeight} kg/bird</strong></span>
+                      </div>
+                    </div>
                   ))
                 )}
-              </tbody>
-            </table>
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
+                      <th className="pb-3 px-2">Set #</th>
+                      <th className="pb-3 px-2">Boxes in Set</th>
+                      <th className="pb-3 px-2">Empty Box Wt</th>
+                      <th className="pb-3 px-2">Loaded Wt</th>
+                      <th className="pb-3 px-2">Birds Count</th>
+                      <th className="pb-3 px-2">Total Net Wt</th>
+                      <th className="pb-3 px-2">Avg Weight</th>
+                      <th className="pb-3 px-2 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {boxSets.length === 0 ? (
+                      <tr>
+                        <td colSpan="8" className="py-6 text-center text-slate-400">No box sets recorded for this vehicle yet.</td>
+                      </tr>
+                    ) : (
+                      boxSets.map((s) => (
+                        <tr key={s.id} className="hover:bg-slate-50">
+                          <td className="py-3 px-2 font-bold text-slate-900">Box Set #{s.boxSetNumber}</td>
+                          <td className="py-3 px-2 text-slate-700 font-bold">{s.boxesInSet || 5} Boxes</td>
+                          <td className="py-3 px-2 text-slate-600">{s.emptyBoxWeight} kg</td>
+                          <td className="py-3 px-2 text-slate-900 font-bold">{s.loadedWeight} kg</td>
+                          <td className="py-3 px-2 text-emerald-700 font-bold">{s.chickenCount}</td>
+                          <td className="py-3 px-2 text-emerald-600 font-black">{s.totalChickenWeight} kg</td>
+                          <td className="py-3 px-2 font-bold text-slate-900">{s.averageChickenWeight} kg</td>
+                          <td className="py-3 px-2 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => handleEditBoxSet(s)}
+                                className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                                title="Edit Box Set"
+                              >
+                                <Edit className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteBoxSet(s.id)}
+                                className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
+                                title="Delete Box Set"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
-        </div>
+        </Modal>
       )}
 
-      {/* Vehicle Header Form Modal (Step 1 Setup) */}
+      {/* Vehicle Header Form Modal (Create / Edit Vehicle Card) */}
       <Modal
         isOpen={showHeaderForm}
         onClose={() => setShowHeaderForm(false)}
-        title={activeDispatch ? `Edit Vehicle Header: ${activeDispatch.vehicleNumber}` : "Setup New Vehicle Dispatch"}
+        title={activeDispatch ? `Edit Vehicle Card: ${activeDispatch.vehicleNumber}` : "Setup New Vehicle Dispatch Card"}
       >
         <form onSubmit={handleSaveDispatchHeader} className="space-y-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -733,7 +906,7 @@ export const DispatchPage = () => {
                 required
                 value={dispatchHeader.vehicleName}
                 onChange={(e) => setDispatchHeader({ ...dispatchHeader, vehicleName: e.target.value })}
-                placeholder="e.g. Sri Amman Poultry / Eicher Pro"
+                placeholder="e.g. Sri Amman Poultry / Eicher"
                 className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
               />
             </div>
@@ -824,7 +997,7 @@ export const DispatchPage = () => {
               className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
             >
               <Save className="h-4 w-4" />
-              {saving ? 'Saving Header...' : activeDispatch ? 'Update Header' : 'Create & Start Weighing'}
+              {saving ? 'Saving Card...' : activeDispatch ? 'Update Card' : 'Save & Open Weighing'}
             </button>
           </div>
         </form>
@@ -912,5 +1085,3 @@ export const DispatchPage = () => {
     </div>
   );
 };
-
-
