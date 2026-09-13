@@ -53,7 +53,7 @@ export const TraderInvoiceModal = ({
   const grandTotal = totalNetWeight * currentRate;
   const avgWeight = totalBirds > 0 ? (totalNetWeight / totalBirds).toFixed(3) : (dispatch?.averageWeight || 0);
 
-  // PDF Generation Function
+  // PDF Generation Function - with oklch color parser fix
   const handleDownloadPDF = async () => {
     const el = document.getElementById('trader-invoice-document');
     if (!el) return;
@@ -63,7 +63,56 @@ export const TraderInvoiceModal = ({
         scale: 2,
         useCORS: true,
         logging: false,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        onclone: (clonedDoc) => {
+          const container = clonedDoc.getElementById('trader-invoice-document');
+          if (!container) return;
+
+          const dummyCanvas = document.createElement('canvas');
+          const ctx = dummyCanvas.getContext('2d');
+
+          const elements = [container, ...Array.from(container.querySelectorAll('*'))];
+          elements.forEach((node) => {
+            const style = window.getComputedStyle(node);
+            const colorProps = [
+              'color',
+              'backgroundColor',
+              'borderColor',
+              'borderTopColor',
+              'borderRightColor',
+              'borderBottomColor',
+              'borderLeftColor',
+              'fill',
+              'stroke'
+            ];
+
+            colorProps.forEach((prop) => {
+              const val = style.getPropertyValue(prop) || style[prop];
+              if (val && typeof val === 'string' && val.includes('oklch')) {
+                try {
+                  if (ctx) {
+                    ctx.fillStyle = '#000000';
+                    ctx.fillStyle = val;
+                    const hexOrRgb = ctx.fillStyle;
+                    if (hexOrRgb && !hexOrRgb.includes('oklch')) {
+                      node.style.setProperty(prop, hexOrRgb, 'important');
+                      return;
+                    }
+                  }
+                } catch (_e) {
+                  // fallback
+                }
+                if (prop.toLowerCase().includes('background')) {
+                  node.style.setProperty(prop, '#ffffff', 'important');
+                } else if (prop.toLowerCase().includes('border')) {
+                  node.style.setProperty(prop, '#cbd5e1', 'important');
+                } else {
+                  node.style.setProperty(prop, '#0f172a', 'important');
+                }
+              }
+            });
+          });
+        }
       });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
@@ -132,7 +181,7 @@ Thank you for your business!`;
           <div className="flex items-center gap-2">
             <button
               onClick={handleSendToTraderWhatsApp}
-              className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-all active:scale-95"
+              className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-all active:scale-95 cursor-pointer"
             >
               <Send className="h-3.5 w-3.5" />
               <span>Send to Trader (WhatsApp)</span>
@@ -141,7 +190,7 @@ Thank you for your business!`;
             <button
               onClick={handleDownloadPDF}
               disabled={downloading}
-              className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
             >
               <Download className="h-3.5 w-3.5 text-emerald-400" />
               <span>{downloading ? 'Exporting PDF...' : 'Download PDF'}</span>
@@ -149,7 +198,7 @@ Thank you for your business!`;
 
             <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors"
+              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
             >
               <Printer className="h-3.5 w-3.5 text-slate-500" />
               <span className="hidden sm:inline">Print</span>
@@ -160,22 +209,31 @@ Thank you for your business!`;
         {/* Printable / Capturable Document Container */}
         <div
           id="trader-invoice-document"
-          className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-xs space-y-6 text-slate-900 font-sans"
+          style={{ backgroundColor: '#ffffff', color: '#0f172a' }}
+          className="rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6 font-sans"
         >
           {/* Farm Brand Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b-2 border-emerald-600 pb-5 gap-4">
+          <div
+            style={{ borderBottom: '2px solid #059669' }}
+            className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-5 gap-4"
+          >
             <div className="flex items-center gap-4">
               <img
                 src="/kg-logo.jpg"
                 alt="KG Poultry Farms Official Logo"
-                className="h-16 w-16 sm:h-20 sm:w-20 object-contain rounded-2xl shadow-xs ring-1 ring-emerald-500/30 p-1 bg-white shrink-0"
+                className="h-16 w-16 sm:h-20 sm:w-20 object-contain rounded-2xl shadow-xs border border-emerald-200 p-1 bg-white shrink-0"
               />
               <div>
                 <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
                   <span>KG POULTRY FARMS</span>
-                  <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800 uppercase tracking-wider">Verified Farm</span>
+                  <span
+                    style={{ backgroundColor: '#d1fae5', color: '#065f46' }}
+                    className="rounded-md px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider"
+                  >
+                    Verified Farm
+                  </span>
                 </h1>
-                <p className="text-xs font-semibold text-emerald-700">Broiler Meat Sales & Wholesale Vehicle Dispatch</p>
+                <p style={{ color: '#047857' }} className="text-xs font-semibold">Broiler Meat Sales & Wholesale Vehicle Dispatch</p>
                 <p className="text-[11px] font-medium text-slate-500 mt-1">
                   Plot #45, Farm Zone, Palani Road, Dindigul, Tamil Nadu - 624001
                 </p>
@@ -185,15 +243,21 @@ Thank you for your business!`;
               </div>
             </div>
 
-            <div className="text-left sm:text-right bg-emerald-50/60 p-3 rounded-2xl border border-emerald-100 shrink-0">
-              <div className="text-xs uppercase font-extrabold tracking-wider text-emerald-700">Official Invoice</div>
+            <div
+              style={{ backgroundColor: '#f0fdf4', borderColor: '#d1fae5' }}
+              className="text-left sm:text-right p-3 rounded-2xl border shrink-0"
+            >
+              <div style={{ color: '#047857' }} className="text-xs uppercase font-extrabold tracking-wider">Official Invoice</div>
               <div className="text-lg font-black text-slate-900 tracking-tight mt-0.5">{invNumber}</div>
               <div className="text-xs text-slate-600 font-bold mt-1">Date: {invDate}</div>
             </div>
           </div>
 
           {/* Trader & Dispatch Details Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50/70 p-4 rounded-2xl border border-slate-200 text-xs">
+          <div
+            style={{ backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }}
+            className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl border text-xs"
+          >
             <div className="space-y-1.5">
               <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider block">Billed To (Trader / Customer)</span>
               <div className="font-black text-slate-900 text-sm">{customerName}</div>
@@ -205,7 +269,7 @@ Thank you for your business!`;
               <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider block">Vehicle & Transport Info</span>
               <div className="font-bold text-slate-900 flex items-center gap-1.5">
                 <Truck className="h-3.5 w-3.5 text-emerald-600" />
-                <span>Vehicle Number: <strong className="text-emerald-700">{vehicleNo}</strong></span>
+                <span>Vehicle Number: <strong style={{ color: '#047857' }}>{vehicleNo}</strong></span>
               </div>
               <div className="text-slate-600 font-medium flex items-center gap-1.5">
                 <User className="h-3.5 w-3.5 text-slate-400" />
@@ -225,9 +289,9 @@ Thank you for your business!`;
               <span>Weighing Scale Breakdown (Tare & Gross Load)</span>
             </h3>
 
-            <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <div style={{ borderColor: '#e2e8f0' }} className="overflow-x-auto rounded-xl border">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200">
+                <thead style={{ backgroundColor: '#f1f5f9', color: '#334155' }} className="font-bold uppercase tracking-wider text-[10px] border-b border-slate-200">
                   <tr>
                     <th className="py-2.5 px-3">Set #</th>
                     <th className="py-2.5 px-3">Boxes</th>
@@ -259,7 +323,7 @@ Thank you for your business!`;
                           <td className="py-2 px-3">{boxesInSet} Boxes</td>
                           <td className="py-2 px-3 text-slate-500">{s.emptyBoxWeight} kg ({totalEmptyTare} kg total)</td>
                           <td className="py-2 px-3 font-semibold">{isLoaded ? `${gross} kg` : 'Pending'}</td>
-                          <td className="py-2 px-3 font-bold text-emerald-700">{isLoaded ? `${net.toFixed(2)} kg` : '—'}</td>
+                          <td style={{ color: '#047857' }} className="py-2 px-3 font-bold">{isLoaded ? `${net.toFixed(2)} kg` : '—'}</td>
                           <td className="py-2 px-3">{s.chickenCount || '—'}</td>
                           <td className="py-2 px-3 text-slate-600">{isLoaded ? `${s.averageChickenWeight || (net / (s.chickenCount || 1)).toFixed(3)} kg` : '—'}</td>
                         </tr>
@@ -267,15 +331,15 @@ Thank you for your business!`;
                     })
                   )}
                 </tbody>
-                <tfoot className="bg-slate-100/80 font-bold border-t border-slate-200 text-slate-900 text-xs">
+                <tfoot style={{ backgroundColor: '#f8fafc', color: '#0f172a' }} className="font-bold border-t border-slate-200 text-xs">
                   <tr>
                     <td className="py-2.5 px-3">TOTALS</td>
                     <td className="py-2.5 px-3">{totalBoxes} Boxes</td>
                     <td className="py-2.5 px-3 text-slate-600">{totalTareWeight.toFixed(1)} kg</td>
                     <td className="py-2.5 px-3 text-slate-800">{totalGrossWeight.toFixed(1)} kg</td>
-                    <td className="py-2.5 px-3 font-black text-emerald-700 text-sm">{totalNetWeight.toFixed(2)} kg</td>
-                    <td className="py-2.5 px-3 font-extrabold text-teal-700">{totalBirds} Birds</td>
-                    <td className="py-2.5 px-3 text-emerald-900">{avgWeight} kg/bird</td>
+                    <td style={{ color: '#047857' }} className="py-2.5 px-3 font-black text-sm">{totalNetWeight.toFixed(2)} kg</td>
+                    <td style={{ color: '#0f766e' }} className="py-2.5 px-3 font-extrabold">{totalBirds} Birds</td>
+                    <td style={{ color: '#064e3b' }} className="py-2.5 px-3">{avgWeight} kg/bird</td>
                   </tr>
                 </tfoot>
               </table>
@@ -285,10 +349,16 @@ Thank you for your business!`;
           {/* Settlement Calculation & Official Seal Box */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center pt-2">
             {/* Payment Summary Box */}
-            <div className="rounded-2xl border-2 border-emerald-600/30 bg-emerald-50/40 p-4 space-y-2">
-              <div className="text-xs font-black text-emerald-900 uppercase tracking-wider flex items-center justify-between border-b border-emerald-200/60 pb-2">
+            <div
+              style={{ backgroundColor: '#f0fdf4', borderColor: '#a7f3d0' }}
+              className="rounded-2xl border-2 p-4 space-y-2"
+            >
+              <div
+                style={{ color: '#064e3b', borderColor: '#a7f3d0' }}
+                className="text-xs font-black uppercase tracking-wider flex items-center justify-between border-b pb-2"
+              >
                 <span>Financial Settlement</span>
-                <span className="text-[10px] font-bold text-emerald-700">Rate & Total Breakdown</span>
+                <span style={{ color: '#047857' }} className="text-[10px] font-bold">Rate & Total Breakdown</span>
               </div>
 
               <div className="space-y-1.5 text-xs text-slate-700">
@@ -314,22 +384,28 @@ Thank you for your business!`;
                   </div>
                 </div>
 
-                <div className="flex justify-between border-t border-emerald-200/60 pt-2 text-sm sm:text-base font-black text-slate-900">
-                  <span className="text-emerald-950">TOTAL AMOUNT:</span>
-                  <span className="text-emerald-700">₹ {Math.round(grandTotal).toLocaleString('en-IN')}</span>
+                <div
+                  style={{ borderColor: '#a7f3d0' }}
+                  className="flex justify-between border-t pt-2 text-sm sm:text-base font-black text-slate-900"
+                >
+                  <span>TOTAL AMOUNT:</span>
+                  <span style={{ color: '#047857' }}>₹ {Math.round(grandTotal).toLocaleString('en-IN')}</span>
                 </div>
               </div>
             </div>
 
             {/* Official Verified Farm Seal & Stamp */}
             <div className="flex flex-col items-center justify-center p-3 text-center space-y-2">
-              <div className="relative flex items-center justify-center h-28 w-28 rounded-full border-4 border-dashed border-emerald-600 bg-emerald-50/50 shadow-xs p-2 transform rotate-[-3deg]">
-                <div className="absolute inset-1 rounded-full border border-emerald-500"></div>
-                <div className="flex flex-col items-center justify-center space-y-0.5 text-center text-emerald-800">
+              <div
+                style={{ borderColor: '#059669', backgroundColor: '#f0fdf4' }}
+                className="relative flex items-center justify-center h-28 w-28 rounded-full border-4 border-dashed shadow-xs p-2 transform rotate-[-3deg]"
+              >
+                <div style={{ borderColor: '#10b981' }} className="absolute inset-1 rounded-full border"></div>
+                <div style={{ color: '#065f46' }} className="flex flex-col items-center justify-center space-y-0.5 text-center">
                   <ShieldCheck className="h-6 w-6 text-emerald-600" />
                   <span className="text-[8px] font-black uppercase tracking-widest leading-none">KG POULTRY</span>
-                  <span className="text-[9px] font-extrabold text-emerald-900 uppercase tracking-tighter">VERIFIED</span>
-                  <span className="text-[7px] font-bold text-emerald-600 uppercase">OFFICIAL SEAL</span>
+                  <span style={{ color: '#064e3b' }} className="text-[9px] font-extrabold uppercase tracking-tighter">VERIFIED</span>
+                  <span style={{ color: '#047857' }} className="text-[7px] font-bold uppercase">OFFICIAL SEAL</span>
                 </div>
               </div>
               <div className="text-[11px] font-bold text-slate-700">KG Poultry Farms Verified Dispatch</div>
