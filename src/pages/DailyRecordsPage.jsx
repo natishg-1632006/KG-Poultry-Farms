@@ -198,11 +198,17 @@ export const DailyRecordsPage = () => {
 
     const currentFeedStock = selectedBatch.feedStock || { 'Pre-Starter': 0, 'Starter': 0, 'Finisher': 0 };
     const totalAvailableKg = (Number(currentFeedStock['Pre-Starter']) || 0) + (Number(currentFeedStock['Starter']) || 0) + (Number(currentFeedStock['Finisher']) || 0);
-    const totalAvailableBags = kgToBags(totalAvailableKg, KG_PER_BAG);
+
+    // If updating an existing record for formData.recordDate, add back the existing record's feed consumption to available pool for validation
+    const existingRecord = recordsMap && recordsMap[formData.recordDate];
+    const existingKg = existingRecord ? Number(existingRecord.feedConsumption || 0) : 0;
+
+    const effectiveAvailableKg = totalAvailableKg + existingKg;
+    const effectiveAvailableBags = kgToBags(effectiveAvailableKg, KG_PER_BAG);
 
     // Stock availability validation
-    if (totalAvailableKg < totalKg) {
-      setErrorMsg(`Insufficient feed stock available in farm pool! Available: ${totalAvailableBags} Bags. Requested: ${totalBags} Bags. Please receive feed stock first.`);
+    if (effectiveAvailableKg < totalKg) {
+      setErrorMsg(`Insufficient feed stock available in farm pool! Available: ${effectiveAvailableBags} Bags. Requested: ${totalBags} Bags. Please receive feed stock first.`);
       return;
     }
 
