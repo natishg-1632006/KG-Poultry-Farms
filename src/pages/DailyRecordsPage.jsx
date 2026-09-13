@@ -5,7 +5,7 @@ import { calculateRemainingChickens, validateRecordDate, deductFeedStock, bagsTo
 import { KG_PER_BAG, FEED_CONSUMPTION_TARGETS, AVERAGE_WEIGHT_TARGETS } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
 import { Modal } from '../components/common/Modal';
-import { ClipboardList, AlertCircle, Save, CheckCircle2, Edit, Trash2, Layers, Plus, X, Calendar, Package, Scale, Target } from 'lucide-react';
+import { ClipboardList, AlertCircle, Save, CheckCircle2, Edit, Trash2, Layers, Plus, X, Calendar, Package, Scale, Target, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export const DailyRecordsPage = () => {
   const { userProfile, isFarmer } = useAuth();
@@ -18,6 +18,8 @@ export const DailyRecordsPage = () => {
   const [successMsg, setSuccessMsg] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [showTargetsTable, setShowTargetsTable] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -260,6 +262,12 @@ export const DailyRecordsPage = () => {
   };
 
   const recordsList = Object.values(recordsMap).sort((a, b) => b.recordDate.localeCompare(a.recordDate));
+  const totalRecords = recordsList.length;
+  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(totalRecords, startIndex + pageSize);
+  const paginatedRecords = recordsList.slice(startIndex, endIndex);
+
   const lastRecord = recordsList.length > 0 ? recordsList[0] : null;
 
   // Compute current flock age day for selected batch
@@ -568,30 +576,58 @@ export const DailyRecordsPage = () => {
         </form>
       </Modal>
 
-      {/* History Table with Edit and Delete Actions - Full Width */}
+      {/* History Table with Edit and Delete Actions - Fixed Header & Paginated */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm min-w-0">
-        <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4">
-          Daily Record Log History ({selectedBatch?.batchNumber})
-        </h2>
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 mb-4">
+          <div className="flex items-center justify-between sm:justify-start gap-2">
+            <h2 className="text-sm sm:text-base font-bold text-slate-900">
+              Daily Record Log History ({selectedBatch?.batchNumber})
+            </h2>
+            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600">
+              {totalRecords} Entries
+            </span>
+          </div>
 
-        <div className="w-full overflow-x-auto">
+          <div className="flex items-center justify-between sm:justify-end gap-3">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
+              <span>View:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-bold text-slate-800 focus:border-emerald-600 focus:bg-white transition-colors cursor-pointer"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={30}>30</option>
+                <option value={40}>40</option>
+                <option value={50}>50</option>
+              </select>
+              <span>records</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="w-full overflow-auto max-h-[440px] rounded-xl border border-slate-100">
           <table className="w-full min-w-[500px] text-left text-xs">
-            <thead>
-              <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold whitespace-nowrap">
-                <th className="pb-3 px-2" title="Date">Date</th>
-                <th className="pb-3 px-2" title="Mortality">Mortality</th>
-                <th className="pb-3 px-2" title="Bags Consumed">Bags Consumed</th>
-                <th className="pb-3 px-2" title="Avg Weight (g)">Avg Weight</th>
-                <th className="pb-3 px-2 text-right" title="Actions">Actions</th>
+            <thead className="bg-slate-50 sticky top-0 border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold whitespace-nowrap z-10 shadow-2xs">
+              <tr>
+                <th className="p-3" title="Date">Date</th>
+                <th className="p-3" title="Mortality">Mortality</th>
+                <th className="p-3" title="Bags Consumed">Bags Consumed</th>
+                <th className="p-3" title="Avg Weight (g)">Avg Weight</th>
+                <th className="p-3 text-right" title="Actions">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium whitespace-nowrap">
-              {recordsList.length === 0 ? (
+              {totalRecords === 0 ? (
                 <tr>
                   <td colSpan="5" className="py-8 text-center text-slate-400">No daily records for this batch yet. Click any Farm button or "+ Record Daily Log" to add data.</td>
                 </tr>
               ) : (
-                recordsList.map((r) => {
+                paginatedRecords.map((r) => {
                   const bags = Math.max(1, Math.round(r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG)));
                   const totalKg = bags * KG_PER_BAG;
                   const chickCount = Number(r.remainingChickCount || selectedBatch?.remainingChickCount || selectedBatch?.initialChickCount || 5000);
@@ -610,15 +646,15 @@ export const DailyRecordsPage = () => {
 
                   return (
                     <tr key={r.recordDate} className="hover:bg-slate-50">
-                      <td className="py-3 px-1 font-bold text-slate-900 truncate" title={r.recordDate}>{r.recordDate}</td>
-                      <td className="py-3 px-1 font-bold text-rose-600 truncate" title={r.mortalityCount}>{r.mortalityCount}</td>
-                      <td className="py-3 px-1 text-slate-700 font-bold truncate" title={`${bags} Bags (${perBirdEat} g/bird)`}>
+                      <td className="p-3 font-bold text-slate-900" title={r.recordDate}>{r.recordDate}</td>
+                      <td className="p-3 font-bold text-rose-600" title={r.mortalityCount}>{r.mortalityCount}</td>
+                      <td className="p-3 text-slate-700 font-bold" title={`${bags} Bags (${perBirdEat} g/bird)`}>
                         {bags} Bags <span className="text-[10px] font-normal text-slate-500">({perBirdEat}g/bird)</span>
                       </td>
-                      <td className="py-3 px-1 font-bold text-slate-900 truncate" title={`${r.averageWeight} g (Target: ${rTargetWeight}g, Diff: ${rDiffStr})`}>
+                      <td className="p-3 font-bold text-slate-900" title={`${r.averageWeight} g (Target: ${rTargetWeight}g, Diff: ${rDiffStr})`}>
                         {r.averageWeight} g <span className={`text-[10px] font-semibold ${rWeightDiff < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>({rDiffStr})</span>
                       </td>
-                      <td className="py-3 px-1 text-right">
+                      <td className="p-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => handleEditRecord(r)}
@@ -643,6 +679,41 @@ export const DailyRecordsPage = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {totalRecords > 0 && (
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t border-slate-100 pt-4 mt-4">
+            <div className="text-xs font-medium text-slate-500 text-center sm:text-left">
+              Showing <span className="font-bold text-slate-900">{startIndex + 1}</span> to{' '}
+              <span className="font-bold text-slate-900">{endIndex}</span> of{' '}
+              <span className="font-bold text-slate-900">{totalRecords}</span> records (Latest to Oldest)
+            </div>
+
+            <div className="flex items-center justify-center gap-1.5">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent transition-all shadow-2xs cursor-pointer"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span>Prev</span>
+              </button>
+
+              <div className="px-2 text-xs font-bold text-slate-700">
+                Page {currentPage} of {totalPages}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent transition-all shadow-2xs cursor-pointer"
+              >
+                <span>Next</span>
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
