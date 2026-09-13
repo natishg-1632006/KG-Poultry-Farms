@@ -26,6 +26,7 @@ export const FeedPage = () => {
     driverName: '',
     vehicleNumber: '',
     bagsReceived: 5,
+    additionalKg: 0,
     date: new Date().toISOString().split('T')[0],
     notes: ''
   });
@@ -81,7 +82,9 @@ export const FeedPage = () => {
   const feedStats = feedArrivals.reduce((acc, f) => {
     const type = f.feedType || 'Pre-Starter';
     const isReturn = f.transactionType === 'Return';
-    const bags = Number(f.bagsReceived) || kgToBags(f.quantityReceived || 0, KG_PER_BAG);
+    const totalKg = Number(f.quantityReceivedKg ?? f.quantityReceived ?? ((Number(f.bagsReceived || 0) * KG_PER_BAG) + Number(f.additionalKg || 0)));
+    const bags = totalKg / KG_PER_BAG;
+
     if (isReturn) {
       acc.returned[type] = (acc.returned[type] || 0) + bags;
     } else {
@@ -97,13 +100,13 @@ export const FeedPage = () => {
   const starterAvailableBags = kgToBags(Number(feedStock['Starter'] || 0), KG_PER_BAG);
   const finisherAvailableBags = kgToBags(Number(feedStock['Finisher'] || 0), KG_PER_BAG);
 
-  const preArrivedBags = Math.max(feedStats.arrived['Pre-Starter'] || 0, preAvailableBags);
-  const starterArrivedBags = Math.max(feedStats.arrived['Starter'] || 0, starterAvailableBags);
-  const finisherArrivedBags = Math.max(feedStats.arrived['Finisher'] || 0, finisherAvailableBags);
+  const preArrivedBags = parseFloat(Math.max(feedStats.arrived['Pre-Starter'] || 0, preAvailableBags).toFixed(1));
+  const starterArrivedBags = parseFloat(Math.max(feedStats.arrived['Starter'] || 0, starterAvailableBags).toFixed(1));
+  const finisherArrivedBags = parseFloat(Math.max(feedStats.arrived['Finisher'] || 0, finisherAvailableBags).toFixed(1));
 
-  const preReturnedBags = feedStats.returned['Pre-Starter'] || 0;
-  const starterReturnedBags = feedStats.returned['Starter'] || 0;
-  const finisherReturnedBags = feedStats.returned['Finisher'] || 0;
+  const preReturnedBags = parseFloat((feedStats.returned['Pre-Starter'] || 0).toFixed(1));
+  const starterReturnedBags = parseFloat((feedStats.returned['Starter'] || 0).toFixed(1));
+  const finisherReturnedBags = parseFloat((feedStats.returned['Finisher'] || 0).toFixed(1));
 
   const preConsumedBags = Math.max(0, parseFloat((preArrivedBags - preReturnedBags - preAvailableBags).toFixed(1)));
   const starterConsumedBags = Math.max(0, parseFloat((starterArrivedBags - starterReturnedBags - starterAvailableBags).toFixed(1)));
@@ -112,13 +115,14 @@ export const FeedPage = () => {
   const handleEditArrival = (arrival) => {
     setEditingFeedId(arrival.id);
     setShowForm(true);
-    const bags = arrival.bagsReceived || kgToBags(arrival.quantityReceived || 0, KG_PER_BAG);
+    const bags = arrival.bagsReceived !== undefined ? arrival.bagsReceived : kgToBags(arrival.quantityReceived || 0, KG_PER_BAG);
     setFormData({
       transactionType: arrival.transactionType || 'Receive',
       feedType: arrival.feedType || 'Pre-Starter',
       driverName: arrival.driverName || '',
       vehicleNumber: arrival.vehicleNumber || '',
       bagsReceived: bags,
+      additionalKg: arrival.additionalKg || 0,
       date: arrival.date || new Date().toISOString().split('T')[0],
       notes: arrival.notes || ''
     });
@@ -143,13 +147,21 @@ export const FeedPage = () => {
 
     setSaving(true);
     try {
-      const bags = Number(formData.bagsReceived) || 0;
-      const totalKg = bagsToKg(bags, KG_PER_BAG);
+      const bags = Number(formData.bagsReceived || 0);
+      const extraKg = Number(formData.additionalKg || 0);
+      const totalKg = bagsToKg(bags, KG_PER_BAG) + extraKg;
       const isReturn = formData.transactionType === 'Return';
 
-      const currentCategoryStockBags = kgToBags(Number(feedStock[formData.feedType] || 0), KG_PER_BAG);
-      if (isReturn && bags > currentCategoryStockBags && !editingFeedId) {
-        if (!confirm(`Warning: Returning ${bags} bags of ${formData.feedType} exceeds current available stock (${currentCategoryStockBags} bags). Do you still want to proceed?`)) {
+      if (bags === 0 && extraKg === 0) {
+        alert('Please enter at least 1 bag or additional kg.');
+        setSaving(false);
+        return;
+      }
+
+      const currentCategoryStockKg = Number(feedStock[formData.feedType] || 0);
+      if (isReturn && totalKg > currentCategoryStockKg && !editingFeedId) {
+        const currentStockBagsStr = kgToBags(currentCategoryStockKg, KG_PER_BAG);
+        if (!confirm(`Warning: Returning ${bags} bags & ${extraKg} kg (${totalKg} kg) exceeds current available stock (~${currentStockBagsStr} bags). Do you still want to proceed?`)) {
           setSaving(false);
           return;
         }
@@ -162,6 +174,7 @@ export const FeedPage = () => {
         driverName: formData.driverName,
         vehicleNumber: formData.vehicleNumber,
         bagsReceived: bags,
+        additionalKg: extraKg,
         quantityReceived: totalKg,
         quantityReceivedKg: totalKg,
         date: formData.date,
@@ -172,11 +185,11 @@ export const FeedPage = () => {
       const actionText = isReturn ? 'return' : (editingFeedId ? 'update' : 'arrival');
       await dbLogAuditEvent(
         isReturn ? 'FEED_RETURNED' : (editingFeedId ? 'FEED_UPDATED' : 'FEED_ARRIVED'),
-        `${isReturn ? 'Returned' : (editingFeedId ? 'Updated' : 'Received')} ${bags} bags of ${formData.feedType} for ${selectedBatch.batchNumber}`,
+        `${isReturn ? 'Returned' : (editingFeedId ? 'Updated' : 'Received')} ${bags} bags & ${extraKg} kg of ${formData.feedType} for ${selectedBatch.batchNumber}`,
         userProfile?.name
       );
 
-      setSuccessMsg(`Successfully recorded ${actionText} of ${bags} bags of ${formData.feedType}!`);
+      setSuccessMsg(`Successfully recorded ${actionText} of ${bags} bags ${extraKg > 0 ? `& ${extraKg} kg` : ''} of ${formData.feedType}!`);
       setEditingFeedId(null);
       setShowForm(false);
       loadFeedArrivals(selectedBatch.id);
@@ -186,6 +199,7 @@ export const FeedPage = () => {
         driverName: '',
         vehicleNumber: '',
         bagsReceived: 5,
+        additionalKg: 0,
         date: new Date().toISOString().split('T')[0],
         notes: ''
       });
@@ -206,52 +220,32 @@ export const FeedPage = () => {
 
   return (
     <div className="space-y-6">
-      {/* Page Header with Action Buttons */}
+      {/* Page Header with Single Action Button */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-slate-900">Feed Stock & Return Management</h1>
           <p className="text-sm font-medium text-slate-500">Log incoming feed stock, record returned feed, and monitor available inventory.</p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => {
-              setEditingFeedId(null);
-              setFormData({
-                transactionType: 'Receive',
-                feedType: 'Pre-Starter',
-                driverName: '',
-                vehicleNumber: '',
-                bagsReceived: 5,
-                date: new Date().toISOString().split('T')[0],
-                notes: ''
-              });
-              setShowForm(true);
-            }}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-3.5 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95"
-          >
-            <Plus className="h-4 w-4" />
-            <span>+ Receive Feed</span>
-          </button>
-          <button
-            onClick={() => {
-              setEditingFeedId(null);
-              setFormData({
-                transactionType: 'Return',
-                feedType: 'Pre-Starter',
-                driverName: '',
-                vehicleNumber: '',
-                bagsReceived: 1,
-                date: new Date().toISOString().split('T')[0],
-                notes: ''
-              });
-              setShowForm(true);
-            }}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 px-3.5 py-2.5 text-xs font-bold text-white shadow-md shadow-amber-600/20 ring-2 ring-amber-500/20 hover:from-amber-700 hover:to-orange-700 transition-all active:scale-95"
-          >
-            <RotateCcw className="h-4 w-4" />
-            <span>- Return Feed</span>
-          </button>
-        </div>
+        <button
+          onClick={() => {
+            setEditingFeedId(null);
+            setFormData({
+              transactionType: 'Receive',
+              feedType: 'Pre-Starter',
+              driverName: '',
+              vehicleNumber: '',
+              bagsReceived: 5,
+              additionalKg: 0,
+              date: new Date().toISOString().split('T')[0],
+              notes: ''
+            });
+            setShowForm(true);
+          }}
+          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95 shrink-0"
+        >
+          <Plus className="h-4 w-4" />
+          <span>+ Log Feed Stock</span>
+        </button>
       </div>
 
       {/* KPI Stock Cards in Bags */}
@@ -351,7 +345,11 @@ export const FeedPage = () => {
                   Quantity
                 </span>
                 <span className={`font-bold ${viewingDetail.transactionType === 'Return' ? 'text-amber-700' : 'text-emerald-700'}`}>
-                  {viewingDetail.transactionType === 'Return' ? '-' : '+'}{viewingDetail.bagsReceived || kgToBags(viewingDetail.quantityReceived || 0, KG_PER_BAG)} Bags
+                  {viewingDetail.transactionType === 'Return' ? '-' : '+'}{viewingDetail.bagsReceived || 0} Bags
+                  {viewingDetail.additionalKg ? ` & ${viewingDetail.additionalKg} kg` : ''}
+                  <span className="text-slate-500 font-medium ml-1">
+                    ({viewingDetail.quantityReceivedKg || viewingDetail.quantityReceived || 0} kg total)
+                  </span>
                 </span>
               </div>
 
@@ -423,7 +421,7 @@ export const FeedPage = () => {
             <select
               value={formData.feedType}
               onChange={(e) => setFormData({ ...formData, feedType: e.target.value })}
-              className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600"
+              className="w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600"
             >
               <option value="Pre-Starter">Pre-Starter (Blue Bag)</option>
               <option value="Starter">Starter (Green Bag)</option>
@@ -431,20 +429,51 @@ export const FeedPage = () => {
             </select>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              {formData.transactionType === 'Return' ? 'Feed Bags Returned (Whole Bags) *' : 'Feed Bags Received (Whole Bags) *'}
-            </label>
-            <input
-              type="number"
-              required
-              min="1"
-              step="1"
-              value={formData.bagsReceived}
-              onChange={(e) => setFormData({ ...formData, bagsReceived: e.target.value ? Math.round(Number(e.target.value)) : '' })}
-              placeholder="e.g. 5"
-              className="w-full rounded-xl border border-slate-200 py-2.5 px-3 text-sm font-bold text-slate-900 focus:border-emerald-600"
-            />
+          <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  {formData.transactionType === 'Return' ? 'Bags Returned (Whole Bags)' : 'Bags Received (Whole Bags)'}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={formData.bagsReceived}
+                  onChange={(e) => setFormData({ ...formData, bagsReceived: e.target.value !== '' ? Number(e.target.value) : '' })}
+                  placeholder="e.g. 7"
+                  className="w-full rounded-xl border border-slate-200 py-2.5 px-3 text-sm font-bold text-slate-900 focus:border-emerald-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Additional Loose Weight (Kg)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="69"
+                  step="0.5"
+                  value={formData.additionalKg}
+                  onChange={(e) => setFormData({ ...formData, additionalKg: e.target.value !== '' ? Number(e.target.value) : '' })}
+                  placeholder="e.g. 55"
+                  className="w-full rounded-xl border border-slate-200 py-2.5 px-3 text-sm font-bold text-slate-900 focus:border-emerald-600"
+                />
+              </div>
+            </div>
+
+            {/* Helper Summary Pill */}
+            <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 border border-slate-200 text-xs">
+              <span className="text-slate-500 font-bold">Total Entry Quantity:</span>
+              <span className={`font-black ${formData.transactionType === 'Return' ? 'text-amber-700' : 'text-emerald-700'}`}>
+                {formData.transactionType === 'Return' ? '-' : '+'}{Number(formData.bagsReceived || 0)} Bags
+                {Number(formData.additionalKg || 0) > 0 ? ` & ${formData.additionalKg} kg` : ''}
+                <span className="ml-1 text-[11px] font-semibold text-slate-500">
+                  ({(Number(formData.bagsReceived || 0) * KG_PER_BAG) + Number(formData.additionalKg || 0)} kg total)
+                </span>
+              </span>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -488,7 +517,7 @@ export const FeedPage = () => {
               rows="2"
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Optional remarks (e.g. Returned unused bags to mill)..."
+              placeholder="Optional remarks (e.g. Returned 7 bags & 55 kg loose feed)..."
               className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
             />
           </div>
@@ -505,6 +534,7 @@ export const FeedPage = () => {
                   driverName: '',
                   vehicleNumber: '',
                   bagsReceived: 5,
+                  additionalKg: 0,
                   date: new Date().toISOString().split('T')[0],
                   notes: ''
                 });
@@ -565,7 +595,7 @@ export const FeedPage = () => {
                 </tr>
               ) : (
                 filteredFeedArrivals.map((f) => {
-                  const bags = f.bagsReceived || kgToBags(f.quantityReceived || 0, KG_PER_BAG);
+                  const bags = f.bagsReceived !== undefined ? f.bagsReceived : kgToBags(f.quantityReceived || 0, KG_PER_BAG);
                   const isReturn = f.transactionType === 'Return';
                   return (
                     <tr
@@ -590,8 +620,8 @@ export const FeedPage = () => {
                         <Package className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate">{f.feedType}</span>
                       </td>
-                      <td className={`py-3 px-1 font-bold truncate ${isReturn ? 'text-amber-700' : 'text-emerald-700'}`} title={`${isReturn ? '-' : '+'}${bags} Bags`}>
-                        {isReturn ? `-${bags} Bags` : `+${bags} Bags`}
+                      <td className={`py-3 px-1 font-bold truncate ${isReturn ? 'text-amber-700' : 'text-emerald-700'}`} title={`${isReturn ? '-' : '+'}${bags} Bags ${f.additionalKg ? `& ${f.additionalKg} kg` : ''}`}>
+                        {isReturn ? '-' : '+'}{bags} Bags{f.additionalKg ? ` & ${f.additionalKg} kg` : ''}
                       </td>
                       <td className="py-3 px-1 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">

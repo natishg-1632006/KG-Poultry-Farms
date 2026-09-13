@@ -160,7 +160,7 @@ export function computeBatchFeedStock(batchId, local = getLocalDB()) {
     timeKey: a.createdAt || a.date || '2000-01-01',
     date: a.date || (a.createdAt ? a.createdAt.split('T')[0] : '2000-01-01'),
     feedType: a.feedType || 'Pre-Starter',
-    kg: Number(a.quantityReceivedKg ?? a.quantityReceived ?? (a.bagsReceived ? Number(a.bagsReceived) * 70 : 0))
+    kg: Number(a.quantityReceivedKg ?? a.quantityReceived ?? ((Number(a.bagsReceived || 0) * 70) + Number(a.additionalKg || 0)))
   }));
 
   const dailyMap = local.dailyRecords[batchId] || {};
