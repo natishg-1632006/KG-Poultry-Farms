@@ -7,7 +7,8 @@ export const Header = ({ onToggleSidebar }) => {
   const { userProfile, role, logout } = useAuth();
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-6">
+    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-slate-200/80 bg-white/95 px-4 backdrop-blur sm:px-6 shadow-xs">
+      <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600" />
       <div className="flex items-center gap-3">
         <button
           onClick={onToggleSidebar}
@@ -16,31 +17,31 @@ export const Header = ({ onToggleSidebar }) => {
         >
           <Menu className="h-5 w-5" />
         </button>
-        <div className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 font-black text-white shadow-sm">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-emerald-700 to-emerald-500 font-black text-white shadow-sm shadow-emerald-600/30 ring-1 ring-emerald-400/40">
             KG
           </div>
           <div>
-            <h1 className="text-base font-bold leading-tight text-slate-900">KG Poultry Farms</h1>
-            <p className="text-xs text-slate-500 hidden sm:block">Broiler Farm Management System</p>
+            <h1 className="text-base font-black leading-tight tracking-tight text-slate-900">KG Poultry Farms</h1>
+            <p className="text-[11px] font-semibold text-slate-400 hidden sm:block">Broiler Farm Operations & Intelligence</p>
           </div>
         </div>
       </div>
 
       <div className="flex items-center gap-4">
         {userProfile && (
-          <div className="flex items-center gap-3 border-l border-slate-200 pl-4">
+          <div className="flex items-center gap-3 border-l border-slate-200/80 pl-4">
             <div className="hidden text-right sm:block">
-              <div className="text-sm font-bold text-slate-800">{userProfile.name}</div>
-              <div className="text-xs text-slate-500">{userProfile.farmName || 'Central Operations'}</div>
+              <div className="text-xs font-bold text-slate-900">{userProfile.name}</div>
+              <div className="text-[10px] font-semibold text-emerald-700">{userProfile.farmName || 'Central Operations'}</div>
             </div>
             <Badge variant={role}>{role}</Badge>
             <button
               onClick={logout}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-700 transition-all active:scale-95"
               title="Sign Out"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-3.5 w-3.5" />
               <span className="hidden md:inline">Logout</span>
             </button>
           </div>

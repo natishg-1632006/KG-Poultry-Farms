@@ -81,14 +81,14 @@ export const Sidebar = ({ isOpen, onClose }) => {
                     if (window.innerWidth < 1024) onClose();
                   }}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all ${
+                    `flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all ${
                       isActive
-                        ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-200'
-                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                        ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white shadow-sm shadow-emerald-600/30 ring-1 ring-emerald-500/40 translate-x-0.5'
+                        : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
                     }`
                   }
                 >
-                  <Icon className="h-5 w-5 shrink-0" />
+                  <Icon className="h-4 w-4 shrink-0" />
                   <span>{item.name}</span>
                 </NavLink>
               );
@@ -96,10 +96,13 @@ export const Sidebar = ({ isOpen, onClose }) => {
           </nav>
         </div>
 
-        <div className="border-t border-slate-200 p-4">
-          <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-500">
-            <p className="font-semibold text-slate-700">KG Poultry v1.0.0</p>
-            <p>Protected & Encrypted</p>
+        <div className="border-t border-slate-200/80 p-4">
+          <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 text-xs text-slate-500 space-y-0.5">
+            <div className="flex items-center justify-between font-bold text-slate-800">
+              <span>KG Poultry</span>
+              <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[9px] font-black text-emerald-800">v1.0.0</span>
+            </div>
+            <p className="text-[10px] text-slate-400">Encrypted Cloud Sync</p>
           </div>
         </div>
       </aside>

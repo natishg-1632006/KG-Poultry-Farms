@@ -2,7 +2,23 @@
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 antialiased min-h-screen font-sans;
+    @apply bg-slate-50 text-slate-900 antialiased min-h-screen font-sans selection:bg-emerald-100 selection:text-emerald-900;
+  }
+
+  /* Smooth Custom Scrollbar with Emerald Accent */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #f8fafc;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #059669;
   }
 
   /* Custom Theme Styled Dropdowns across entire application */
@@ -21,7 +37,7 @@
 
   select:focus {
     outline: none;
-    border-color: #059669;
-    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15);
+    border-color: #059669 !important;
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15) !important;
   }
 }
