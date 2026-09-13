@@ -1,0 +1,52 @@
+{
+  "rules": {
+    "users": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && (auth.token.role === 'admin' || auth.uid === $uid)"
+      }
+    },
+    "batches": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.role === 'admin'"
+    },
+    "dailyRecords": {
+      ".read": "auth != null",
+      "$batchId": {
+        ".write": "auth != null && (auth.token.role === 'admin' || (root.child('batches').child($batchId).child('assignedFarmerId').val() === auth.uid && root.child('batches').child($batchId).child('status').val() === 'Active'))"
+      }
+    },
+    "feedStocks": {
+      ".read": "auth != null",
+      "$batchId": {
+        ".write": "auth != null && (auth.token.role === 'admin' || root.child('batches').child($batchId).child('assignedFarmerId').val() === auth.uid)"
+      }
+    },
+    "medicineRecords": {
+      ".read": "auth != null",
+      "$batchId": {
+        ".write": "auth != null && (auth.token.role === 'admin' || root.child('batches').child($batchId).child('assignedFarmerId').val() === auth.uid)"
+      }
+    },
+    "dispatches": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "boxSets": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "targets": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.role === 'admin'"
+    },
+    "invoices": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "auditLogs": {
+      ".read": "auth != null && auth.token.role === 'admin'",
+      ".write": "auth != null"
+    }
+  }
+}
