@@ -87,7 +87,7 @@ export function getPoultryWeatherAdvisory(temperatureC) {
  */
 export async function fetchWeather(lat = DEFAULT_FARM_LOCATION.latitude, lon = DEFAULT_FARM_LOCATION.longitude) {
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&timezone=Asia%2FKolkata`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&hourly=temperature_2m,relative_humidity_2m,weather_code,precipitation_probability&daily=temperature_2m_max,temperature_2m_min&timezone=Asia%2FKolkata`;
     
     const res = await fetch(url);
     if (!res.ok) throw new Error('Weather API HTTP Error');
@@ -95,9 +95,48 @@ export async function fetchWeather(lat = DEFAULT_FARM_LOCATION.latitude, lon = D
 
     const current = data.current || {};
     const daily = data.daily || {};
+    const hourly = data.hourly || {};
+    
     const weatherInfo = decodeWeatherCode(current.weather_code ?? 0);
     const temp = Math.round(current.temperature_2m ?? 30);
     const advisory = getPoultryWeatherAdvisory(temp);
+
+    // Extract next 7 hours forecast starting from current hour
+    const times = hourly.time || [];
+    const temps = hourly.temperature_2m || [];
+    const codes = hourly.weather_code || [];
+    const rainProbs = hourly.precipitation_probability || [];
+
+    const now = new Date();
+    const currentISO = now.toISOString().slice(0, 13); // e.g. "2026-09-13T10"
+    let startIndex = times.findIndex(t => t.startsWith(currentISO));
+    if (startIndex === -1) {
+      startIndex = Math.max(0, now.getHours());
+    }
+
+    const next7Hours = [];
+    for (let i = 0; i < 7; i++) {
+      const idx = startIndex + i;
+      if (idx < times.length) {
+        const rawTime = times[idx];
+        const dateObj = new Date(rawTime);
+        const formattedHour = i === 0 ? 'Now' : dateObj.toLocaleTimeString([], { hour: 'numeric', hour12: true });
+        const hTemp = Math.round(temps[idx] ?? temp);
+        const hCode = codes[idx] ?? 0;
+        const hWeather = decodeWeatherCode(hCode);
+        const hRain = Math.round(rainProbs[idx] ?? 0);
+
+        next7Hours.push({
+          time: formattedHour,
+          temp: hTemp,
+          weatherLabel: hWeather.label,
+          weatherIconKey: hWeather.icon,
+          weatherColor: hWeather.color,
+          rainProb: hRain,
+          isHot: hTemp >= 32
+        });
+      }
+    }
 
     return {
       temperature: temp,
@@ -110,11 +149,29 @@ export async function fetchWeather(lat = DEFAULT_FARM_LOCATION.latitude, lon = D
       weatherIconKey: weatherInfo.icon,
       weatherColor: weatherInfo.color,
       advisory,
+      next7Hours,
       updatedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
   } catch (err) {
     console.error('Failed to fetch Open-Meteo weather:', err);
     // Return graceful fallback data
+    const currentHour = new Date().getHours();
+    const fallback7Hours = Array.from({ length: 7 }, (_, i) => {
+      const h = (currentHour + i) % 24;
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const displayH = h % 12 === 0 ? 12 : h % 12;
+      const hTemp = 30 + Math.round(Math.sin(i) * 3);
+      return {
+        time: i === 0 ? 'Now' : `${displayH} ${ampm}`,
+        temp: hTemp,
+        weatherLabel: 'Partly Cloudy',
+        weatherIconKey: 'CloudSun',
+        weatherColor: 'text-amber-500',
+        rainProb: 10,
+        isHot: hTemp >= 32
+      };
+    });
+
     return {
       temperature: 31,
       feelsLike: 35,
@@ -126,6 +183,7 @@ export async function fetchWeather(lat = DEFAULT_FARM_LOCATION.latitude, lon = D
       weatherIconKey: 'CloudSun',
       weatherColor: 'text-amber-500',
       advisory: getPoultryWeatherAdvisory(31),
+      next7Hours: fallback7Hours,
       updatedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
   }

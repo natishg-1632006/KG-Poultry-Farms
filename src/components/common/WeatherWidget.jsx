@@ -225,6 +225,48 @@ export const WeatherWidget = () => {
             </div>
           </div>
         )}
+
+        {/* Next 7-Hour Hourly Forecast Strip */}
+        {weather?.next7Hours && weather.next7Hours.length > 0 && (
+          <div className="mt-4 border-t border-slate-100 pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                Next 7-Hour Forecast
+              </span>
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-md">
+                Hourly Climate Trend
+              </span>
+            </div>
+            <div className="grid grid-cols-7 gap-1.5 overflow-x-auto pb-1 min-w-[340px]">
+              {weather.next7Hours.map((h, i) => {
+                const HIcon = ICON_MAP[h.weatherIconKey] || CloudSun;
+                return (
+                  <div 
+                    key={i} 
+                    className={`flex flex-col items-center justify-between rounded-xl border p-2 text-center transition-all ${
+                      h.isHot 
+                        ? 'border-amber-200/80 bg-amber-50/60 text-amber-950 shadow-2xs' 
+                        : 'border-slate-200/70 bg-slate-50/80 text-slate-800'
+                    }`}
+                  >
+                    <span className="text-[10px] font-bold text-slate-500">{h.time}</span>
+                    <HIcon className={`my-1.5 h-4 w-4 ${h.weatherColor}`} />
+                    <span className="text-xs font-black text-slate-900">{h.temp}°C</span>
+                    {h.rainProb > 0 ? (
+                      <span className="text-[9px] font-extrabold text-blue-600 mt-0.5">
+                        ☔ {h.rainProb}%
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-medium text-slate-400 mt-0.5">
+                        0%
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Village Location Search Modal */}
