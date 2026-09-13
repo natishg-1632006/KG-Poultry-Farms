@@ -95,7 +95,7 @@ export const FeedPage = () => {
       await dbDeleteFeedArrival(selectedBatchId, feedId);
       await dbLogAuditEvent('FEED_DELETED', `Deleted feed arrival entry for batch ${selectedBatch?.batchNumber}`, userProfile?.name);
       setSuccessMsg('Feed arrival record deleted successfully.');
-      loadFeedArrivals(selectedBatchId);
+      await loadFeedArrivals(selectedBatchId);
     } catch (err) {
       alert('Failed deleting feed arrival.');
     }

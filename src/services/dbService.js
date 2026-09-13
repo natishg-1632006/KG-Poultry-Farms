@@ -156,7 +156,7 @@ export function computeBatchFeedStock(batchId, local = getLocalDB()) {
   const arrivals = local.feedStocks[batchId] || [];
   arrivals.forEach(a => {
     const type = a.feedType || 'Pre-Starter';
-    const kg = Number(a.quantityReceivedKg || a.quantityReceived || 0);
+    const kg = Number(a.quantityReceivedKg ?? a.quantityReceived ?? (a.bagsReceived ? Number(a.bagsReceived) * 70 : 0));
     stock[type] = (stock[type] || 0) + kg;
   });
 
@@ -321,13 +321,22 @@ export async function dbDeleteDailyRecord(batchId, recordDate) {
 
 // FEED MANAGEMENT
 export async function dbGetFeedArrivals(batchId) {
+  const local = getLocalDB();
   try {
     const snap = await withTimeout(get(ref(db, `feedStocks/${batchId}`)));
-    if (snap.exists()) return Array.isArray(snap.val()) ? snap.val() : Object.values(snap.val());
+    if (snap.exists()) {
+      const val = snap.val();
+      const list = (Array.isArray(val) ? val : Object.values(val)).filter(Boolean);
+      local.feedStocks[batchId] = list;
+      if (local.batches[batchId]) {
+        local.batches[batchId].feedStock = computeBatchFeedStock(batchId, local);
+      }
+      saveLocalDB(local);
+      return list;
+    }
   } catch (_err) {
     // fallback
   }
-  const local = getLocalDB();
   return local.feedStocks[batchId] || [];
 }
 
@@ -339,12 +348,6 @@ export async function dbAddFeedArrival(batchId, feedData) {
     batchId,
     createdAt: feedData.createdAt || new Date().toISOString()
   };
-
-  try {
-    await withTimeout(set(ref(db, `feedStocks/${batchId}/${feedId}`), record));
-  } catch (_err) {
-    // fallback
-  }
 
   const local = getLocalDB();
   if (!local.feedStocks[batchId]) {
@@ -369,33 +372,39 @@ export async function dbAddFeedArrival(batchId, feedData) {
     };
   }
 
-  local.batches[batchId].feedStock = computeBatchFeedStock(batchId, local);
-
-  try {
-    await withTimeout(set(ref(db, `batches/${batchId}/feedStock`), local.batches[batchId].feedStock));
-  } catch (_e) {
-    // fallback
-  }
-
+  const calculatedStock = computeBatchFeedStock(batchId, local);
+  local.batches[batchId].feedStock = calculatedStock;
   saveLocalDB(local);
-  return record;
-}
 
-export async function dbDeleteFeedArrival(batchId, feedId) {
   try {
-    await withTimeout(remove(ref(db, `feedStocks/${batchId}/${feedId}`)));
+    await withTimeout(set(ref(db, `feedStocks/${batchId}/${feedId}`), record));
+    await withTimeout(set(ref(db, `batches/${batchId}/feedStock`), calculatedStock));
   } catch (_err) {
     // fallback
   }
 
+  return record;
+}
+
+export async function dbDeleteFeedArrival(batchId, feedId) {
   const local = getLocalDB();
   if (local.feedStocks[batchId]) {
     local.feedStocks[batchId] = local.feedStocks[batchId].filter(f => f.id !== feedId);
   }
+
+  const calculatedStock = computeBatchFeedStock(batchId, local);
   if (local.batches[batchId]) {
-    local.batches[batchId].feedStock = computeBatchFeedStock(batchId, local);
+    local.batches[batchId].feedStock = calculatedStock;
   }
   saveLocalDB(local);
+
+  try {
+    await withTimeout(remove(ref(db, `feedStocks/${batchId}/${feedId}`)));
+    await withTimeout(set(ref(db, `feedStocks/${batchId}`), local.feedStocks[batchId]));
+    await withTimeout(set(ref(db, `batches/${batchId}/feedStock`), calculatedStock));
+  } catch (_err) {
+    // fallback
+  }
 }
 
 export async function dbUpdateBatchFeedStockPool(batchId, updatedStock) {
