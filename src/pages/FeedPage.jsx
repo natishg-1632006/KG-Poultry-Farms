@@ -5,6 +5,7 @@ import { formatFeedStock, bagsToKg, kgToBags } from '../utils/calculations';
 import { KG_PER_BAG } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
 import { Modal } from '../components/common/Modal';
+import { FeedBagIcon } from '../components/common/FeedBagIcon';
 import { Wheat, Truck, Save, CheckCircle2, Edit, Trash2, Layers, Plus, Eye, User, Calendar, FileText } from 'lucide-react';
 
 export const FeedPage = () => {
@@ -178,22 +179,22 @@ export const FeedPage = () => {
           title="1. Pre-Starter Stock"
           value={formatFeedStock(feedStock['Pre-Starter'] || 0)}
           subtext="First deduction priority (Blue Bag)"
-          icon={Wheat}
+          icon={FeedBagIcon}
           color="blue"
         />
         <StatCard
           title="2. Starter Stock"
           value={formatFeedStock(feedStock['Starter'] || 0)}
           subtext="Second deduction priority (Green Bag)"
-          icon={Wheat}
+          icon={FeedBagIcon}
           color="emerald"
         />
         <StatCard
           title="3. Finisher Stock"
           value={formatFeedStock(feedStock['Finisher'] || 0)}
-          subtext="Third deduction priority (Red Bag)"
-          icon={Wheat}
-          color="rose"
+          subtext="Third deduction priority (Orange Bag)"
+          icon={FeedBagIcon}
+          color="orange"
         />
       </div>
 
@@ -223,17 +224,17 @@ export const FeedPage = () => {
 
               <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                 <span className="font-medium text-slate-500 flex items-center gap-1.5">
-                  <Wheat className={`h-4 w-4 ${
+                  <FeedBagIcon className={`h-4 w-4 ${
                     viewingDetail.feedType === 'Pre-Starter' ? 'text-blue-600' :
                     viewingDetail.feedType === 'Starter' ? 'text-emerald-600' :
-                    viewingDetail.feedType === 'Finisher' ? 'text-rose-600' : 'text-slate-400'
+                    viewingDetail.feedType === 'Finisher' ? 'text-orange-600' : 'text-slate-400'
                   }`} />
                   Feed Category
                 </span>
                 <span className={`font-bold ${
                   viewingDetail.feedType === 'Pre-Starter' ? 'text-blue-700' :
                   viewingDetail.feedType === 'Starter' ? 'text-emerald-700' :
-                  viewingDetail.feedType === 'Finisher' ? 'text-rose-700' : 'text-slate-900'
+                  viewingDetail.feedType === 'Finisher' ? 'text-orange-700' : 'text-slate-900'
                 }`}>
                   {viewingDetail.feedType}
                 </span>
@@ -309,7 +310,7 @@ export const FeedPage = () => {
             >
               <option value="Pre-Starter">Pre-Starter (Blue Bag)</option>
               <option value="Starter">Starter (Green Bag)</option>
-              <option value="Finisher">Finisher (Red Bag)</option>
+              <option value="Finisher">Finisher (Orange Bag)</option>
             </select>
           </div>
 
@@ -435,12 +436,13 @@ export const FeedPage = () => {
                       className="hover:bg-slate-50 cursor-pointer transition-colors"
                     >
                       <td className="py-3 px-1 font-bold text-slate-900 truncate" title={f.date}>{f.date}</td>
-                      <td className={`py-3 px-1 font-bold truncate ${
+                      <td className={`py-3 px-1 font-bold truncate flex items-center gap-1.5 ${
                         f.feedType === 'Pre-Starter' ? 'text-blue-600' :
                         f.feedType === 'Starter' ? 'text-emerald-600' :
-                        f.feedType === 'Finisher' ? 'text-rose-600' : 'text-slate-700'
+                        f.feedType === 'Finisher' ? 'text-orange-600' : 'text-slate-700'
                       }`} title={f.feedType}>
-                        {f.feedType}
+                        <FeedBagIcon className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{f.feedType}</span>
                       </td>
                       <td className="py-3 px-1 font-bold text-slate-800 truncate" title={`+${bags} Bags`}>+{bags} Bags</td>
                       <td className="py-3 px-1 text-right" onClick={(e) => e.stopPropagation()}>

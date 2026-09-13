@@ -17,8 +17,13 @@ export const StatCard = ({ title, value, subtext, icon: Icon, color = 'emerald' 
       icon: 'border-rose-100 bg-rose-50 text-rose-600',
       dot: 'bg-rose-500'
     },
+    orange: {
+      bar: 'from-orange-500 to-amber-400',
+      icon: 'border-orange-100 bg-orange-50 text-orange-600',
+      dot: 'bg-orange-500'
+    },
     amber: {
-      bar: 'from-amber-500 to-amber-400',
+      bar: 'from-amber-500 to-orange-400',
       icon: 'border-amber-100 bg-amber-50 text-amber-600',
       dot: 'bg-amber-500'
     }
