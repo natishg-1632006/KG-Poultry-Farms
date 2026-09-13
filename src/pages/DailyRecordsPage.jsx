@@ -339,43 +339,46 @@ export const DailyRecordsPage = () => {
 
       {/* Target Feed Standards Reference Panel */}
       {showTargetsTable && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm space-y-4 min-w-0">
+          <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-base font-bold text-slate-900">Standard Daily Feed Consumption Targets (Day 1 - 45)</h2>
-              <p className="text-xs text-slate-500">Recommended daily feed intake per bird (grams/day) and estimated total for current batch size ({remainingChicksCount} birds).</p>
+              <h2 className="text-sm sm:text-base font-bold text-slate-900">Standard Daily Feed Consumption Targets (Day 1 - 45)</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Recommended daily feed intake per bird (grams/day) and estimated total for current batch size ({remainingChicksCount} birds).</p>
             </div>
             <button
               onClick={() => setShowTargetsTable(false)}
-              className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 shrink-0"
+              title="Close Reference Panel"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
-          <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-100">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 sticky top-0 border-b border-slate-100 text-slate-500 font-semibold">
+          <div className="max-h-72 overflow-auto rounded-xl border border-slate-100">
+            <table className="w-full min-w-[540px] text-left text-xs">
+              <thead className="bg-slate-50 sticky top-0 border-b border-slate-100 text-slate-500 font-semibold whitespace-nowrap z-10">
                 <tr>
                   <th className="p-3">Flock Age (Day)</th>
-                  <th className="p-3">Target Intake / Bird (g)</th>
-                  <th className="p-3">Est. Total Batch Daily (Kg)</th>
-                  <th className="p-3">Est. Total Batch Daily (Bags)</th>
+                  <th className="p-3">Target Intake / Bird</th>
+                  <th className="p-3">Est. Total Daily (Kg)</th>
+                  <th className="p-3">Est. Total Daily (Bags)</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 font-medium">
+              <tbody className="divide-y divide-slate-100 font-medium whitespace-nowrap">
                 {Object.entries(FEED_CONSUMPTION_TARGETS).map(([day, grams]) => {
                   const totalKg = (remainingChicksCount * Number(grams)) / 1000;
                   const bags = kgToBags(totalKg, KG_PER_BAG);
                   const isCurrent = Number(day) === currentFlockAgeDay;
                   return (
-                    <tr key={day} className={isCurrent ? 'bg-emerald-50/60 font-bold text-emerald-900' : 'hover:bg-slate-50 text-slate-700'}>
-                      <td className="p-3 flex items-center gap-2">
-                        <span>Day {day}</span>
-                        {isCurrent && <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">Current Day</span>}
+                    <tr key={day} className={isCurrent ? 'bg-emerald-50/70 font-bold text-emerald-900' : 'hover:bg-slate-50 text-slate-700'}>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <span>Day {day}</span>
+                          {isCurrent && <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-2xs">Current Day</span>}
+                        </div>
                       </td>
-                      <td className="p-3">{grams} g</td>
+                      <td className="p-3 font-semibold">{grams} g</td>
                       <td className="p-3">{totalKg.toFixed(1)} kg</td>
-                      <td className="p-3">{bags.toFixed(1)} Bags</td>
+                      <td className="p-3 font-bold text-emerald-700">{bags.toFixed(1)} Bags</td>
                     </tr>
                   );
                 })}
@@ -546,17 +549,17 @@ export const DailyRecordsPage = () => {
         </h2>
 
         <div className="w-full overflow-x-auto">
-          <table className="w-full text-left text-xs table-fixed">
+          <table className="w-full min-w-[500px] text-left text-xs">
             <thead>
-              <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
-                <th className="pb-3 px-1 w-[24%] truncate" title="Date">Date</th>
-                <th className="pb-3 px-1 w-[16%] truncate" title="Mortality">Mortality</th>
-                <th className="pb-3 px-1 w-[24%] truncate" title="Bags Consumed">Bags Consumed</th>
-                <th className="pb-3 px-1 w-[20%] truncate" title="Avg Weight (g)">Avg Weight</th>
-                <th className="pb-3 px-1 w-[16%] text-right truncate" title="Actions">Actions</th>
+              <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold whitespace-nowrap">
+                <th className="pb-3 px-2" title="Date">Date</th>
+                <th className="pb-3 px-2" title="Mortality">Mortality</th>
+                <th className="pb-3 px-2" title="Bags Consumed">Bags Consumed</th>
+                <th className="pb-3 px-2" title="Avg Weight (g)">Avg Weight</th>
+                <th className="pb-3 px-2 text-right" title="Actions">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 font-medium">
+            <tbody className="divide-y divide-slate-100 font-medium whitespace-nowrap">
               {recordsList.length === 0 ? (
                 <tr>
                   <td colSpan="5" className="py-8 text-center text-slate-400">No daily records for this batch yet. Click any Farm button or "+ Record Daily Log" to add data.</td>
