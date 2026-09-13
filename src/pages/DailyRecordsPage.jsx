@@ -285,6 +285,27 @@ export const DailyRecordsPage = () => {
   const expectedTotalKg = (remainingChicksCount * targetGramPerBird) / 1000;
   const recommendedBags = Math.round(kgToBags(expectedTotalKg, KG_PER_BAG));
 
+  // Compute Last Record feed details
+  let lastRecordFlockAgeDay = 1;
+  let lastRecordBags = 0;
+  let lastRecordTotalKg = 0;
+  let lastRecordPerBirdGram = 0;
+  let lastRecordTargetGram = 20;
+
+  if (lastRecord) {
+    if (selectedBatch?.chickArrivalDate && lastRecord.recordDate) {
+      const arrivalDate = new Date(selectedBatch.chickArrivalDate);
+      const recDate = new Date(lastRecord.recordDate);
+      const diffMs = Math.max(0, recDate.getTime() - arrivalDate.getTime());
+      lastRecordFlockAgeDay = Math.min(45, Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1);
+    }
+    lastRecordTargetGram = FEED_CONSUMPTION_TARGETS[lastRecordFlockAgeDay] || 20;
+    lastRecordBags = Math.max(1, Math.round(lastRecord.feedConsumptionBags || kgToBags(lastRecord.feedConsumption || 0, KG_PER_BAG)));
+    lastRecordTotalKg = lastRecordBags * KG_PER_BAG; // 1 Bag = 70 kg
+    const chicksCount = Number(lastRecord.remainingChickCount || selectedBatch?.remainingChickCount || selectedBatch?.initialChickCount || 5000);
+    lastRecordPerBirdGram = chicksCount > 0 ? Math.round((lastRecordTotalKg * 1000) / chicksCount) : 0;
+  }
+
   if (loading) return <div className="p-8 text-center text-slate-500">Loading Daily Farm Records...</div>;
 
   return (
@@ -382,8 +403,8 @@ export const DailyRecordsPage = () => {
         />
         <StatCard
           title="Last Feed Consumed"
-          value={lastRecord ? `${lastRecord.feedConsumptionBags || kgToBags(lastRecord.feedConsumption || 0, KG_PER_BAG)} Bags` : '0 Bags'}
-          subtext={lastRecord ? `Daily consumption on ${lastRecord.recordDate}` : 'No feed logged'}
+          value={lastRecord ? `${lastRecordBags} Bags (${lastRecordPerBirdGram} g/bird)` : '0 Bags'}
+          subtext={lastRecord ? `Day ${lastRecordFlockAgeDay} Target: ${lastRecordTargetGram} g/bird` : 'No feed logged'}
           icon={Package}
           color="blue"
         />
@@ -533,12 +554,17 @@ export const DailyRecordsPage = () => {
                 </tr>
               ) : (
                 recordsList.map((r) => {
-                  const bags = r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG);
+                  const bags = Math.max(1, Math.round(r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG)));
+                  const totalKg = bags * KG_PER_BAG;
+                  const chickCount = Number(r.remainingChickCount || selectedBatch?.remainingChickCount || selectedBatch?.initialChickCount || 5000);
+                  const perBirdEat = chickCount > 0 ? Math.round((totalKg * 1000) / chickCount) : 0;
                   return (
                     <tr key={r.recordDate} className="hover:bg-slate-50">
                       <td className="py-3 px-1 font-bold text-slate-900 truncate" title={r.recordDate}>{r.recordDate}</td>
                       <td className="py-3 px-1 font-bold text-rose-600 truncate" title={r.mortalityCount}>{r.mortalityCount}</td>
-                      <td className="py-3 px-1 text-slate-700 font-bold truncate" title={`${bags} Bags`}>{bags} Bags</td>
+                      <td className="py-3 px-1 text-slate-700 font-bold truncate" title={`${bags} Bags (${perBirdEat} g/bird)`}>
+                        {bags} Bags <span className="text-[10px] font-normal text-slate-500">({perBirdEat}g/bird)</span>
+                      </td>
                       <td className="py-3 px-1 font-bold text-slate-900 truncate" title={`${r.averageWeight} g`}>{r.averageWeight} g</td>
                       <td className="py-3 px-1 text-right">
                         <div className="flex items-center justify-end gap-1">
