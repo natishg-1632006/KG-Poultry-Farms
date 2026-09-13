@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { dbGetBatches, dbGetDailyRecords, dbSaveDailyRecord, dbDeleteDailyRecord, dbUpdateBatchFeedStockPool, dbLogAuditEvent } from '../services/dbService';
 import { calculateRemainingChickens, validateRecordDate, deductFeedStock, bagsToKg, kgToBags } from '../utils/calculations';
 import { KG_PER_BAG } from '../constants/companyTargets';
+import { Modal } from '../components/common/Modal';
 import { ClipboardList, AlertCircle, Save, CheckCircle2, Edit, Trash2, Layers, Plus, X } from 'lucide-react';
 
 export const DailyRecordsPage = () => {
@@ -204,6 +205,7 @@ export const DailyRecordsPage = () => {
       );
 
       setSuccessMsg(`Daily record for ${formData.recordDate} saved successfully!`);
+      setShowForm(false);
       loadRecordsForBatch(selectedBatch.id);
       loadBatches();
     } catch (err) {
@@ -232,15 +234,11 @@ export const DailyRecordsPage = () => {
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Select Farm Shed / Batch:</span>
           {!isReadOnly && (
             <button
-              onClick={() => setShowForm(!showForm)}
-              className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold transition-all shadow-md active:scale-95 ${
-                showForm
-                  ? 'bg-slate-800 text-white hover:bg-slate-900 shadow-slate-900/10'
-                  : 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-700 hover:to-teal-700 shadow-emerald-500/25 ring-2 ring-emerald-500/20'
-              }`}
+              onClick={() => setShowForm(true)}
+              className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-emerald-500/25 ring-2 ring-emerald-500/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95"
             >
-              {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-              <span>{showForm ? 'Hide Form' : '+ Record Daily Log'}</span>
+              <Plus className="h-4 w-4" />
+              <span>+ Record Daily Log</span>
             </button>
           )}
         </div>
@@ -290,192 +288,178 @@ export const DailyRecordsPage = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Record Entry Form - Displayed when showForm is true */}
-        {showForm && (
-          <div className="rounded-2xl border-2 border-emerald-500/30 bg-white p-6 shadow-md transition-all">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <ClipboardList className="h-5 w-5 text-emerald-600" />
-                {recordsMap[formData.recordDate] ? 'Update Daily Record' : 'New Daily Entry'}
-              </h2>
+      {/* Record Entry Form Modal */}
+      <Modal
+        isOpen={showForm}
+        onClose={() => setShowForm(false)}
+        title={recordsMap[formData.recordDate] ? "Update Daily Record" : "New Daily Farm Entry"}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Record Date *</label>
+            <input
+              type="date"
+              required
+              min={selectedBatch?.chickArrivalDate}
+              max={todayStr}
+              disabled={isReadOnly}
+              value={formData.recordDate}
+              onChange={(e) => handleDateChange(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
+            />
+          </div>
+
+          <div className="rounded-xl bg-slate-50 border border-slate-100 p-3">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+              <span>Calculated Remaining Chicks:</span>
+              <span className="text-base font-black text-emerald-600">{calculatedRemaining}</span>
+            </div>
+            <p className="text-[10px] text-slate-400 mt-1">Formula: Prev Remaining ({prevRemaining}) - Mortality</p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Mortality Count *</label>
+            <input
+              type="number"
+              required
+              min="0"
+              disabled={isReadOnly}
+              value={formData.mortalityCount}
+              onChange={(e) => setFormData({ ...formData, mortalityCount: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Feed Type *</label>
+              <select
+                disabled={isReadOnly}
+                value={formData.feedType}
+                onChange={(e) => setFormData({ ...formData, feedType: e.target.value })}
+                className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
+              >
+                <option value="Pre-Starter">Pre-Starter</option>
+                <option value="Starter">Starter</option>
+                <option value="Finisher">Finisher</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Feed Bags Used *</label>
+              <input
+                type="number"
+                required
+                min="0.1"
+                step="0.1"
+                disabled={isReadOnly}
+                value={formData.feedConsumptionBags}
+                onChange={(e) => setFormData({ ...formData, feedConsumptionBags: e.target.value })}
+                placeholder="e.g. 1.5"
+                className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Average Chicken Weight (grams) *</label>
+            <input
+              type="number"
+              required
+              min="0"
+              step="1"
+              disabled={isReadOnly}
+              value={formData.averageWeight}
+              onChange={(e) => setFormData({ ...formData, averageWeight: e.target.value })}
+              placeholder="e.g. 58"
+              className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
+            />
+          </div>
+
+          {!isReadOnly && (
+            <div className="flex gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                title="Close Form"
+                className="w-1/3 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
               >
-                <X className="h-4 w-4" />
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+              >
+                <Save className="h-4 w-4" />
+                {saving ? 'Saving...' : 'Save Record'}
               </button>
             </div>
+          )}
+        </form>
+      </Modal>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Record Date *</label>
-                <input
-                  type="date"
-                  required
-                  min={selectedBatch?.chickArrivalDate}
-                  max={todayStr}
-                  disabled={isReadOnly}
-                  value={formData.recordDate}
-                  onChange={(e) => handleDateChange(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
-                />
-              </div>
+      {/* History Table with Edit and Delete Actions - Full Width */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4">
+          Daily Record Log History ({selectedBatch?.batchNumber})
+        </h2>
 
-              <div className="rounded-xl bg-slate-50 border border-slate-100 p-3">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                  <span>Calculated Remaining Chicks:</span>
-                  <span className="text-base font-black text-emerald-600">{calculatedRemaining}</span>
-                </div>
-                <p className="text-[10px] text-slate-400 mt-1">Formula: Prev Remaining ({prevRemaining}) - Mortality</p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Mortality Count *</label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  disabled={isReadOnly}
-                  value={formData.mortalityCount}
-                  onChange={(e) => setFormData({ ...formData, mortalityCount: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Feed Type *</label>
-                  <select
-                    disabled={isReadOnly}
-                    value={formData.feedType}
-                    onChange={(e) => setFormData({ ...formData, feedType: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
-                  >
-                    <option value="Pre-Starter">Pre-Starter</option>
-                    <option value="Starter">Starter</option>
-                    <option value="Finisher">Finisher</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Feed Bags Used *</label>
-                  <input
-                    type="number"
-                    required
-                    min="0.1"
-                    step="0.1"
-                    disabled={isReadOnly}
-                    value={formData.feedConsumptionBags}
-                    onChange={(e) => setFormData({ ...formData, feedConsumptionBags: e.target.value })}
-                    placeholder="e.g. 1.5"
-                    className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Average Chicken Weight (grams) *</label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  step="1"
-                  disabled={isReadOnly}
-                  value={formData.averageWeight}
-                  onChange={(e) => setFormData({ ...formData, averageWeight: e.target.value })}
-                  placeholder="e.g. 58"
-                  className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
-                />
-              </div>
-
-              {!isReadOnly && (
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowForm(false)}
-                    className="w-1/3 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
-                  >
-                    <Save className="h-4 w-4" />
-                    {saving ? 'Saving...' : 'Save Record'}
-                  </button>
-                </div>
-              )}
-            </form>
-          </div>
-        )}
-
-        {/* History Table with Edit and Delete Actions */}
-        <div className={`rounded-2xl border border-slate-200 bg-white p-6 shadow-sm ${showForm ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
-          <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4">
-            Daily Record Log History ({selectedBatch?.batchNumber})
-          </h2>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
-                  <th className="pb-3 px-2">Date</th>
-                  <th className="pb-3 px-2">Mortality</th>
-                  <th className="pb-3 px-2">Remaining Chicks</th>
-                  <th className="pb-3 px-2">Feed Used</th>
-                  <th className="pb-3 px-2">Bags Consumed</th>
-                  <th className="pb-3 px-2">Avg Weight (g)</th>
-                  <th className="pb-3 px-2 text-right">Actions</th>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
+                <th className="pb-3 px-2">Date</th>
+                <th className="pb-3 px-2">Mortality</th>
+                <th className="pb-3 px-2">Remaining Chicks</th>
+                <th className="pb-3 px-2">Feed Used</th>
+                <th className="pb-3 px-2">Bags Consumed</th>
+                <th className="pb-3 px-2">Avg Weight (g)</th>
+                <th className="pb-3 px-2 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 font-medium">
+              {recordsList.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="py-8 text-center text-slate-400">No daily records for this batch yet. Click any Farm button or "+ Record Daily Log" to add data.</td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-medium">
-                {recordsList.length === 0 ? (
-                  <tr>
-                    <td colSpan="7" className="py-8 text-center text-slate-400">No daily records for this batch yet. Click any Farm button or "+ Record Daily Log" to add data.</td>
-                  </tr>
-                ) : (
-                  recordsList.map((r) => {
-                    const bags = r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG);
-                    return (
-                      <tr key={r.recordDate} className="hover:bg-slate-50">
-                        <td className="py-3 px-2 font-bold text-slate-900">{r.recordDate}</td>
-                        <td className="py-3 px-2 font-bold text-rose-600">{r.mortalityCount}</td>
-                        <td className="py-3 px-2 text-emerald-700 font-bold">{r.remainingChickCount}</td>
-                        <td className="py-3 px-2 text-slate-700">{r.feedType}</td>
-                        <td className="py-3 px-2 text-slate-700 font-bold">{bags} Bags</td>
-                        <td className="py-3 px-2 font-bold text-slate-900">{r.averageWeight} g</td>
-                        <td className="py-3 px-2 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={() => handleEditRecord(r)}
-                              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                              title="Edit Record"
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteRecord(r.recordDate)}
-                              className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
-                              title="Delete Record"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+              ) : (
+                recordsList.map((r) => {
+                  const bags = r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG);
+                  return (
+                    <tr key={r.recordDate} className="hover:bg-slate-50">
+                      <td className="py-3 px-2 font-bold text-slate-900">{r.recordDate}</td>
+                      <td className="py-3 px-2 font-bold text-rose-600">{r.mortalityCount}</td>
+                      <td className="py-3 px-2 text-emerald-700 font-bold">{r.remainingChickCount}</td>
+                      <td className="py-3 px-2 text-slate-700">{r.feedType}</td>
+                      <td className="py-3 px-2 text-slate-700 font-bold">{bags} Bags</td>
+                      <td className="py-3 px-2 font-bold text-slate-900">{r.averageWeight} g</td>
+                      <td className="py-3 px-2 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => handleEditRecord(r)}
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                            title="Edit Record"
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteRecord(r.recordDate)}
+                            className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
+                            title="Delete Record"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
   );
 };
+
