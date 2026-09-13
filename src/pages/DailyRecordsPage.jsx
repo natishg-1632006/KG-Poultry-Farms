@@ -293,6 +293,7 @@ export const DailyRecordsPage = () => {
   let lastRecordPerBirdGram = 0;
   let lastRecordTargetGram = 20;
   let lastRecordTargetWeightGram = 58;
+  let lastRecordWeightDiff = 0;
 
   if (lastRecord) {
     if (selectedBatch?.chickArrivalDate && lastRecord.recordDate) {
@@ -307,6 +308,7 @@ export const DailyRecordsPage = () => {
     lastRecordTotalKg = lastRecordBags * KG_PER_BAG; // 1 Bag = 70 kg
     const chicksCount = Number(lastRecord.remainingChickCount || selectedBatch?.remainingChickCount || selectedBatch?.initialChickCount || 5000);
     lastRecordPerBirdGram = chicksCount > 0 ? Math.round((lastRecordTotalKg * 1000) / chicksCount) : 0;
+    lastRecordWeightDiff = Number(lastRecord.averageWeight || 0) - lastRecordTargetWeightGram;
   }
 
   if (loading) return <div className="p-8 text-center text-slate-500">Loading Daily Farm Records...</div>;
@@ -428,8 +430,21 @@ export const DailyRecordsPage = () => {
         />
         <StatCard
           title="Last Avg Weight"
+          statsBreakdown={
+            lastRecord
+              ? [
+                  { label: 'ACTUAL', value: `${lastRecord.averageWeight} g`, labelColor: 'text-slate-600', valueColor: 'text-slate-900' },
+                  { label: 'TARGET', value: `${lastRecordTargetWeightGram} g`, labelColor: 'text-blue-600', valueColor: 'text-blue-600' },
+                  { label: 'DIFF', value: `${lastRecordWeightDiff > 0 ? '+' : ''}${lastRecordWeightDiff} g`, labelColor: lastRecordWeightDiff < 0 ? 'text-rose-600' : 'text-emerald-600', valueColor: lastRecordWeightDiff < 0 ? 'text-rose-600' : 'text-emerald-600' }
+                ]
+              : null
+          }
           value={lastRecord ? `${lastRecord.averageWeight} g` : '0 g'}
-          subtext={lastRecord ? `Day ${lastRecordFlockAgeDay} Target: ${lastRecordTargetWeightGram} g` : 'No weight logged'}
+          subtext={
+            lastRecord
+              ? `Day ${lastRecordFlockAgeDay} Target: ${lastRecordTargetWeightGram} g (${lastRecordWeightDiff > 0 ? '+' : ''}${lastRecordWeightDiff} g vs target)`
+              : 'No weight logged'
+          }
           icon={Scale}
           color="emerald"
         />
@@ -581,6 +596,18 @@ export const DailyRecordsPage = () => {
                   const totalKg = bags * KG_PER_BAG;
                   const chickCount = Number(r.remainingChickCount || selectedBatch?.remainingChickCount || selectedBatch?.initialChickCount || 5000);
                   const perBirdEat = chickCount > 0 ? Math.round((totalKg * 1000) / chickCount) : 0;
+
+                  let rAgeDay = 1;
+                  if (selectedBatch?.chickArrivalDate && r.recordDate) {
+                    const arrDate = new Date(selectedBatch.chickArrivalDate);
+                    const rDate = new Date(r.recordDate);
+                    const diffMs = Math.max(0, rDate.getTime() - arrDate.getTime());
+                    rAgeDay = Math.min(45, Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1);
+                  }
+                  const rTargetWeight = AVERAGE_WEIGHT_TARGETS[rAgeDay] || 58;
+                  const rWeightDiff = Number(r.averageWeight || 0) - rTargetWeight;
+                  const rDiffStr = rWeightDiff > 0 ? `+${rWeightDiff}g` : `${rWeightDiff}g`;
+
                   return (
                     <tr key={r.recordDate} className="hover:bg-slate-50">
                       <td className="py-3 px-1 font-bold text-slate-900 truncate" title={r.recordDate}>{r.recordDate}</td>
@@ -588,7 +615,9 @@ export const DailyRecordsPage = () => {
                       <td className="py-3 px-1 text-slate-700 font-bold truncate" title={`${bags} Bags (${perBirdEat} g/bird)`}>
                         {bags} Bags <span className="text-[10px] font-normal text-slate-500">({perBirdEat}g/bird)</span>
                       </td>
-                      <td className="py-3 px-1 font-bold text-slate-900 truncate" title={`${r.averageWeight} g`}>{r.averageWeight} g</td>
+                      <td className="py-3 px-1 font-bold text-slate-900 truncate" title={`${r.averageWeight} g (Target: ${rTargetWeight}g, Diff: ${rDiffStr})`}>
+                        {r.averageWeight} g <span className={`text-[10px] font-semibold ${rWeightDiff < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>({rDiffStr})</span>
+                      </td>
                       <td className="py-3 px-1 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
