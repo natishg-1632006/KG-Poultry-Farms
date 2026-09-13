@@ -5,7 +5,7 @@ import { formatFeedStock, bagsToKg, kgToBags } from '../utils/calculations';
 import { KG_PER_BAG } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
 import { Modal } from '../components/common/Modal';
-import { Package, Wheat, Truck, Save, CheckCircle2, Edit, Trash2, Layers, Plus, Eye, User, Calendar, FileText } from 'lucide-react';
+import { Package, Wheat, Truck, Save, CheckCircle2, Edit, Trash2, Layers, Plus, Eye, User, Calendar, FileText, RotateCcw } from 'lucide-react';
 
 export const FeedPage = () => {
   const { userProfile, isFarmer } = useAuth();
@@ -18,8 +18,10 @@ export const FeedPage = () => {
   const [editingFeedId, setEditingFeedId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [viewingDetail, setViewingDetail] = useState(null);
+  const [transactionFilter, setTransactionFilter] = useState('ALL');
 
   const [formData, setFormData] = useState({
+    transactionType: 'Receive',
     feedType: 'Pre-Starter',
     driverName: '',
     vehicleNumber: '',
@@ -76,30 +78,43 @@ export const FeedPage = () => {
   const selectedBatch = batches.find(b => b.id === selectedBatchId);
   const feedStock = selectedBatch?.feedStock || { 'Pre-Starter': 0, 'Starter': 0, 'Finisher': 0 };
 
-  const totalArrivedBags = feedArrivals.reduce((acc, f) => {
+  const feedStats = feedArrivals.reduce((acc, f) => {
     const type = f.feedType || 'Pre-Starter';
+    const isReturn = f.transactionType === 'Return';
     const bags = Number(f.bagsReceived) || kgToBags(f.quantityReceived || 0, KG_PER_BAG);
-    acc[type] = (acc[type] || 0) + bags;
+    if (isReturn) {
+      acc.returned[type] = (acc.returned[type] || 0) + bags;
+    } else {
+      acc.arrived[type] = (acc.arrived[type] || 0) + bags;
+    }
     return acc;
-  }, { 'Pre-Starter': 0, 'Starter': 0, 'Finisher': 0 });
+  }, {
+    arrived: { 'Pre-Starter': 0, 'Starter': 0, 'Finisher': 0 },
+    returned: { 'Pre-Starter': 0, 'Starter': 0, 'Finisher': 0 }
+  });
 
   const preAvailableBags = kgToBags(Number(feedStock['Pre-Starter'] || 0), KG_PER_BAG);
   const starterAvailableBags = kgToBags(Number(feedStock['Starter'] || 0), KG_PER_BAG);
   const finisherAvailableBags = kgToBags(Number(feedStock['Finisher'] || 0), KG_PER_BAG);
 
-  const preArrivedBags = Math.max(totalArrivedBags['Pre-Starter'] || 0, preAvailableBags);
-  const starterArrivedBags = Math.max(totalArrivedBags['Starter'] || 0, starterAvailableBags);
-  const finisherArrivedBags = Math.max(totalArrivedBags['Finisher'] || 0, finisherAvailableBags);
+  const preArrivedBags = Math.max(feedStats.arrived['Pre-Starter'] || 0, preAvailableBags);
+  const starterArrivedBags = Math.max(feedStats.arrived['Starter'] || 0, starterAvailableBags);
+  const finisherArrivedBags = Math.max(feedStats.arrived['Finisher'] || 0, finisherAvailableBags);
 
-  const preConsumedBags = Math.max(0, parseFloat((preArrivedBags - preAvailableBags).toFixed(1)));
-  const starterConsumedBags = Math.max(0, parseFloat((starterArrivedBags - starterAvailableBags).toFixed(1)));
-  const finisherConsumedBags = Math.max(0, parseFloat((finisherArrivedBags - finisherAvailableBags).toFixed(1)));
+  const preReturnedBags = feedStats.returned['Pre-Starter'] || 0;
+  const starterReturnedBags = feedStats.returned['Starter'] || 0;
+  const finisherReturnedBags = feedStats.returned['Finisher'] || 0;
+
+  const preConsumedBags = Math.max(0, parseFloat((preArrivedBags - preReturnedBags - preAvailableBags).toFixed(1)));
+  const starterConsumedBags = Math.max(0, parseFloat((starterArrivedBags - starterReturnedBags - starterAvailableBags).toFixed(1)));
+  const finisherConsumedBags = Math.max(0, parseFloat((finisherArrivedBags - finisherReturnedBags - finisherAvailableBags).toFixed(1)));
 
   const handleEditArrival = (arrival) => {
     setEditingFeedId(arrival.id);
     setShowForm(true);
     const bags = arrival.bagsReceived || kgToBags(arrival.quantityReceived || 0, KG_PER_BAG);
     setFormData({
+      transactionType: arrival.transactionType || 'Receive',
       feedType: arrival.feedType || 'Pre-Starter',
       driverName: arrival.driverName || '',
       vehicleNumber: arrival.vehicleNumber || '',
@@ -110,14 +125,14 @@ export const FeedPage = () => {
   };
 
   const handleDeleteArrival = async (feedId) => {
-    if (!confirm('Are you sure you want to delete this feed arrival entry? Stock KPI cards will recalculate.')) return;
+    if (!confirm('Are you sure you want to delete this feed entry? Stock KPI cards will recalculate.')) return;
     try {
       await dbDeleteFeedArrival(selectedBatchId, feedId);
-      await dbLogAuditEvent('FEED_DELETED', `Deleted feed arrival entry for batch ${selectedBatch?.batchNumber}`, userProfile?.name);
-      setSuccessMsg('Feed arrival record deleted successfully.');
+      await dbLogAuditEvent('FEED_DELETED', `Deleted feed entry for batch ${selectedBatch?.batchNumber}`, userProfile?.name);
+      setSuccessMsg('Feed record deleted successfully.');
       await loadFeedArrivals(selectedBatchId);
     } catch (err) {
-      alert('Failed deleting feed arrival.');
+      alert('Failed deleting feed record.');
     }
   };
 
@@ -130,9 +145,19 @@ export const FeedPage = () => {
     try {
       const bags = Number(formData.bagsReceived) || 0;
       const totalKg = bagsToKg(bags, KG_PER_BAG);
+      const isReturn = formData.transactionType === 'Return';
+
+      const currentCategoryStockBags = kgToBags(Number(feedStock[formData.feedType] || 0), KG_PER_BAG);
+      if (isReturn && bags > currentCategoryStockBags && !editingFeedId) {
+        if (!confirm(`Warning: Returning ${bags} bags of ${formData.feedType} exceeds current available stock (${currentCategoryStockBags} bags). Do you still want to proceed?`)) {
+          setSaving(false);
+          return;
+        }
+      }
 
       const feedObj = {
         id: editingFeedId || `feed-${Date.now()}`,
+        transactionType: formData.transactionType || 'Receive',
         feedType: formData.feedType,
         driverName: formData.driverName,
         vehicleNumber: formData.vehicleNumber,
@@ -144,17 +169,19 @@ export const FeedPage = () => {
       };
 
       await dbAddFeedArrival(selectedBatch.id, feedObj);
+      const actionText = isReturn ? 'return' : (editingFeedId ? 'update' : 'arrival');
       await dbLogAuditEvent(
-        editingFeedId ? 'FEED_UPDATED' : 'FEED_ARRIVED',
-        `${editingFeedId ? 'Updated' : 'Received'} ${bags} bags of ${formData.feedType} for ${selectedBatch.batchNumber}`,
+        isReturn ? 'FEED_RETURNED' : (editingFeedId ? 'FEED_UPDATED' : 'FEED_ARRIVED'),
+        `${isReturn ? 'Returned' : (editingFeedId ? 'Updated' : 'Received')} ${bags} bags of ${formData.feedType} for ${selectedBatch.batchNumber}`,
         userProfile?.name
       );
 
-      setSuccessMsg(`Successfully ${editingFeedId ? 'updated' : 'added'} ${bags} bags of ${formData.feedType}!`);
+      setSuccessMsg(`Successfully recorded ${actionText} of ${bags} bags of ${formData.feedType}!`);
       setEditingFeedId(null);
       setShowForm(false);
       loadFeedArrivals(selectedBatch.id);
       setFormData({
+        transactionType: 'Receive',
         feedType: 'Pre-Starter',
         driverName: '',
         vehicleNumber: '',
@@ -163,35 +190,71 @@ export const FeedPage = () => {
         notes: ''
       });
     } catch (err) {
-      alert('Failed recording feed arrival: ' + err.message);
+      alert('Failed recording feed transaction: ' + err.message);
     } finally {
       setSaving(false);
     }
   };
 
+  const filteredFeedArrivals = feedArrivals.filter(f => {
+    if (transactionFilter === 'ALL') return true;
+    const type = f.transactionType || 'Receive';
+    return type === transactionFilter;
+  });
+
   if (loading) return <div className="p-8 text-center text-slate-500">Loading Feed Management...</div>;
 
   return (
     <div className="space-y-6">
-      {/* Page Header with Action Button */}
+      {/* Page Header with Action Buttons */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900">Feed Stock & Arrival Management</h1>
-          <p className="text-sm font-medium text-slate-500">Log incoming feed bags arrival and view live available stock in Bags.</p>
+          <h1 className="text-2xl font-black tracking-tight text-slate-900">Feed Stock & Return Management</h1>
+          <p className="text-sm font-medium text-slate-500">Log incoming feed stock, record returned feed, and monitor available inventory.</p>
         </div>
-        <button
-          onClick={() => {
-            setEditingFeedId(null);
-            setShowForm(true);
-          }}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95 shrink-0"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Receive Feed Stock</span>
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => {
+              setEditingFeedId(null);
+              setFormData({
+                transactionType: 'Receive',
+                feedType: 'Pre-Starter',
+                driverName: '',
+                vehicleNumber: '',
+                bagsReceived: 5,
+                date: new Date().toISOString().split('T')[0],
+                notes: ''
+              });
+              setShowForm(true);
+            }}
+            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-3.5 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95"
+          >
+            <Plus className="h-4 w-4" />
+            <span>+ Receive Feed</span>
+          </button>
+          <button
+            onClick={() => {
+              setEditingFeedId(null);
+              setFormData({
+                transactionType: 'Return',
+                feedType: 'Pre-Starter',
+                driverName: '',
+                vehicleNumber: '',
+                bagsReceived: 1,
+                date: new Date().toISOString().split('T')[0],
+                notes: ''
+              });
+              setShowForm(true);
+            }}
+            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 px-3.5 py-2.5 text-xs font-bold text-white shadow-md shadow-amber-600/20 ring-2 ring-amber-500/20 hover:from-amber-700 hover:to-orange-700 transition-all active:scale-95"
+          >
+            <RotateCcw className="h-4 w-4" />
+            <span>- Return Feed</span>
+          </button>
+        </div>
       </div>
 
-      {/* KPI Stock Cards in Bags - Color Coded by Ponni Feeds Bag Colors */}
+      {/* KPI Stock Cards in Bags */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
           title="1. Pre-Starter Stock"
@@ -200,7 +263,7 @@ export const FeedPage = () => {
           availableValue={`${preAvailableBags} Bags`}
           consumedValue={`${preConsumedBags} Bags`}
           arrivedValue={`${preArrivedBags} Bags`}
-          subtext="First deduction priority (Blue Bag)"
+          subtext={`First deduction priority (Blue Bag)${preReturnedBags > 0 ? ` • ${preReturnedBags} Returned` : ''}`}
           icon={Package}
           color="blue"
         />
@@ -211,7 +274,7 @@ export const FeedPage = () => {
           availableValue={`${starterAvailableBags} Bags`}
           consumedValue={`${starterConsumedBags} Bags`}
           arrivedValue={`${starterArrivedBags} Bags`}
-          subtext="Second deduction priority (Green Bag)"
+          subtext={`Second deduction priority (Green Bag)${starterReturnedBags > 0 ? ` • ${starterReturnedBags} Returned` : ''}`}
           icon={Package}
           color="emerald"
         />
@@ -222,7 +285,7 @@ export const FeedPage = () => {
           availableValue={`${finisherAvailableBags} Bags`}
           consumedValue={`${finisherConsumedBags} Bags`}
           arrivedValue={`${finisherArrivedBags} Bags`}
-          subtext="Third deduction priority (Orange Bag)"
+          subtext={`Third deduction priority (Orange Bag)${finisherReturnedBags > 0 ? ` • ${finisherReturnedBags} Returned` : ''}`}
           icon={Package}
           color="orange"
         />
@@ -235,19 +298,31 @@ export const FeedPage = () => {
         </div>
       )}
 
-      {/* Feed Arrival Details Modal */}
+      {/* Feed Transaction Details Modal */}
       <Modal
         isOpen={!!viewingDetail}
         onClose={() => setViewingDetail(null)}
-        title="Feed Arrival Details"
+        title="Feed Transaction Details"
       >
         {viewingDetail && (
           <div className="space-y-4">
             <div className="rounded-xl bg-slate-50 p-4 border border-slate-100 space-y-3 text-xs">
               <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                 <span className="font-medium text-slate-500 flex items-center gap-1.5">
+                  <RotateCcw className="h-4 w-4 text-slate-400" />
+                  Transaction Type
+                </span>
+                <span className={`font-bold inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs ${
+                  viewingDetail.transactionType === 'Return' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                }`}>
+                  {viewingDetail.transactionType === 'Return' ? 'Return Feed (Stock Out -)' : 'Receive Feed (Stock In +)'}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <span className="font-medium text-slate-500 flex items-center gap-1.5">
                   <Calendar className="h-4 w-4 text-slate-400" />
-                  Arrival Date
+                  Date
                 </span>
                 <span className="font-bold text-slate-900">{viewingDetail.date}</span>
               </div>
@@ -273,10 +348,10 @@ export const FeedPage = () => {
               <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                 <span className="font-medium text-slate-500 flex items-center gap-1.5">
                   <Layers className="h-4 w-4 text-emerald-600" />
-                  Bags Received
+                  Quantity
                 </span>
-                <span className="font-bold text-emerald-700">
-                  +{viewingDetail.bagsReceived || kgToBags(viewingDetail.quantityReceived || 0, KG_PER_BAG)} Bags
+                <span className={`font-bold ${viewingDetail.transactionType === 'Return' ? 'text-amber-700' : 'text-emerald-700'}`}>
+                  {viewingDetail.transactionType === 'Return' ? '-' : '+'}{viewingDetail.bagsReceived || kgToBags(viewingDetail.quantityReceived || 0, KG_PER_BAG)} Bags
                 </span>
               </div>
 
@@ -291,7 +366,7 @@ export const FeedPage = () => {
               <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                 <span className="font-medium text-slate-500 flex items-center gap-1.5">
                   <User className="h-4 w-4 text-slate-400" />
-                  Driver Name
+                  Driver / Collector Name
                 </span>
                 <span className="font-bold text-slate-900">{viewingDetail.driverName || '—'}</span>
               </div>
@@ -321,16 +396,28 @@ export const FeedPage = () => {
         )}
       </Modal>
 
-      {/* Feed Arrival Form Modal */}
+      {/* Feed Entry Form Modal */}
       <Modal
         isOpen={showForm}
         onClose={() => {
           setShowForm(false);
           setEditingFeedId(null);
         }}
-        title={editingFeedId ? "Edit Feed Stock Arrival" : "Receive Feed Stock Arrival"}
+        title={editingFeedId ? "Edit Feed Entry" : formData.transactionType === 'Return' ? "Return Feed Stock" : "Receive Feed Stock"}
       >
         <form onSubmit={handleAddArrival} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Transaction Type *</label>
+            <select
+              value={formData.transactionType}
+              onChange={(e) => setFormData({ ...formData, transactionType: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600"
+            >
+              <option value="Receive">Receive Feed (Stock In +)</option>
+              <option value="Return">Return Feed (Stock Out - Reduces Inventory)</option>
+            </select>
+          </div>
+
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Feed Type *</label>
             <select
@@ -345,7 +432,9 @@ export const FeedPage = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Feed Bags Received (Whole Bags: 1, 2, 3...) *</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              {formData.transactionType === 'Return' ? 'Feed Bags Returned (Whole Bags) *' : 'Feed Bags Received (Whole Bags) *'}
+            </label>
             <input
               type="number"
               required
@@ -360,7 +449,7 @@ export const FeedPage = () => {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Arrival Date *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Date *</label>
               <input
                 type="date"
                 required
@@ -383,7 +472,7 @@ export const FeedPage = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Driver Name</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Driver / Collector Name</label>
             <input
               type="text"
               value={formData.driverName}
@@ -399,7 +488,7 @@ export const FeedPage = () => {
               rows="2"
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Optional delivery comments..."
+              placeholder="Optional remarks (e.g. Returned unused bags to mill)..."
               className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
             />
           </div>
@@ -411,6 +500,7 @@ export const FeedPage = () => {
                 setShowForm(false);
                 setEditingFeedId(null);
                 setFormData({
+                  transactionType: 'Receive',
                   feedType: 'Pre-Starter',
                   driverName: '',
                   vehicleNumber: '',
@@ -426,39 +516,57 @@ export const FeedPage = () => {
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+              className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold text-white shadow-sm transition-colors ${
+                formData.transactionType === 'Return' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'
+              } disabled:opacity-50`}
             >
               <Save className="h-4 w-4" />
-              {saving ? 'Processing...' : editingFeedId ? 'Update Arrival' : 'Add Feed Stock'}
+              {saving ? 'Processing...' : editingFeedId ? 'Update Entry' : formData.transactionType === 'Return' ? 'Process Return Feed' : 'Add Feed Stock'}
             </button>
           </div>
         </form>
       </Modal>
 
-      {/* Feed Arrival History with Edit, Delete, and Popup Details Action Controls */}
+      {/* Feed Transaction Log History Table */}
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4">
-          Feed Arrival Log History ({selectedBatch?.batchNumber})
-        </h2>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 mb-4">
+          <h2 className="text-base font-bold text-slate-900">
+            Feed Transaction Log History ({selectedBatch?.batchNumber})
+          </h2>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-500">Filter:</span>
+            <select
+              value={transactionFilter}
+              onChange={(e) => setTransactionFilter(e.target.value)}
+              className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-800 focus:border-emerald-600 cursor-pointer"
+            >
+              <option value="ALL">All Transactions ({feedArrivals.length})</option>
+              <option value="Receive">Received Feed Only</option>
+              <option value="Return">Returned Feed Only</option>
+            </select>
+          </div>
+        </div>
 
         <div className="w-full overflow-hidden">
           <table className="w-full text-left text-xs table-fixed">
             <thead>
               <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
-                <th className="pb-3 px-1 w-[26%] truncate" title="Date">Date</th>
-                <th className="pb-3 px-1 w-[28%] truncate" title="Feed Type">Feed Type</th>
-                <th className="pb-3 px-1 w-[26%] truncate" title="Bags Received">Bags Received</th>
-                <th className="pb-3 px-1 w-[20%] text-right truncate" title="Actions">Actions</th>
+                <th className="pb-3 px-1 w-[22%] truncate" title="Date">Date</th>
+                <th className="pb-3 px-1 w-[24%] truncate" title="Type">Transaction</th>
+                <th className="pb-3 px-1 w-[24%] truncate" title="Feed Category">Feed Category</th>
+                <th className="pb-3 px-1 w-[16%] truncate" title="Quantity">Quantity</th>
+                <th className="pb-3 px-1 w-[14%] text-right truncate" title="Actions">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
-              {feedArrivals.length === 0 ? (
+              {filteredFeedArrivals.length === 0 ? (
                 <tr>
-                  <td colSpan="4" className="py-8 text-center text-slate-400">No feed arrivals recorded for this batch yet. Click any Farm button or "+ Receive Feed Stock" to add data.</td>
+                  <td colSpan="5" className="py-8 text-center text-slate-400">No feed transactions recorded matching criteria.</td>
                 </tr>
               ) : (
-                feedArrivals.map((f) => {
+                filteredFeedArrivals.map((f) => {
                   const bags = f.bagsReceived || kgToBags(f.quantityReceived || 0, KG_PER_BAG);
+                  const isReturn = f.transactionType === 'Return';
                   return (
                     <tr
                       key={f.id}
@@ -466,6 +574,14 @@ export const FeedPage = () => {
                       className="hover:bg-slate-50 cursor-pointer transition-colors"
                     >
                       <td className="py-3 px-1 font-bold text-slate-900 truncate" title={f.date}>{f.date}</td>
+                      <td className="py-3 px-1 font-bold truncate">
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
+                          isReturn ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        }`}>
+                          {isReturn ? <RotateCcw className="h-3 w-3 shrink-0" /> : <Plus className="h-3 w-3 shrink-0" />}
+                          <span>{isReturn ? 'Return Feed' : 'Receive Feed'}</span>
+                        </span>
+                      </td>
                       <td className={`py-3 px-1 font-bold truncate flex items-center gap-1.5 ${
                         f.feedType === 'Pre-Starter' ? 'text-blue-600' :
                         f.feedType === 'Starter' ? 'text-emerald-600' :
@@ -474,27 +590,29 @@ export const FeedPage = () => {
                         <Package className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate">{f.feedType}</span>
                       </td>
-                      <td className="py-3 px-1 font-bold text-slate-800 truncate" title={`+${bags} Bags`}>+{bags} Bags</td>
+                      <td className={`py-3 px-1 font-bold truncate ${isReturn ? 'text-amber-700' : 'text-emerald-700'}`} title={`${isReturn ? '-' : '+'}${bags} Bags`}>
+                        {isReturn ? `-${bags} Bags` : `+${bags} Bags`}
+                      </td>
                       <td className="py-3 px-1 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => setViewingDetail(f)}
                             className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                            title="View Arrival Details"
+                            title="View Details"
                           >
                             <Eye className="h-3.5 w-3.5" />
                           </button>
                           <button
                             onClick={() => handleEditArrival(f)}
                             className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                            title="Edit Arrival"
+                            title="Edit Entry"
                           >
                             <Edit className="h-3.5 w-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteArrival(f.id)}
                             className="rounded-lg p-1 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
-                            title="Delete Arrival"
+                            title="Delete Entry"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>

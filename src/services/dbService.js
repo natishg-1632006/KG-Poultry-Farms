@@ -156,6 +156,7 @@ export function computeBatchFeedStock(batchId, local = getLocalDB()) {
 
   const arrivals = (local.feedStocks[batchId] || []).map(a => ({
     eventType: 'ARRIVAL',
+    transactionType: a.transactionType || 'Receive',
     timeKey: a.createdAt || a.date || '2000-01-01',
     date: a.date || (a.createdAt ? a.createdAt.split('T')[0] : '2000-01-01'),
     feedType: a.feedType || 'Pre-Starter',
@@ -180,7 +181,11 @@ export function computeBatchFeedStock(batchId, local = getLocalDB()) {
   events.forEach(evt => {
     if (evt.eventType === 'ARRIVAL') {
       const fType = evt.feedType || 'Pre-Starter';
-      stock[fType] = (stock[fType] || 0) + evt.kg;
+      if (evt.transactionType === 'Return') {
+        stock[fType] = Math.max(0, (stock[fType] || 0) - evt.kg);
+      } else {
+        stock[fType] = (stock[fType] || 0) + evt.kg;
+      }
     } else if (evt.eventType === 'DAILY_LOG' && evt.kg > 0) {
       const deductionResult = deductFeedStock(stock, null, evt.kg);
       stock['Pre-Starter'] = deductionResult.updatedStock['Pre-Starter'];
