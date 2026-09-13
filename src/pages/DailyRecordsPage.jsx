@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { dbGetBatches, dbGetDailyRecords, dbSaveDailyRecord, dbUpdateBatchFeedStockPool, dbLogAuditEvent } from '../services/dbService';
-import { calculateRemainingChickens, validateRecordDate, deductFeedStock } from '../utils/calculations';
+import { calculateRemainingChickens, validateRecordDate, deductFeedStock, bagsToKg, kgToBags } from '../utils/calculations';
+import { KG_PER_BAG } from '../constants/companyTargets';
 import { ClipboardList, AlertCircle, Save, CheckCircle2 } from 'lucide-react';
 
 export const DailyRecordsPage = () => {
@@ -20,7 +21,8 @@ export const DailyRecordsPage = () => {
     recordDate: todayStr,
     mortalityCount: 0,
     feedType: 'Pre-Starter',
-    feedConsumption: 0,
+    feedConsumptionBags: 1.5,
+    feedConsumptionKg: 105,
     averageWeight: 0
   });
 
@@ -62,14 +64,16 @@ export const DailyRecordsPage = () => {
     try {
       const map = await dbGetDailyRecords(bId);
       setRecordsMap(map || {});
-      // Pre-fill form if today's record exists
       if (map && map[todayStr]) {
         const r = map[todayStr];
+        const kg = r.feedConsumption || 0;
+        const bags = r.feedConsumptionBags || kgToBags(kg, KG_PER_BAG);
         setFormData({
           recordDate: r.recordDate,
           mortalityCount: r.mortalityCount || 0,
           feedType: r.feedType || 'Pre-Starter',
-          feedConsumption: r.feedConsumption || 0,
+          feedConsumptionBags: bags,
+          feedConsumptionKg: kg,
           averageWeight: r.averageWeight || 0
         });
       }
@@ -81,7 +85,6 @@ export const DailyRecordsPage = () => {
   const selectedBatch = batches.find(b => b.id === selectedBatchId);
   const isReadOnly = isFarmer && selectedBatch?.status !== 'Active';
 
-  // Handle Date Selection: pre-populate if record already exists for that date
   const handleDateChange = (newDate) => {
     setErrorMsg('');
     setSuccessMsg('');
@@ -93,11 +96,14 @@ export const DailyRecordsPage = () => {
 
     if (recordsMap && recordsMap[newDate]) {
       const existing = recordsMap[newDate];
+      const kg = existing.feedConsumption || 0;
+      const bags = existing.feedConsumptionBags || kgToBags(kg, KG_PER_BAG);
       setFormData({
         recordDate: newDate,
         mortalityCount: existing.mortalityCount || 0,
         feedType: existing.feedType || 'Pre-Starter',
-        feedConsumption: existing.feedConsumption || 0,
+        feedConsumptionBags: bags,
+        feedConsumptionKg: kg,
         averageWeight: existing.averageWeight || 0
       });
     } else {
@@ -105,13 +111,22 @@ export const DailyRecordsPage = () => {
         recordDate: newDate,
         mortalityCount: 0,
         feedType: 'Pre-Starter',
-        feedConsumption: 0,
+        feedConsumptionBags: 1.5,
+        feedConsumptionKg: 105,
         averageWeight: 0
       });
     }
   };
 
-  // Calculate live remaining count preview
+  const handleBagsChange = (bagsVal) => {
+    const b = Number(bagsVal) || 0;
+    setFormData({
+      ...formData,
+      feedConsumptionBags: bagsVal,
+      feedConsumptionKg: bagsToKg(b, KG_PER_BAG)
+    });
+  };
+
   const prevRemaining = selectedBatch ? (selectedBatch.remainingChickCount !== undefined ? Number(selectedBatch.remainingChickCount) : Number(selectedBatch.initialChickCount)) : 0;
   let calculatedRemaining = prevRemaining;
   let calculationError = null;
@@ -150,30 +165,30 @@ export const DailyRecordsPage = () => {
 
     setSaving(true);
     try {
-      // 1. Calculate new feed stock pool
-      const currentFeedStock = selectedBatch.feedStock || { 'Pre-Starter': 0, 'Starter': 0, 'Finisher': 0 };
-      const deductionResult = deductFeedStock(currentFeedStock, formData.feedType, formData.feedConsumption);
+      const totalKg = Number(formData.feedConsumptionKg) || bagsToKg(formData.feedConsumptionBags, KG_PER_BAG);
+      const totalBags = Number(formData.feedConsumptionBags) || kgToBags(totalKg, KG_PER_BAG);
 
-      // 2. Save daily record object
+      const currentFeedStock = selectedBatch.feedStock || { 'Pre-Starter': 0, 'Starter': 0, 'Finisher': 0 };
+      const deductionResult = deductFeedStock(currentFeedStock, formData.feedType, totalKg);
+
       const recordObj = {
         batchId: selectedBatch.id,
         recordDate: formData.recordDate,
         mortalityCount: Number(formData.mortalityCount),
         feedType: formData.feedType,
-        feedConsumption: Number(formData.feedConsumption),
+        feedConsumption: totalKg,
+        feedConsumptionBags: totalBags,
         averageWeight: Number(formData.averageWeight),
         remainingChickCount: calculatedRemaining,
         recordedBy: userProfile?.name || 'Farmer'
       };
 
       await dbSaveDailyRecord(selectedBatch.id, formData.recordDate, recordObj);
-
-      // 3. Deduct feed stock from batch pool
       await dbUpdateBatchFeedStockPool(selectedBatch.id, deductionResult.updatedStock);
 
       await dbLogAuditEvent(
         'DAILY_RECORD_SAVED',
-        `Logged daily record for ${selectedBatch.batchNumber} on ${formData.recordDate} (Mortality: ${formData.mortalityCount}, Consumed: ${formData.feedConsumption}kg)`,
+        `Logged daily record for ${selectedBatch.batchNumber} on ${formData.recordDate} (Mortality: ${formData.mortalityCount}, Feed: ${totalBags} Bags / ${totalKg}kg)`,
         userProfile?.name
       );
 
@@ -196,7 +211,7 @@ export const DailyRecordsPage = () => {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-slate-900">Daily Farm Records</h1>
-          <p className="text-sm font-medium text-slate-500">Record daily mortality, feed consumption, and chicken growth weights.</p>
+          <p className="text-sm font-medium text-slate-500">Record daily mortality, feed consumption in Bags (70 kg/bag), and chicken weights.</p>
         </div>
         {selectedBatch && (
           <div className="flex items-center gap-2">
@@ -253,11 +268,8 @@ export const DailyRecordsPage = () => {
                 disabled={isReadOnly}
                 value={formData.recordDate}
                 onChange={(e) => handleDateChange(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 focus:outline-hidden disabled:bg-slate-50"
+                className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
               />
-              <span className="text-[10px] text-slate-400 mt-1 block">
-                Allowed: {selectedBatch?.chickArrivalDate} through today ({todayStr}). Future dates disabled.
-              </span>
             </div>
 
             <div className="rounded-xl bg-slate-50 border border-slate-100 p-3">
@@ -277,36 +289,51 @@ export const DailyRecordsPage = () => {
                 disabled={isReadOnly}
                 value={formData.mortalityCount}
                 onChange={(e) => setFormData({ ...formData, mortalityCount: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 focus:outline-hidden disabled:bg-slate-50"
+                className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Feed Type *</label>
+              <select
+                disabled={isReadOnly}
+                value={formData.feedType}
+                onChange={(e) => setFormData({ ...formData, feedType: e.target.value })}
+                className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
+              >
+                <option value="Pre-Starter">Pre-Starter</option>
+                <option value="Starter">Starter</option>
+                <option value="Finisher">Finisher</option>
+              </select>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Feed Type *</label>
-                <select
-                  disabled={isReadOnly}
-                  value={formData.feedType}
-                  onChange={(e) => setFormData({ ...formData, feedType: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600 focus:outline-hidden disabled:bg-slate-50"
-                >
-                  <option value="Pre-Starter">Pre-Starter</option>
-                  <option value="Starter">Starter</option>
-                  <option value="Finisher">Finisher</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Feed Consumed (kg) *</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Feed Bags Used *</label>
                 <input
                   type="number"
                   required
-                  min="0"
+                  min="0.1"
                   step="0.1"
                   disabled={isReadOnly}
-                  value={formData.feedConsumption}
-                  onChange={(e) => setFormData({ ...formData, feedConsumption: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 focus:outline-hidden disabled:bg-slate-50"
+                  value={formData.feedConsumptionBags}
+                  onChange={(e) => handleBagsChange(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">1 Bag = 70 kg</span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Weight (kg)</label>
+                <input
+                  type="number"
+                  required
+                  min="0.1"
+                  step="0.1"
+                  disabled={isReadOnly}
+                  value={formData.feedConsumptionKg}
+                  onChange={(e) => setFormData({ ...formData, feedConsumptionKg: e.target.value, feedConsumptionBags: kgToBags(e.target.value, KG_PER_BAG) })}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-emerald-700 disabled:bg-slate-50"
                 />
               </div>
             </div>
@@ -322,7 +349,7 @@ export const DailyRecordsPage = () => {
                 value={formData.averageWeight}
                 onChange={(e) => setFormData({ ...formData, averageWeight: e.target.value })}
                 placeholder="e.g. 58"
-                className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 focus:outline-hidden disabled:bg-slate-50"
+                className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
               />
             </div>
 
@@ -353,7 +380,7 @@ export const DailyRecordsPage = () => {
                   <th className="pb-3 px-2">Mortality</th>
                   <th className="pb-3 px-2">Remaining Chicks</th>
                   <th className="pb-3 px-2">Feed Used</th>
-                  <th className="pb-3 px-2">Consumption (kg)</th>
+                  <th className="pb-3 px-2">Bags (kg) Consumed</th>
                   <th className="pb-3 px-2 text-right">Avg Weight (g)</th>
                 </tr>
               </thead>
@@ -363,16 +390,19 @@ export const DailyRecordsPage = () => {
                     <td colSpan="6" className="py-8 text-center text-slate-400">No daily records for this batch yet.</td>
                   </tr>
                 ) : (
-                  recordsList.map((r) => (
-                    <tr key={r.recordDate} className="hover:bg-slate-50">
-                      <td className="py-3 px-2 font-bold text-slate-900">{r.recordDate}</td>
-                      <td className="py-3 px-2 font-bold text-rose-600">{r.mortalityCount}</td>
-                      <td className="py-3 px-2 text-emerald-700 font-bold">{r.remainingChickCount}</td>
-                      <td className="py-3 px-2 text-slate-700">{r.feedType}</td>
-                      <td className="py-3 px-2 text-slate-700">{r.feedConsumption}</td>
-                      <td className="py-3 px-2 text-right font-bold text-slate-900">{r.averageWeight} g</td>
-                    </tr>
-                  ))
+                  recordsList.map((r) => {
+                    const bags = r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG);
+                    return (
+                      <tr key={r.recordDate} className="hover:bg-slate-50">
+                        <td className="py-3 px-2 font-bold text-slate-900">{r.recordDate}</td>
+                        <td className="py-3 px-2 font-bold text-rose-600">{r.mortalityCount}</td>
+                        <td className="py-3 px-2 text-emerald-700 font-bold">{r.remainingChickCount}</td>
+                        <td className="py-3 px-2 text-slate-700">{r.feedType}</td>
+                        <td className="py-3 px-2 text-slate-700">{bags} Bags ({r.feedConsumption} kg)</td>
+                        <td className="py-3 px-2 text-right font-bold text-slate-900">{r.averageWeight} g</td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

@@ -43,3 +43,6 @@ export const USER_ROLES = {
 };
 
 export const MEDICINE_UNITS = ['g', 'kg', 'ml', 'l'];
+
+export const KG_PER_BAG = 70;
+

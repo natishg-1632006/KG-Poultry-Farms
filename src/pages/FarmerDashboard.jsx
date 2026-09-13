@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { dbGetBatches, dbGetDailyRecords } from '../services/dbService';
+import { formatFeedStock, kgToBags } from '../utils/calculations';
+import { KG_PER_BAG } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
 import { Badge } from '../components/common/Badge';
 import { ClipboardList, Wheat, Syringe, Truck, Activity, ArrowRight } from 'lucide-react';
@@ -14,33 +16,33 @@ export const FarmerDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function loadFarmerData() {
-      try {
-        const allBatches = await dbGetBatches();
-        // Filter assigned batches
-        const farmerBatches = allBatches.filter(
-          b => b.assignedFarmerId === userProfile?.uid || 
-               b.assignedFarmerName === userProfile?.name ||
-               userProfile?.assignedBatches?.includes(b.batchNumber) ||
-               userProfile?.assignedBatches?.includes(b.id)
-        );
-        
-        setAssignedBatches(farmerBatches);
-        const currentActive = farmerBatches.find(b => b.status === 'Active') || farmerBatches[0];
-        setActiveBatch(currentActive);
-
-        if (currentActive) {
-          const rMap = await dbGetDailyRecords(currentActive.id);
-          setRecords(Object.values(rMap).sort((a, b) => b.recordDate.localeCompare(a.recordDate)));
-        }
-      } catch (err) {
-        console.error('Failed loading farmer dashboard data:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
     loadFarmerData();
   }, [userProfile]);
+
+  async function loadFarmerData() {
+    try {
+      const allBatches = await dbGetBatches();
+      const farmerBatches = allBatches.filter(
+        b => b.assignedFarmerId === userProfile?.uid || 
+             b.assignedFarmerName === userProfile?.name ||
+             userProfile?.assignedBatches?.includes(b.batchNumber) ||
+             userProfile?.assignedBatches?.includes(b.id)
+      );
+      
+      setAssignedBatches(farmerBatches);
+      const currentActive = farmerBatches.find(b => b.status === 'Active') || farmerBatches[0];
+      setActiveBatch(currentActive);
+
+      if (currentActive) {
+        const rMap = await dbGetDailyRecords(currentActive.id);
+        setRecords(Object.values(rMap).sort((a, b) => b.recordDate.localeCompare(a.recordDate)));
+      }
+    } catch (err) {
+      console.error('Failed loading farmer dashboard data:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   if (loading) {
     return <div className="p-8 text-center text-slate-500">Loading Farmer Portal...</div>;
@@ -73,7 +75,7 @@ export const FarmerDashboard = () => {
         </div>
       ) : (
         <>
-          {/* Metrics Overview */}
+          {/* Metrics Overview showing Bags & Kg */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
               title="Remaining Chickens"
@@ -84,22 +86,22 @@ export const FarmerDashboard = () => {
             />
             <StatCard
               title="Pre-Starter Stock"
-              value={`${feedStock['Pre-Starter'] || 0} kg`}
-              subtext="First phase feed"
+              value={formatFeedStock(feedStock['Pre-Starter'] || 0)}
+              subtext="First phase (70kg/bag)"
               icon={Wheat}
               color="amber"
             />
             <StatCard
               title="Starter Stock"
-              value={`${feedStock['Starter'] || 0} kg`}
-              subtext="Growth phase feed"
+              value={formatFeedStock(feedStock['Starter'] || 0)}
+              subtext="Growth phase (70kg/bag)"
               icon={Wheat}
               color="indigo"
             />
             <StatCard
               title="Finisher Stock"
-              value={`${feedStock['Finisher'] || 0} kg`}
-              subtext="Final phase feed"
+              value={formatFeedStock(feedStock['Finisher'] || 0)}
+              subtext="Final phase (70kg/bag)"
               icon={Wheat}
               color="blue"
             />
@@ -132,10 +134,10 @@ export const FarmerDashboard = () => {
                   <Wheat className="h-5 w-5" />
                 </div>
                 <h3 className="mt-4 font-bold text-slate-900">Feed Stock Receive</h3>
-                <p className="mt-1 text-xs text-slate-500">Log incoming feed bags, vehicle numbers, and feed types.</p>
+                <p className="mt-1 text-xs text-slate-500">Log incoming feed bags (70 kg/bag) & vehicle records.</p>
               </div>
               <div className="mt-4 flex items-center text-xs font-bold text-amber-600">
-                Receive Feed Arrival <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                Receive Feed Bags <ArrowRight className="ml-1 h-3.5 w-3.5" />
               </div>
             </Link>
 
@@ -183,7 +185,7 @@ export const FarmerDashboard = () => {
                     <th className="pb-3 px-2">Mortality</th>
                     <th className="pb-3 px-2">Remaining Chicks</th>
                     <th className="pb-3 px-2">Feed Type Used</th>
-                    <th className="pb-3 px-2">Feed Consumed (kg)</th>
+                    <th className="pb-3 px-2">Feed Consumed</th>
                     <th className="pb-3 px-2 text-right">Avg Weight (g)</th>
                   </tr>
                 </thead>
@@ -193,16 +195,19 @@ export const FarmerDashboard = () => {
                       <td colSpan="6" className="py-6 text-center text-slate-400">No daily records logged for this batch yet.</td>
                     </tr>
                   ) : (
-                    records.slice(0, 5).map((r) => (
-                      <tr key={r.recordDate} className="hover:bg-slate-50">
-                        <td className="py-3 px-2 font-bold text-slate-900">{r.recordDate}</td>
-                        <td className="py-3 px-2 font-bold text-rose-600">{r.mortalityCount}</td>
-                        <td className="py-3 px-2 text-emerald-700">{r.remainingChickCount}</td>
-                        <td className="py-3 px-2 text-slate-700">{r.feedType}</td>
-                        <td className="py-3 px-2 text-slate-700">{r.feedConsumption}</td>
-                        <td className="py-3 px-2 text-right font-bold text-slate-900">{r.averageWeight} g</td>
-                      </tr>
-                    ))
+                    records.map((r) => {
+                      const bagsUsed = kgToBags(r.feedConsumption || 0, KG_PER_BAG);
+                      return (
+                        <tr key={r.recordDate} className="hover:bg-slate-50">
+                          <td className="py-3 px-2 font-bold text-slate-900">{r.recordDate}</td>
+                          <td className="py-3 px-2 font-bold text-rose-600">{r.mortalityCount}</td>
+                          <td className="py-3 px-2 text-emerald-700 font-bold">{r.remainingChickCount}</td>
+                          <td className="py-3 px-2 text-slate-700">{r.feedType}</td>
+                          <td className="py-3 px-2 text-slate-700">{bagsUsed} Bags ({r.feedConsumption} kg)</td>
+                          <td className="py-3 px-2 text-right font-bold text-slate-900">{r.averageWeight} g</td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

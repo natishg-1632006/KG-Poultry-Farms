@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { dbGetBatches, dbGetFeedArrivals, dbAddFeedArrival, dbLogAuditEvent } from '../services/dbService';
+import { formatFeedStock, bagsToKg, kgToBags } from '../utils/calculations';
+import { KG_PER_BAG } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
 import { Wheat, Truck, Save, CheckCircle2 } from 'lucide-react';
 
@@ -17,7 +19,8 @@ export const FeedPage = () => {
     feedType: 'Pre-Starter',
     driverName: '',
     vehicleNumber: '',
-    quantityReceived: 500,
+    bagsReceived: 5,
+    quantityReceivedKg: 350,
     date: new Date().toISOString().split('T')[0],
     notes: ''
   });
@@ -65,6 +68,16 @@ export const FeedPage = () => {
     }
   }
 
+  const handleBagsChange = (bagsVal) => {
+    const b = Number(bagsVal) || 0;
+    const calculatedKg = bagsToKg(b, KG_PER_BAG);
+    setFormData({
+      ...formData,
+      bagsReceived: bagsVal,
+      quantityReceivedKg: calculatedKg
+    });
+  };
+
   const selectedBatch = batches.find(b => b.id === selectedBatchId);
   const feedStock = selectedBatch?.feedStock || { 'Pre-Starter': 0, 'Starter': 0, 'Finisher': 0 };
 
@@ -75,26 +88,36 @@ export const FeedPage = () => {
 
     setSaving(true);
     try {
+      const totalKg = Number(formData.quantityReceivedKg) || bagsToKg(formData.bagsReceived, KG_PER_BAG);
+      const bags = Number(formData.bagsReceived) || kgToBags(totalKg, KG_PER_BAG);
+
       const feedObj = {
-        ...formData,
-        quantityReceived: Number(formData.quantityReceived)
+        feedType: formData.feedType,
+        driverName: formData.driverName,
+        vehicleNumber: formData.vehicleNumber,
+        bagsReceived: bags,
+        quantityReceived: totalKg,
+        quantityReceivedKg: totalKg,
+        date: formData.date,
+        notes: formData.notes
       };
 
       await dbAddFeedArrival(selectedBatch.id, feedObj);
       await dbLogAuditEvent(
         'FEED_ARRIVED',
-        `Received ${formData.quantityReceived}kg of ${formData.feedType} for ${selectedBatch.batchNumber} (Vehicle: ${formData.vehicleNumber})`,
+        `Received ${bags} bags (${totalKg} kg) of ${formData.feedType} for ${selectedBatch.batchNumber} (Vehicle: ${formData.vehicleNumber})`,
         userProfile?.name
       );
 
-      setSuccessMsg(`Successfully added ${formData.quantityReceived} kg of ${formData.feedType}!`);
+      setSuccessMsg(`Successfully added ${bags} bags (${totalKg} kg) of ${formData.feedType}!`);
       loadFeedArrivals(selectedBatch.id);
       loadBatches();
       setFormData({
         feedType: 'Pre-Starter',
         driverName: '',
         vehicleNumber: '',
-        quantityReceived: 500,
+        bagsReceived: 5,
+        quantityReceivedKg: 350,
         date: new Date().toISOString().split('T')[0],
         notes: ''
       });
@@ -112,7 +135,7 @@ export const FeedPage = () => {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-slate-900">Feed Stock & Arrival Management</h1>
-          <p className="text-sm font-medium text-slate-500">Log incoming feed bags, driver/vehicle records, and view live stock pools.</p>
+          <p className="text-sm font-medium text-slate-500">Log feed bags arrival (70 kg/bag), vehicle numbers, and view live stock KPI cards.</p>
         </div>
         {selectedBatch && (
           <div className="flex items-center gap-2">
@@ -130,25 +153,25 @@ export const FeedPage = () => {
         )}
       </div>
 
-      {/* Stock Cards */}
+      {/* Dynamic KPI Stock Cards displaying in Bags and Kg */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
           title="1. Pre-Starter Stock"
-          value={`${feedStock['Pre-Starter'] || 0} kg`}
+          value={formatFeedStock(feedStock['Pre-Starter'] || 0)}
           subtext="First deduction priority"
           icon={Wheat}
           color="amber"
         />
         <StatCard
           title="2. Starter Stock"
-          value={`${feedStock['Starter'] || 0} kg`}
+          value={formatFeedStock(feedStock['Starter'] || 0)}
           subtext="Second deduction priority"
           icon={Wheat}
           color="indigo"
         />
         <StatCard
           title="3. Finisher Stock"
-          value={`${feedStock['Finisher'] || 0} kg`}
+          value={formatFeedStock(feedStock['Finisher'] || 0)}
           subtext="Third deduction priority"
           icon={Wheat}
           color="blue"
@@ -184,17 +207,34 @@ export const FeedPage = () => {
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Quantity Received (kg) *</label>
-              <input
-                type="number"
-                required
-                min="1"
-                step="0.5"
-                value={formData.quantityReceived}
-                onChange={(e) => setFormData({ ...formData, quantityReceived: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
-              />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Bags Received *</label>
+                <input
+                  type="number"
+                  required
+                  min="0.5"
+                  step="0.5"
+                  value={formData.bagsReceived}
+                  onChange={(e) => handleBagsChange(e.target.value)}
+                  placeholder="e.g. 5"
+                  className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">1 Bag = 70 kg</span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Total Weight (kg)</label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  step="0.5"
+                  value={formData.quantityReceivedKg}
+                  onChange={(e) => setFormData({ ...formData, quantityReceivedKg: e.target.value, bagsReceived: kgToBags(e.target.value, KG_PER_BAG) })}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-emerald-700"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -266,10 +306,10 @@ export const FeedPage = () => {
                 <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
                   <th className="pb-3 px-2">Date</th>
                   <th className="pb-3 px-2">Feed Type</th>
-                  <th className="pb-3 px-2">Quantity Recv</th>
+                  <th className="pb-3 px-2">Bags Recv</th>
+                  <th className="pb-3 px-2">Total Weight</th>
                   <th className="pb-3 px-2">Vehicle #</th>
-                  <th className="pb-3 px-2">Driver Name</th>
-                  <th className="pb-3 px-2">Notes</th>
+                  <th className="pb-3 px-2">Driver</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
@@ -278,16 +318,20 @@ export const FeedPage = () => {
                     <td colSpan="6" className="py-8 text-center text-slate-400">No feed arrivals recorded for this batch yet.</td>
                   </tr>
                 ) : (
-                  feedArrivals.map((f) => (
-                    <tr key={f.id} className="hover:bg-slate-50">
-                      <td className="py-3 px-2 font-bold text-slate-900">{f.date}</td>
-                      <td className="py-3 px-2 font-bold text-amber-700">{f.feedType}</td>
-                      <td className="py-3 px-2 font-bold text-emerald-600">+{f.quantityReceived} kg</td>
-                      <td className="py-3 px-2 text-slate-600">{f.vehicleNumber || '—'}</td>
-                      <td className="py-3 px-2 text-slate-600">{f.driverName || '—'}</td>
-                      <td className="py-3 px-2 text-slate-500 text-[11px]">{f.notes || '—'}</td>
-                    </tr>
-                  ))
+                  feedArrivals.map((f) => {
+                    const totalKg = f.quantityReceivedKg || f.quantityReceived || 0;
+                    const bags = f.bagsReceived || kgToBags(totalKg, KG_PER_BAG);
+                    return (
+                      <tr key={f.id} className="hover:bg-slate-50">
+                        <td className="py-3 px-2 font-bold text-slate-900">{f.date}</td>
+                        <td className="py-3 px-2 font-bold text-amber-700">{f.feedType}</td>
+                        <td className="py-3 px-2 font-bold text-emerald-700">+{bags} Bags</td>
+                        <td className="py-3 px-2 text-slate-700">+{totalKg} kg</td>
+                        <td className="py-3 px-2 text-slate-600">{f.vehicleNumber || '—'}</td>
+                        <td className="py-3 px-2 text-slate-600">{f.driverName || '—'}</td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

@@ -2,7 +2,40 @@
  * Calculation engine for KG Poultry Farms Management System
  */
 
-import { FEED_DEDUCTION_ORDER } from '../constants/companyTargets';
+import { FEED_DEDUCTION_ORDER, KG_PER_BAG } from '../constants/companyTargets';
+
+/**
+ * Convert feed bags to kilograms
+ * @param {number} bags 
+ * @param {number} [kgPerBag=70] 
+ * @returns {number}
+ */
+export function bagsToKg(bags, kgPerBag = KG_PER_BAG) {
+  const b = Number(bags) || 0;
+  return parseFloat((b * kgPerBag).toFixed(2));
+}
+
+/**
+ * Convert kilograms to feed bags
+ * @param {number} kg 
+ * @param {number} [kgPerBag=70] 
+ * @returns {number}
+ */
+export function kgToBags(kg, kgPerBag = KG_PER_BAG) {
+  const k = Number(kg) || 0;
+  return parseFloat((k / kgPerBag).toFixed(1));
+}
+
+/**
+ * Format feed stock string in Bags & Kg
+ * @param {number} kgAmount 
+ * @returns {string} e.g. "7.1 Bags (500 kg)"
+ */
+export function formatFeedStock(kgAmount) {
+  const k = Number(kgAmount) || 0;
+  const bags = (k / KG_PER_BAG).toFixed(1);
+  return `${bags} Bags (${k} kg)`;
+}
 
 /**
  * Calculates remaining chicken count after mortality
@@ -120,7 +153,6 @@ export function deductFeedStock(currentStock = {}, specifiedFeedType = null, con
   };
 
   if (specifiedFeedType && stock[specifiedFeedType] !== undefined) {
-    // If specific feed type provided, deduct directly from that type first
     const available = stock[specifiedFeedType];
     const deduct = Math.min(available, remainingToDeduct);
     stock[specifiedFeedType] -= deduct;
@@ -128,7 +160,6 @@ export function deductFeedStock(currentStock = {}, specifiedFeedType = null, con
     remainingToDeduct -= deduct;
   }
 
-  // Deduct remaining from order: Pre-Starter -> Starter -> Finisher
   if (remainingToDeduct > 0) {
     for (const type of FEED_DEDUCTION_ORDER) {
       if (remainingToDeduct <= 0) break;
