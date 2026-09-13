@@ -286,51 +286,46 @@ export const DispatchPage = () => {
 
   return (
     <div className="space-y-6">
+      {/* Page Header with Action Button */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-slate-900">Chicken Dispatch & Weighing</h1>
           <p className="text-sm font-medium text-slate-500">Manage vehicle dispatches, box set weights, and totals.</p>
         </div>
+        <button
+          onClick={() => setShowForm(true)}
+          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95 shrink-0"
+        >
+          <Plus className="h-4 w-4" />
+          <span>Create Dispatch Entry</span>
+        </button>
       </div>
 
-      {/* Interactive Farm / Batch Button Selector Bar */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4.5 shadow-sm space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-black text-slate-500 uppercase tracking-wider block">Select Farm Shed / Batch:</span>
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-emerald-500/25 ring-2 ring-emerald-500/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95"
-          >
-            <Plus className="h-4 w-4" />
-            <span>+ Create Dispatch Entry</span>
-          </button>
-        </div>
-        <div className="flex flex-wrap items-center gap-2.5">
-          {batches.length === 0 ? (
-            <p className="text-xs text-slate-400">No batches available.</p>
-          ) : (
-            batches.map((b) => (
-              <button
-                key={b.id}
-                onClick={() => {
-                  setSelectedBatchId(b.id);
-                  setShowForm(true);
-                }}
-                className={`group flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-xs transition-all duration-200 ${
-                  selectedBatchId === b.id
-                    ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-500/40 border border-emerald-400/30 font-black scale-[1.02]'
-                    : 'bg-slate-50/90 border border-slate-200 text-slate-700 hover:bg-emerald-50/50 hover:border-emerald-300/80 hover:text-emerald-800 font-bold shadow-xs'
-                }`}
-              >
-                <div className={`rounded-lg p-1 transition-colors ${selectedBatchId === b.id ? 'bg-white/20 text-white' : 'bg-slate-200/70 text-slate-500 group-hover:bg-emerald-100 group-hover:text-emerald-700'}`}>
-                  <Layers className="h-3.5 w-3.5" />
-                </div>
-                <span>{b.batchNumber}</span>
-                <span className={selectedBatchId === b.id ? 'text-emerald-100 font-medium' : 'text-slate-400 group-hover:text-emerald-600 font-medium'}>({b.batchName})</span>
-              </button>
-            ))
-          )}
-        </div>
+      {/* Sleek Farm Shed Selector Bar */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">Farm Sheds:</span>
+        {batches.length === 0 ? (
+          <p className="text-xs text-slate-400">No batches available.</p>
+        ) : (
+          batches.map((b) => (
+            <button
+              key={b.id}
+              onClick={() => {
+                setSelectedBatchId(b.id);
+                setShowForm(true);
+              }}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all shrink-0 ${
+                selectedBatchId === b.id
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/25 ring-2 ring-emerald-500/30'
+                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
+              }`}
+            >
+              <Layers className={`h-3.5 w-3.5 ${selectedBatchId === b.id ? 'text-white' : 'text-emerald-600'}`} />
+              <span>{b.batchNumber}</span>
+              <span className={`text-[11px] ${selectedBatchId === b.id ? 'text-emerald-100' : 'text-slate-400'}`}>({b.batchName})</span>
+            </button>
+          ))
+        )}
       </div>
 
       {successMsg && (
