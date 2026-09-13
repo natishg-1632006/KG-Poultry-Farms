@@ -295,9 +295,21 @@ export async function dbSaveDailyRecord(batchId, recordDate, recordData) {
   local.dailyRecords[batchId][recordDate] = record;
 
   if (local.batches[batchId]) {
-    local.batches[batchId].remainingChickCount = record.remainingChickCount;
+    const totalMortality = Object.values(local.dailyRecords[batchId]).reduce((sum, r) => sum + Number(r.mortalityCount || 0), 0);
+    const initialChicks = Number(local.batches[batchId].initialChickCount || 5000);
+    const remaining = Math.max(0, initialChicks - totalMortality);
+
+    local.batches[batchId].remainingChickCount = remaining;
     local.batches[batchId].feedStock = computeBatchFeedStock(batchId, local);
+
+    try {
+      await withTimeout(set(ref(db, `batches/${batchId}/remainingChickCount`), remaining));
+      await withTimeout(set(ref(db, `batches/${batchId}/feedStock`), local.batches[batchId].feedStock));
+    } catch (_e) {
+      // fallback
+    }
   }
+
   saveLocalDB(local);
   return record;
 }
@@ -313,9 +325,23 @@ export async function dbDeleteDailyRecord(batchId, recordDate) {
   if (local.dailyRecords[batchId]) {
     delete local.dailyRecords[batchId][recordDate];
   }
+
   if (local.batches[batchId]) {
+    const totalMortality = Object.values(local.dailyRecords[batchId] || {}).reduce((sum, r) => sum + Number(r.mortalityCount || 0), 0);
+    const initialChicks = Number(local.batches[batchId].initialChickCount || 5000);
+    const remaining = Math.max(0, initialChicks - totalMortality);
+
+    local.batches[batchId].remainingChickCount = remaining;
     local.batches[batchId].feedStock = computeBatchFeedStock(batchId, local);
+
+    try {
+      await withTimeout(set(ref(db, `batches/${batchId}/remainingChickCount`), remaining));
+      await withTimeout(set(ref(db, `batches/${batchId}/feedStock`), local.batches[batchId].feedStock));
+    } catch (_e) {
+      // fallback
+    }
   }
+
   saveLocalDB(local);
 }
 

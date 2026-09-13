@@ -206,8 +206,8 @@ export const DailyRecordsPage = () => {
 
       setSuccessMsg(`Daily record for ${formData.recordDate} saved successfully!`);
       setShowForm(false);
-      loadRecordsForBatch(selectedBatch.id);
-      loadBatches();
+      await loadRecordsForBatch(selectedBatch.id);
+      await loadBatches();
     } catch (err) {
       setErrorMsg('Failed saving daily record: ' + err.message);
     } finally {

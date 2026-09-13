@@ -50,14 +50,13 @@ export const FarmerDashboard = () => {
   }
 
   const initialChicks = activeBatch ? Number(activeBatch.initialChickCount || 0) : 0;
-  const remainingChicks = activeBatch ? (activeBatch.remainingChickCount ?? activeBatch.initialChickCount) : 0;
+  const totalMortality = records.reduce((acc, r) => acc + Number(r.mortalityCount || 0), 0);
+  const remainingChicks = Math.max(0, initialChicks - totalMortality);
 
   const totalFeedBags = records.reduce((acc, r) => {
     const bags = r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG);
     return acc + Number(bags || 0);
   }, 0);
-
-  const totalMortality = records.reduce((acc, r) => acc + Number(r.mortalityCount || 0), 0);
 
   const latestRecord = records.length > 0 ? records[0] : null;
   const latestAvgWeight = latestRecord ? Number(latestRecord.averageWeight || 0) : 0;
