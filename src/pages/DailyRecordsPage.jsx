@@ -315,6 +315,7 @@ export const DailyRecordsPage = () => {
   // Compute Last Record feed and weight details
   let lastRecordFlockAgeDay = 1;
   let lastRecordBags = 0;
+  let lastRecordLooseKg = 0;
   let lastRecordTotalKg = 0;
   let lastRecordPerBirdGram = 0;
   let lastRecordTargetGram = 20;
@@ -331,7 +332,7 @@ export const DailyRecordsPage = () => {
     lastRecordTargetGram = FEED_CONSUMPTION_TARGETS[lastRecordFlockAgeDay] || 20;
     lastRecordTargetWeightGram = AVERAGE_WEIGHT_TARGETS[lastRecordFlockAgeDay] || 58;
     lastRecordBags = lastRecord.feedConsumptionBags !== undefined ? lastRecord.feedConsumptionBags : (lastRecord.feedConsumption ? Math.floor(lastRecord.feedConsumption / KG_PER_BAG) : 0);
-    const lastRecordLooseKg = lastRecord.additionalLooseKg || (lastRecord.feedConsumption ? parseFloat((lastRecord.feedConsumption % KG_PER_BAG).toFixed(1)) : 0);
+    lastRecordLooseKg = lastRecord.additionalLooseKg !== undefined && lastRecord.additionalLooseKg !== null ? lastRecord.additionalLooseKg : (lastRecord.feedConsumption ? parseFloat((lastRecord.feedConsumption % KG_PER_BAG).toFixed(1)) : 0);
     lastRecordTotalKg = Number(lastRecord.feedConsumption || ((lastRecordBags * KG_PER_BAG) + lastRecordLooseKg));
     const chicksCount = Number(lastRecord.remainingChickCount || selectedBatch?.remainingChickCount || selectedBatch?.initialChickCount || 5000);
     lastRecordPerBirdGram = chicksCount > 0 ? Math.round((lastRecordTotalKg * 1000) / chicksCount) : 0;
@@ -474,7 +475,7 @@ export const DailyRecordsPage = () => {
           statsBreakdown={
             lastRecord
               ? [
-                  { label: 'CONSUMED', value: `${lastRecordBags} Bags${lastRecordLooseKg > 0 ? ` & ${lastRecordLooseKg}k` : ''}`, labelColor: 'text-emerald-600', valueColor: 'text-slate-900' },
+                  { label: 'CONSUMED', value: `${lastRecordBags} Bags${lastRecordLooseKg > 0 ? ` & ${lastRecordLooseKg} kg` : ''}`, labelColor: 'text-emerald-600', valueColor: 'text-slate-900' },
                   { label: 'EAT / BIRD', value: `${lastRecordPerBirdGram} g`, labelColor: 'text-orange-600', valueColor: 'text-orange-600' },
                   { label: 'TARGET', value: `${lastRecordTargetGram} g`, labelColor: 'text-blue-600', valueColor: 'text-blue-600' }
                 ]
