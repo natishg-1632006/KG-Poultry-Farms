@@ -321,7 +321,7 @@ Thank you for your business!`;
                         <tr key={s.id || s.boxSetNumber} className="hover:bg-slate-50/60">
                           <td className="py-2 px-3 font-bold text-slate-900">Set #{s.boxSetNumber}</td>
                           <td className="py-2 px-3">{boxesInSet} Boxes</td>
-                          <td className="py-2 px-3 text-slate-500">{s.emptyBoxWeight} kg ({totalEmptyTare} kg total)</td>
+                          <td className="py-2 px-3 text-slate-500">{s.emptyBoxWeight} kg</td>
                           <td className="py-2 px-3 font-semibold">{isLoaded ? `${gross} kg` : 'Pending'}</td>
                           <td style={{ color: '#047857' }} className="py-2 px-3 font-bold">{isLoaded ? `${net.toFixed(2)} kg` : '—'}</td>
                           <td className="py-2 px-3">{s.chickenCount || '—'}</td>
