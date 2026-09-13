@@ -97,9 +97,12 @@ export const Sidebar = ({ isOpen, onClose }) => {
         </div>
 
         <div className="border-t border-slate-200/80 p-4">
-          <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 text-xs text-slate-500 space-y-0.5">
+          <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 text-xs text-slate-500 space-y-2">
             <div className="flex items-center justify-between font-bold text-slate-800">
-              <span>KG Poultry</span>
+              <div className="flex items-center gap-2">
+                <img src="/kg-logo.jpg" alt="KG Logo" className="h-6 w-6 object-contain rounded-md" />
+                <span>KG Poultry</span>
+              </div>
               <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[9px] font-black text-emerald-800">v1.0.0</span>
             </div>
             <p className="text-[10px] text-slate-400">Encrypted Cloud Sync</p>

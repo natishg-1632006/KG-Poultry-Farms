@@ -14,6 +14,7 @@ import {
 import { calculateBoxSetWeights } from '../utils/calculations';
 import { Badge } from '../components/common/Badge';
 import { Modal } from '../components/common/Modal';
+import { TraderInvoiceModal } from '../components/invoice/TraderInvoiceModal';
 import {
   Truck,
   Save,
@@ -1624,82 +1625,14 @@ export const DispatchPage = () => {
 
       {/* Trader Invoice Modal */}
       {activeDispatch && (
-        <Modal
+        <TraderInvoiceModal
           isOpen={showInvoiceModal}
           onClose={() => setShowInvoiceModal(false)}
-          title={`Trader Invoice: ${activeDispatch.vehicleNumber}`}
-          maxWidth="max-w-lg"
-        >
-          <div className="space-y-4">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-              <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-                <div>
-                  <h3 className="font-extrabold text-sm text-slate-900">{activeDispatch.vehicleName || 'Trader Purchase'}</h3>
-                  <p className="text-xs text-slate-500">Vehicle: {activeDispatch.vehicleNumber} • {activeDispatch.dispatchDate}</p>
-                </div>
-                <Badge variant={activeDispatch.status}>{activeDispatch.status}</Badge>
-              </div>
-
-              <div className="space-y-1.5 text-xs font-medium text-slate-700">
-                <div className="flex justify-between">
-                  <span>Driver Name:</span>
-                  <span className="font-bold text-slate-900">{activeDispatch.driverName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Total Boxes Weighed:</span>
-                  <span className="font-bold text-slate-900">{totalWeighedBoxes} Boxes ({boxSets.length} Sets)</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Total Dispatched Birds:</span>
-                  <span className="font-bold text-emerald-700">{totalDispatchedBirds} Birds</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Total Net Weight:</span>
-                  <span className="font-bold text-emerald-700">{totalNetWeight} kg</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Average Bird Weight:</span>
-                  <span className="font-bold text-slate-900">{avgBirdWeight} kg/bird</span>
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-slate-200 grid grid-cols-2 gap-2 items-center">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Rate per Kg (₹) *</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={ratePerKg}
-                    onChange={(e) => setRatePerKg(Number(e.target.value))}
-                    className="w-full rounded-lg border border-slate-300 py-1.5 px-2.5 text-xs font-bold text-slate-900"
-                  />
-                </div>
-                <div className="text-right">
-                  <span className="text-[11px] font-bold text-slate-500 block uppercase">Total Invoice Amount</span>
-                  <span className="text-lg font-black text-emerald-700">₹{(totalNetWeight * ratePerKg).toLocaleString('en-IN')}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setShowInvoiceModal(false)}
-                className="w-1/2 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="w-1/2 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-colors"
-              >
-                <Printer className="h-4 w-4" />
-                <span>Print Invoice</span>
-              </button>
-            </div>
-          </div>
-        </Modal>
+          dispatch={activeDispatch}
+          boxSets={boxSets}
+          ratePerKg={ratePerKg}
+          onRateChange={setRatePerKg}
+        />
       )}
     </div>
   );

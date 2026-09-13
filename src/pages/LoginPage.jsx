@@ -55,9 +55,11 @@ export const LoginPage = () => {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 p-4 sm:p-6 lg:p-8">
       <div className="w-full max-w-md space-y-8 rounded-3xl bg-white p-8 shadow-2xl border border-slate-100">
         <div className="text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-600 font-black text-2xl text-white shadow-lg shadow-emerald-600/30">
-            KG
-          </div>
+          <img
+            src="/kg-logo.jpg"
+            alt="KG Poultry Farms Logo"
+            className="mx-auto h-20 w-20 object-contain rounded-2xl shadow-lg ring-1 ring-emerald-500/20 p-1 bg-white"
+          />
           <h2 className="mt-4 text-2xl font-black text-slate-900 tracking-tight">KG Poultry Farms</h2>
           <p className="mt-1 text-sm font-medium text-slate-500">Broiler Poultry Farm Operations Portal</p>
         </div>

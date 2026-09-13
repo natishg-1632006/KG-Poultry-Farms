@@ -18,9 +18,11 @@ export const Header = ({ onToggleSidebar }) => {
           <Menu className="h-5 w-5" />
         </button>
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-emerald-700 to-emerald-500 font-black text-white shadow-sm shadow-emerald-600/30 ring-1 ring-emerald-400/40">
-            KG
-          </div>
+          <img
+            src="/kg-logo.jpg"
+            alt="KG Poultry Farms Logo"
+            className="h-10 w-10 object-contain rounded-xl shadow-xs ring-1 ring-emerald-500/20 bg-white"
+          />
           <div>
             <h1 className="text-base font-black leading-tight tracking-tight text-slate-900">KG Poultry Farms</h1>
             <p className="text-[11px] font-semibold text-slate-400 hidden sm:block">Broiler Farm Operations & Intelligence</p>
