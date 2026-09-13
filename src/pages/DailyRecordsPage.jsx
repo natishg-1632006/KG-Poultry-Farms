@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { dbGetBatches, dbGetDailyRecords, dbSaveDailyRecord, dbDeleteDailyRecord, dbUpdateBatchFeedStockPool, dbLogAuditEvent } from '../services/dbService';
 import { calculateRemainingChickens, validateRecordDate, deductFeedStock, bagsToKg, kgToBags } from '../utils/calculations';
-import { KG_PER_BAG, FEED_CONSUMPTION_TARGETS } from '../constants/companyTargets';
+import { KG_PER_BAG, FEED_CONSUMPTION_TARGETS, AVERAGE_WEIGHT_TARGETS } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
 import { Modal } from '../components/common/Modal';
 import { ClipboardList, AlertCircle, Save, CheckCircle2, Edit, Trash2, Layers, Plus, X, Calendar, Package, Scale, Target } from 'lucide-react';
@@ -271,7 +271,7 @@ export const DailyRecordsPage = () => {
     currentFlockAgeDay = Math.min(45, Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1);
   }
 
-  // Compute Target Feed info for selected form date
+  // Compute Target Feed & Weight info for selected form date
   let formFlockAgeDay = 1;
   if (selectedBatch?.chickArrivalDate && formData.recordDate) {
     const arrivalDate = new Date(selectedBatch.chickArrivalDate);
@@ -281,16 +281,18 @@ export const DailyRecordsPage = () => {
   }
 
   const targetGramPerBird = FEED_CONSUMPTION_TARGETS[formFlockAgeDay] || 20;
+  const targetWeightGram = AVERAGE_WEIGHT_TARGETS[formFlockAgeDay] || 58;
   const remainingChicksCount = Number(selectedBatch?.remainingChickCount || selectedBatch?.initialChickCount || 5000);
   const expectedTotalKg = (remainingChicksCount * targetGramPerBird) / 1000;
   const recommendedBags = Math.round(kgToBags(expectedTotalKg, KG_PER_BAG));
 
-  // Compute Last Record feed details
+  // Compute Last Record feed and weight details
   let lastRecordFlockAgeDay = 1;
   let lastRecordBags = 0;
   let lastRecordTotalKg = 0;
   let lastRecordPerBirdGram = 0;
   let lastRecordTargetGram = 20;
+  let lastRecordTargetWeightGram = 58;
 
   if (lastRecord) {
     if (selectedBatch?.chickArrivalDate && lastRecord.recordDate) {
@@ -300,6 +302,7 @@ export const DailyRecordsPage = () => {
       lastRecordFlockAgeDay = Math.min(45, Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1);
     }
     lastRecordTargetGram = FEED_CONSUMPTION_TARGETS[lastRecordFlockAgeDay] || 20;
+    lastRecordTargetWeightGram = AVERAGE_WEIGHT_TARGETS[lastRecordFlockAgeDay] || 58;
     lastRecordBags = Math.max(1, Math.round(lastRecord.feedConsumptionBags || kgToBags(lastRecord.feedConsumption || 0, KG_PER_BAG)));
     lastRecordTotalKg = lastRecordBags * KG_PER_BAG; // 1 Bag = 70 kg
     const chicksCount = Number(lastRecord.remainingChickCount || selectedBatch?.remainingChickCount || selectedBatch?.initialChickCount || 5000);
@@ -322,7 +325,7 @@ export const DailyRecordsPage = () => {
             className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-xs w-full sm:w-auto"
           >
             <Target className="h-4 w-4 text-emerald-600 shrink-0" />
-            <span>{showTargetsTable ? 'Hide Target Reference' : 'Target Feed Standards (Day 1-45)'}</span>
+            <span>{showTargetsTable ? 'Hide Target Reference' : 'Target Feed & Weight Standards (Day 1-45)'}</span>
           </button>
 
           {!isReadOnly && (
@@ -337,13 +340,13 @@ export const DailyRecordsPage = () => {
         </div>
       </div>
 
-      {/* Target Feed Standards Reference Panel */}
+      {/* Target Feed & Weight Standards Reference Panel */}
       {showTargetsTable && (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm space-y-4 min-w-0">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-sm sm:text-base font-bold text-slate-900">Standard Daily Feed Consumption Targets (Day 1 - 45)</h2>
-              <p className="text-xs text-slate-500 mt-0.5">Recommended daily feed intake per bird (grams/day) and estimated total for current batch size ({remainingChicksCount} birds).</p>
+              <h2 className="text-sm sm:text-base font-bold text-slate-900">Standard Daily Feed & Growth Weight Targets (Day 1 - 45)</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Recommended daily feed intake per bird (g), target body weight (g), and estimated total batch daily feed.</p>
             </div>
             <button
               onClick={() => setShowTargetsTable(false)}
@@ -354,17 +357,19 @@ export const DailyRecordsPage = () => {
             </button>
           </div>
           <div className="max-h-72 overflow-auto rounded-xl border border-slate-100">
-            <table className="w-full min-w-[540px] text-left text-xs">
+            <table className="w-full min-w-[580px] text-left text-xs">
               <thead className="bg-slate-50 sticky top-0 border-b border-slate-100 text-slate-500 font-semibold whitespace-nowrap z-10">
                 <tr>
                   <th className="p-3">Flock Age (Day)</th>
                   <th className="p-3">Target Intake / Bird</th>
+                  <th className="p-3">Target Avg Weight</th>
                   <th className="p-3">Est. Total Daily (Kg)</th>
                   <th className="p-3">Est. Total Daily (Bags)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium whitespace-nowrap">
                 {Object.entries(FEED_CONSUMPTION_TARGETS).map(([day, grams]) => {
+                  const targetWeight = AVERAGE_WEIGHT_TARGETS[day] || '-';
                   const totalKg = (remainingChicksCount * Number(grams)) / 1000;
                   const bags = kgToBags(totalKg, KG_PER_BAG);
                   const isCurrent = Number(day) === currentFlockAgeDay;
@@ -377,6 +382,7 @@ export const DailyRecordsPage = () => {
                         </div>
                       </td>
                       <td className="p-3 font-semibold">{grams} g</td>
+                      <td className="p-3 font-bold text-emerald-800">{targetWeight !== '-' ? `${targetWeight} g` : '-'}</td>
                       <td className="p-3">{totalKg.toFixed(1)} kg</td>
                       <td className="p-3 font-bold text-emerald-700">{bags.toFixed(1)} Bags</td>
                     </tr>
@@ -423,7 +429,7 @@ export const DailyRecordsPage = () => {
         <StatCard
           title="Last Avg Weight"
           value={lastRecord ? `${lastRecord.averageWeight} g` : '0 g'}
-          subtext={lastRecord ? `Body weight on ${lastRecord.recordDate}` : 'No weight logged'}
+          subtext={lastRecord ? `Day ${lastRecordFlockAgeDay} Target: ${lastRecordTargetWeightGram} g` : 'No weight logged'}
           icon={Scale}
           color="emerald"
         />
@@ -506,7 +512,12 @@ export const DailyRecordsPage = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Average Chicken Weight (grams) *</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-slate-700">Average Chicken Weight (grams) *</label>
+              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                Target Day {formFlockAgeDay}: ~{targetWeightGram} g
+              </span>
+            </div>
             <input
               type="number"
               required
