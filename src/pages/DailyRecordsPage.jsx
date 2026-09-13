@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { dbGetBatches, dbGetDailyRecords, dbSaveDailyRecord, dbDeleteDailyRecord, dbUpdateBatchFeedStockPool, dbLogAuditEvent } from '../services/dbService';
 import { calculateRemainingChickens, validateRecordDate, deductFeedStock, bagsToKg, kgToBags } from '../utils/calculations';
-import { KG_PER_BAG } from '../constants/companyTargets';
+import { KG_PER_BAG, FEED_CONSUMPTION_TARGETS } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
 import { Modal } from '../components/common/Modal';
-import { ClipboardList, AlertCircle, Save, CheckCircle2, Edit, Trash2, Layers, Plus, X, Calendar, Package, Scale } from 'lucide-react';
+import { ClipboardList, AlertCircle, Save, CheckCircle2, Edit, Trash2, Layers, Plus, X, Calendar, Package, Scale, Target } from 'lucide-react';
 
 export const DailyRecordsPage = () => {
   const { userProfile, isFarmer } = useAuth();
@@ -17,6 +17,7 @@ export const DailyRecordsPage = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [showTargetsTable, setShowTargetsTable] = useState(false);
 
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -88,7 +89,7 @@ export const DailyRecordsPage = () => {
   }
 
   const selectedBatch = batches.find(b => b.id === selectedBatchId);
-  const isReadOnly = isFarmer && selectedBatch?.status !== 'Active';
+  const isReadOnly = selectedBatch?.status === 'Completed';
 
   const handleOpenNewForm = () => {
     setErrorMsg('');
@@ -167,7 +168,7 @@ export const DailyRecordsPage = () => {
     }
 
     if (isReadOnly) {
-      setErrorMsg('Batch is not active. Operational record creation is disabled.');
+      setErrorMsg('Batch is completed. Operational record creation is disabled.');
       return;
     }
 
@@ -209,7 +210,7 @@ export const DailyRecordsPage = () => {
 
     // Stock availability validation
     if (effectiveAvailableKg < totalKg) {
-      setErrorMsg(`Insufficient feed stock available in farm pool! Available: ${effectiveAvailableBags} Bags. Requested: ${totalBags} Bags. Please receive feed stock first.`);
+      setErrorMsg(`Insufficient feed stock available in farm pool! Available: ${effectiveAvailableBags.toFixed(1)} Bags. Requested: ${totalBags} Bags. Please receive feed stock first.`);
       return;
     }
 
@@ -234,7 +235,8 @@ export const DailyRecordsPage = () => {
         feedConsumptionBags: totalBags,
         averageWeight: weightVal,
         remainingChickCount: calculatedRemaining,
-        recordedBy: userProfile?.name || 'Farmer'
+        recordedBy: userProfile?.name || 'Farmer',
+        updatedAt: new Date().toISOString()
       };
 
       await dbSaveDailyRecord(selectedBatch.id, formData.recordDate, recordObj);
@@ -260,6 +262,29 @@ export const DailyRecordsPage = () => {
   const recordsList = Object.values(recordsMap).sort((a, b) => b.recordDate.localeCompare(a.recordDate));
   const lastRecord = recordsList.length > 0 ? recordsList[0] : null;
 
+  // Compute current flock age day for selected batch
+  let currentFlockAgeDay = 1;
+  if (selectedBatch?.chickArrivalDate) {
+    const arrivalDate = new Date(selectedBatch.chickArrivalDate);
+    const today = new Date();
+    const diffMs = Math.max(0, today.getTime() - arrivalDate.getTime());
+    currentFlockAgeDay = Math.min(45, Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1);
+  }
+
+  // Compute Target Feed info for selected form date
+  let formFlockAgeDay = 1;
+  if (selectedBatch?.chickArrivalDate && formData.recordDate) {
+    const arrivalDate = new Date(selectedBatch.chickArrivalDate);
+    const recDate = new Date(formData.recordDate);
+    const diffMs = Math.max(0, recDate.getTime() - arrivalDate.getTime());
+    formFlockAgeDay = Math.min(45, Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1);
+  }
+
+  const targetGramPerBird = FEED_CONSUMPTION_TARGETS[formFlockAgeDay] || 20;
+  const remainingChicksCount = Number(selectedBatch?.remainingChickCount || selectedBatch?.initialChickCount || 5000);
+  const expectedTotalKg = (remainingChicksCount * targetGramPerBird) / 1000;
+  const recommendedBags = Math.round(kgToBags(expectedTotalKg, KG_PER_BAG));
+
   if (loading) return <div className="p-8 text-center text-slate-500">Loading Daily Farm Records...</div>;
 
   return (
@@ -270,16 +295,74 @@ export const DailyRecordsPage = () => {
           <h1 className="text-2xl font-black tracking-tight text-slate-900">Daily Farm Records</h1>
           <p className="text-sm font-medium text-slate-500">Record daily mortality, feed consumption in Bags, and chicken growth weights.</p>
         </div>
-        {!isReadOnly && (
+        <div className="flex items-center gap-2.5">
           <button
-            onClick={handleOpenNewForm}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95 shrink-0"
+            onClick={() => setShowTargetsTable(!showTargetsTable)}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all shrink-0 shadow-xs"
           >
-            <Plus className="h-4 w-4" />
-            <span>Record Daily Log</span>
+            <Target className="h-4 w-4 text-emerald-600" />
+            <span>{showTargetsTable ? 'Hide Target Reference' : 'Target Feed Standards (Day 1-45)'}</span>
           </button>
-        )}
+
+          {!isReadOnly && (
+            <button
+              onClick={handleOpenNewForm}
+              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95 shrink-0"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Record Daily Log</span>
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Target Feed Standards Reference Panel */}
+      {showTargetsTable && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Standard Daily Feed Consumption Targets (Day 1 - 45)</h2>
+              <p className="text-xs text-slate-500">Recommended daily feed intake per bird (grams/day) and estimated total for current batch size ({remainingChicksCount} birds).</p>
+            </div>
+            <button
+              onClick={() => setShowTargetsTable(false)}
+              className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-100">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 sticky top-0 border-b border-slate-100 text-slate-500 font-semibold">
+                <tr>
+                  <th className="p-3">Flock Age (Day)</th>
+                  <th className="p-3">Target Intake / Bird (g)</th>
+                  <th className="p-3">Est. Total Batch Daily (Kg)</th>
+                  <th className="p-3">Est. Total Batch Daily (Bags)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {Object.entries(FEED_CONSUMPTION_TARGETS).map(([day, grams]) => {
+                  const totalKg = (remainingChicksCount * Number(grams)) / 1000;
+                  const bags = kgToBags(totalKg, KG_PER_BAG);
+                  const isCurrent = Number(day) === currentFlockAgeDay;
+                  return (
+                    <tr key={day} className={isCurrent ? 'bg-emerald-50/60 font-bold text-emerald-900' : 'hover:bg-slate-50 text-slate-700'}>
+                      <td className="p-3 flex items-center gap-2">
+                        <span>Day {day}</span>
+                        {isCurrent && <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">Current Day</span>}
+                      </td>
+                      <td className="p-3">{grams} g</td>
+                      <td className="p-3">{totalKg.toFixed(1)} kg</td>
+                      <td className="p-3">{bags.toFixed(1)} Bags</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Last Updated Record KPI Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -370,7 +453,12 @@ export const DailyRecordsPage = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Feed Bags Used (Whole Bags) *</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-slate-700">Feed Bags Used (Whole Bags) *</label>
+              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                Target Day {formFlockAgeDay}: ~{recommendedBags} Bags ({targetGramPerBird}g/bird)
+              </span>
+            </div>
             <input
               type="number"
               required
