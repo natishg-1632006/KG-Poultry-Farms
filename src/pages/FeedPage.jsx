@@ -5,7 +5,7 @@ import { formatFeedStock, bagsToKg, kgToBags } from '../utils/calculations';
 import { KG_PER_BAG } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
 import { Modal } from '../components/common/Modal';
-import { Wheat, Truck, Save, CheckCircle2, Edit, Trash2, Layers, Plus } from 'lucide-react';
+import { Wheat, Truck, Save, CheckCircle2, Edit, Trash2, Layers, Plus, Eye, User, Calendar, FileText } from 'lucide-react';
 
 export const FeedPage = () => {
   const { userProfile, isFarmer } = useAuth();
@@ -17,6 +17,7 @@ export const FeedPage = () => {
   const [successMsg, setSuccessMsg] = useState('');
   const [editingFeedId, setEditingFeedId] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [viewingDetail, setViewingDetail] = useState(null);
 
   const [formData, setFormData] = useState({
     feedType: 'Pre-Starter',
@@ -203,6 +204,82 @@ export const FeedPage = () => {
         </div>
       )}
 
+      {/* Feed Arrival Details Modal */}
+      <Modal
+        isOpen={!!viewingDetail}
+        onClose={() => setViewingDetail(null)}
+        title="Feed Arrival Details"
+      >
+        {viewingDetail && (
+          <div className="space-y-4">
+            <div className="rounded-xl bg-slate-50 p-4 border border-slate-100 space-y-3 text-xs">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <span className="font-medium text-slate-500 flex items-center gap-1.5">
+                  <Calendar className="h-4 w-4 text-slate-400" />
+                  Arrival Date
+                </span>
+                <span className="font-bold text-slate-900">{viewingDetail.date}</span>
+              </div>
+
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <span className="font-medium text-slate-500 flex items-center gap-1.5">
+                  <Wheat className="h-4 w-4 text-emerald-600" />
+                  Feed Category
+                </span>
+                <span className="font-bold text-emerald-700">{viewingDetail.feedType}</span>
+              </div>
+
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <span className="font-medium text-slate-500 flex items-center gap-1.5">
+                  <Layers className="h-4 w-4 text-emerald-600" />
+                  Bags Received
+                </span>
+                <span className="font-bold text-emerald-700">
+                  +{viewingDetail.bagsReceived || kgToBags(viewingDetail.quantityReceived || 0, KG_PER_BAG)} Bags
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <span className="font-medium text-slate-500 flex items-center gap-1.5">
+                  <Truck className="h-4 w-4 text-slate-400" />
+                  Vehicle Number
+                </span>
+                <span className="font-bold text-slate-900">{viewingDetail.vehicleNumber || '—'}</span>
+              </div>
+
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <span className="font-medium text-slate-500 flex items-center gap-1.5">
+                  <User className="h-4 w-4 text-slate-400" />
+                  Driver Name
+                </span>
+                <span className="font-bold text-slate-900">{viewingDetail.driverName || '—'}</span>
+              </div>
+
+              {viewingDetail.notes && (
+                <div className="pt-1">
+                  <span className="font-medium text-slate-500 block mb-1 flex items-center gap-1.5">
+                    <FileText className="h-4 w-4 text-slate-400" />
+                    Notes / Remarks
+                  </span>
+                  <p className="rounded-lg bg-white p-2.5 text-slate-700 border border-slate-200 font-normal">
+                    {viewingDetail.notes}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={() => setViewingDetail(null)}
+                className="rounded-xl bg-slate-900 px-5 py-2 text-xs font-bold text-white hover:bg-slate-800 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       {/* Feed Arrival Form Modal */}
       <Modal
         isOpen={showForm}
@@ -317,7 +394,7 @@ export const FeedPage = () => {
         </form>
       </Modal>
 
-      {/* Feed Arrival History with Edit and Delete Action Controls - Full Width */}
+      {/* Feed Arrival History with Edit, Delete, and Popup Details Action Controls */}
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4">
           Feed Arrival Log History ({selectedBatch?.batchNumber})
@@ -330,28 +407,35 @@ export const FeedPage = () => {
                 <th className="pb-3 px-2">Date</th>
                 <th className="pb-3 px-2">Feed Type</th>
                 <th className="pb-3 px-2">Bags Received</th>
-                <th className="pb-3 px-2">Vehicle #</th>
-                <th className="pb-3 px-2">Driver</th>
                 <th className="pb-3 px-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {feedArrivals.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="py-8 text-center text-slate-400">No feed arrivals recorded for this batch yet. Click any Farm button or "+ Receive Feed Stock" to add data.</td>
+                  <td colSpan="4" className="py-8 text-center text-slate-400">No feed arrivals recorded for this batch yet. Click any Farm button or "+ Receive Feed Stock" to add data.</td>
                 </tr>
               ) : (
                 feedArrivals.map((f) => {
                   const bags = f.bagsReceived || kgToBags(f.quantityReceived || 0, KG_PER_BAG);
                   return (
-                    <tr key={f.id} className="hover:bg-slate-50">
+                    <tr
+                      key={f.id}
+                      onClick={() => setViewingDetail(f)}
+                      className="hover:bg-slate-50 cursor-pointer transition-colors"
+                    >
                       <td className="py-3 px-2 font-bold text-slate-900">{f.date}</td>
                       <td className="py-3 px-2 font-bold text-emerald-700">{f.feedType}</td>
                       <td className="py-3 px-2 font-bold text-emerald-700">+{bags} Bags</td>
-                      <td className="py-3 px-2 text-slate-600">{f.vehicleNumber || '—'}</td>
-                      <td className="py-3 px-2 text-slate-600">{f.driverName || '—'}</td>
-                      <td className="py-3 px-2 text-right">
+                      <td className="py-3 px-2 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => setViewingDetail(f)}
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                            title="View Arrival Details"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </button>
                           <button
                             onClick={() => handleEditArrival(f)}
                             className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
