@@ -215,34 +215,6 @@ export const MedicinePage = () => {
         </button>
       </div>
 
-      {/* Sleek Farm Shed Selector Bar */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">Farm Sheds:</span>
-        {batches.length === 0 ? (
-          <p className="text-xs text-slate-400">No batches available.</p>
-        ) : (
-          batches.map((b) => (
-            <button
-              key={b.id}
-              onClick={() => {
-                setSelectedBatchId(b.id);
-                setEditingRecordId(null);
-                setShowForm(true);
-              }}
-              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all shrink-0 ${
-                selectedBatchId === b.id
-                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/25 ring-2 ring-emerald-500/30'
-                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
-              }`}
-            >
-              <Layers className={`h-3.5 w-3.5 ${selectedBatchId === b.id ? 'text-white' : 'text-emerald-600'}`} />
-              <span>{b.batchNumber}</span>
-              <span className={`text-[11px] ${selectedBatchId === b.id ? 'text-emerald-100' : 'text-slate-400'}`}>({b.batchName})</span>
-            </button>
-          ))
-        )}
-      </div>
-
       {successMsg && (
         <div className="flex items-center gap-3 rounded-xl bg-emerald-50 p-4 text-xs font-semibold text-emerald-700 border border-emerald-200">
           <CheckCircle2 className="h-5 w-5 shrink-0" />
