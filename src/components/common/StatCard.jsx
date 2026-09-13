@@ -8,6 +8,7 @@ export const StatCard = ({
   availableValue,
   consumedValue,
   arrivedValue,
+  statsBreakdown,
   secondaryValue,
   secondaryLabel = "Total Arrived",
   icon: Icon,
@@ -43,6 +44,12 @@ export const StatCard = ({
 
   const currentStyle = colorStyles[color] || colorStyles.emerald;
 
+  const items = statsBreakdown || (consumedValue !== undefined && arrivedValue !== undefined ? [
+    { label: 'AVAILABLE', value: availableValue || value, labelColor: 'text-emerald-600', valueColor: 'text-slate-900' },
+    { label: 'CONSUMED', value: consumedValue, labelColor: 'text-orange-600', valueColor: 'text-orange-600' },
+    { label: 'ARRIVED', value: arrivedValue, labelColor: 'text-blue-600', valueColor: 'text-blue-600' }
+  ] : null);
+
   return (
     <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
       {/* Top accent bar */}
@@ -57,25 +64,25 @@ export const StatCard = ({
         )}
       </div>
       <div className="mt-3 space-y-3">
-        <div>
-          {valueLabel && <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">{valueLabel}</span>}
-          <div className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">{availableValue || value}</div>
-        </div>
+        {!items && (
+          <div>
+            {valueLabel && <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">{valueLabel}</span>}
+            <div className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">{availableValue || value}</div>
+          </div>
+        )}
 
-        {consumedValue !== undefined && arrivedValue !== undefined ? (
-          <div className="grid grid-cols-3 gap-1 text-center rounded-xl bg-slate-50 p-2 border border-slate-100/90">
-            <div className="px-1 py-0.5">
-              <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-600 block">Available</span>
-              <span className="text-xs font-black text-slate-900">{availableValue || value}</span>
-            </div>
-            <div className="border-x border-slate-200/80 px-1 py-0.5">
-              <span className="text-[9px] font-extrabold uppercase tracking-wider text-amber-600 block">Consumed</span>
-              <span className="text-xs font-black text-amber-700">{consumedValue}</span>
-            </div>
-            <div className="px-1 py-0.5">
-              <span className="text-[9px] font-extrabold uppercase tracking-wider text-blue-600 block">Arrived</span>
-              <span className="text-xs font-black text-blue-700">{arrivedValue}</span>
-            </div>
+        {items ? (
+          <div className="grid grid-cols-3 divide-x divide-slate-200/80 rounded-xl bg-slate-50/70 p-2.5 border border-slate-200/60 text-center shadow-2xs">
+            {items.map((item, idx) => (
+              <div key={idx} className="px-1 py-0.5">
+                <span className={`text-[10px] font-black uppercase tracking-wider block mb-0.5 ${item.labelColor || 'text-slate-500'}`}>
+                  {item.label}
+                </span>
+                <span className={`text-xs sm:text-sm font-black ${item.valueColor || 'text-slate-900'}`}>
+                  {item.value}
+                </span>
+              </div>
+            ))}
           </div>
         ) : secondaryValue ? (
           <div className="flex items-baseline justify-between gap-2">

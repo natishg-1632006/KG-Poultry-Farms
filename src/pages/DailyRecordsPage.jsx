@@ -403,8 +403,17 @@ export const DailyRecordsPage = () => {
         />
         <StatCard
           title="Last Feed Consumed"
+          statsBreakdown={
+            lastRecord
+              ? [
+                  { label: 'CONSUMED', value: `${lastRecordBags} Bags`, labelColor: 'text-emerald-600', valueColor: 'text-slate-900' },
+                  { label: 'EAT / BIRD', value: `${lastRecordPerBirdGram} g`, labelColor: 'text-orange-600', valueColor: 'text-orange-600' },
+                  { label: 'TARGET', value: `${lastRecordTargetGram} g`, labelColor: 'text-blue-600', valueColor: 'text-blue-600' }
+                ]
+              : null
+          }
           value={lastRecord ? `${lastRecordBags} Bags (${lastRecordPerBirdGram} g/bird)` : '0 Bags'}
-          subtext={lastRecord ? `Day ${lastRecordFlockAgeDay} Target: ${lastRecordTargetGram} g/bird` : 'No feed logged'}
+          subtext={lastRecord ? `Day ${lastRecordFlockAgeDay} Target: ${lastRecordTargetGram} g/bird (${lastRecord.recordDate})` : 'No feed logged'}
           icon={Package}
           color="blue"
         />
