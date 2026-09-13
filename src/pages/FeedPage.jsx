@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { dbGetBatches, dbGetFeedArrivals, dbAddFeedArrival, dbLogAuditEvent } from '../services/dbService';
+import { dbGetBatches, dbGetFeedArrivals, dbAddFeedArrival, dbDeleteFeedArrival, dbLogAuditEvent } from '../services/dbService';
 import { formatFeedStock, bagsToKg, kgToBags } from '../utils/calculations';
 import { KG_PER_BAG } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
-import { Wheat, Truck, Save, CheckCircle2 } from 'lucide-react';
+import { Wheat, Truck, Save, CheckCircle2, Edit, Trash2, Layers, Plus, X } from 'lucide-react';
 
 export const FeedPage = () => {
   const { userProfile, isFarmer } = useAuth();
@@ -14,6 +14,8 @@ export const FeedPage = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [editingFeedId, setEditingFeedId] = useState(null);
+  const [showForm, setShowForm] = useState(false);
 
   const [formData, setFormData] = useState({
     feedType: 'Pre-Starter',
@@ -72,6 +74,32 @@ export const FeedPage = () => {
   const selectedBatch = batches.find(b => b.id === selectedBatchId);
   const feedStock = selectedBatch?.feedStock || { 'Pre-Starter': 0, 'Starter': 0, 'Finisher': 0 };
 
+  const handleEditArrival = (arrival) => {
+    setEditingFeedId(arrival.id);
+    setShowForm(true);
+    const bags = arrival.bagsReceived || kgToBags(arrival.quantityReceived || 0, KG_PER_BAG);
+    setFormData({
+      feedType: arrival.feedType || 'Pre-Starter',
+      driverName: arrival.driverName || '',
+      vehicleNumber: arrival.vehicleNumber || '',
+      bagsReceived: bags,
+      date: arrival.date || new Date().toISOString().split('T')[0],
+      notes: arrival.notes || ''
+    });
+  };
+
+  const handleDeleteArrival = async (feedId) => {
+    if (!confirm('Are you sure you want to delete this feed arrival entry? Stock KPI cards will recalculate.')) return;
+    try {
+      await dbDeleteFeedArrival(selectedBatchId, feedId);
+      await dbLogAuditEvent('FEED_DELETED', `Deleted feed arrival entry for batch ${selectedBatch?.batchNumber}`, userProfile?.name);
+      setSuccessMsg('Feed arrival record deleted successfully.');
+      loadFeedArrivals(selectedBatchId);
+    } catch (err) {
+      alert('Failed deleting feed arrival.');
+    }
+  };
+
   const handleAddArrival = async (e) => {
     e.preventDefault();
     setSuccessMsg('');
@@ -83,6 +111,7 @@ export const FeedPage = () => {
       const totalKg = bagsToKg(bags, KG_PER_BAG);
 
       const feedObj = {
+        id: editingFeedId || `feed-${Date.now()}`,
         feedType: formData.feedType,
         driverName: formData.driverName,
         vehicleNumber: formData.vehicleNumber,
@@ -95,14 +124,14 @@ export const FeedPage = () => {
 
       await dbAddFeedArrival(selectedBatch.id, feedObj);
       await dbLogAuditEvent(
-        'FEED_ARRIVED',
-        `Received ${bags} bags of ${formData.feedType} for ${selectedBatch.batchNumber} (Vehicle: ${formData.vehicleNumber})`,
+        editingFeedId ? 'FEED_UPDATED' : 'FEED_ARRIVED',
+        `${editingFeedId ? 'Updated' : 'Received'} ${bags} bags of ${formData.feedType} for ${selectedBatch.batchNumber}`,
         userProfile?.name
       );
 
-      setSuccessMsg(`Successfully added ${bags} bags of ${formData.feedType}!`);
+      setSuccessMsg(`Successfully ${editingFeedId ? 'updated' : 'added'} ${bags} bags of ${formData.feedType}!`);
+      setEditingFeedId(null);
       loadFeedArrivals(selectedBatch.id);
-      loadBatches();
       setFormData({
         feedType: 'Pre-Starter',
         driverName: '',
@@ -122,25 +151,59 @@ export const FeedPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-slate-900">Feed Stock & Arrival Management</h1>
           <p className="text-sm font-medium text-slate-500">Log incoming feed bags arrival and view live available stock in Bags.</p>
         </div>
-        {selectedBatch && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-500">Select Batch:</span>
-            <select
-              value={selectedBatchId}
-              onChange={(e) => setSelectedBatchId(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600"
-            >
-              {batches.map(b => (
-                <option key={b.id} value={b.id}>{b.batchNumber} - {b.batchName}</option>
-              ))}
-            </select>
-          </div>
-        )}
+      </div>
+
+      {/* Interactive Farm / Batch Button Selector Bar */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Select Farm Shed / Batch:</span>
+          <button
+            onClick={() => {
+              setShowForm(!showForm);
+              if (!showForm && !editingFeedId) {
+                setEditingFeedId(null);
+              }
+            }}
+            className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition-all shadow-sm ${
+              showForm
+                ? 'bg-slate-800 text-white hover:bg-slate-900'
+                : 'bg-amber-600 text-white hover:bg-amber-700 ring-2 ring-amber-600/20'
+            }`}
+          >
+            {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            <span>{showForm ? 'Hide Form' : '+ Receive Feed Stock'}</span>
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {batches.length === 0 ? (
+            <p className="text-xs text-slate-400">No batches available.</p>
+          ) : (
+            batches.map((b) => (
+              <button
+                key={b.id}
+                onClick={() => {
+                  setSelectedBatchId(b.id);
+                  setEditingFeedId(null);
+                  setShowForm(true);
+                }}
+                className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all shadow-sm ${
+                  selectedBatchId === b.id
+                    ? 'bg-emerald-600 border-emerald-600 text-white shadow-emerald-200 ring-2 ring-emerald-600/30'
+                    : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
+                }`}
+              >
+                <Layers className="h-4 w-4" />
+                <span>{b.batchNumber}</span>
+                <span className="opacity-80">({b.batchName})</span>
+              </button>
+            ))
+          )}
+        </div>
       </div>
 
       {/* KPI Stock Cards in Bags */}
@@ -176,100 +239,135 @@ export const FeedPage = () => {
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Feed Arrival Entry Form */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
-            <Truck className="h-5 w-5 text-amber-600" />
-            Receive Feed Stock Arrival
-          </h2>
-
-          <form onSubmit={handleAddArrival} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Feed Type *</label>
-              <select
-                value={formData.feedType}
-                onChange={(e) => setFormData({ ...formData, feedType: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600"
+        {/* Feed Arrival Entry Form - Displayed when showForm is true */}
+        {showForm && (
+          <div className="rounded-2xl border-2 border-amber-500/30 bg-white p-6 shadow-md transition-all">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Truck className="h-5 w-5 text-amber-600" />
+                {editingFeedId ? 'Edit Feed Stock Arrival' : 'Receive Feed Stock Arrival'}
+              </h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForm(false);
+                  setEditingFeedId(null);
+                }}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                title="Close Form"
               >
-                <option value="Pre-Starter">Pre-Starter</option>
-                <option value="Starter">Starter</option>
-                <option value="Finisher">Finisher</option>
-              </select>
+                <X className="h-4 w-4" />
+              </button>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Feed Bags Received *</label>
-              <input
-                type="number"
-                required
-                min="0.5"
-                step="0.5"
-                value={formData.bagsReceived}
-                onChange={(e) => setFormData({ ...formData, bagsReceived: e.target.value })}
-                placeholder="e.g. 5"
-                className="w-full rounded-xl border border-slate-200 py-2.5 px-3 text-sm font-bold text-slate-900 focus:border-emerald-600"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <form onSubmit={handleAddArrival} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Arrival Date *</label>
-                <input
-                  type="date"
-                  required
-                  value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
-                />
+                <label className="block text-xs font-bold text-slate-700 mb-1">Feed Type *</label>
+                <select
+                  value={formData.feedType}
+                  onChange={(e) => setFormData({ ...formData, feedType: e.target.value })}
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600"
+                >
+                  <option value="Pre-Starter">Pre-Starter</option>
+                  <option value="Starter">Starter</option>
+                  <option value="Finisher">Finisher</option>
+                </select>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Vehicle Number</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Feed Bags Received *</label>
+                <input
+                  type="number"
+                  required
+                  min="0.5"
+                  step="0.5"
+                  value={formData.bagsReceived}
+                  onChange={(e) => setFormData({ ...formData, bagsReceived: e.target.value })}
+                  placeholder="e.g. 5"
+                  className="w-full rounded-xl border border-slate-200 py-2.5 px-3 text-sm font-bold text-slate-900 focus:border-emerald-600"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Arrival Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.date}
+                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                    className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Vehicle Number</label>
+                  <input
+                    type="text"
+                    value={formData.vehicleNumber}
+                    onChange={(e) => setFormData({ ...formData, vehicleNumber: e.target.value })}
+                    placeholder="e.g. TN-38-B-9988"
+                    className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Driver Name</label>
                 <input
                   type="text"
-                  value={formData.vehicleNumber}
-                  onChange={(e) => setFormData({ ...formData, vehicleNumber: e.target.value })}
-                  placeholder="e.g. TN-38-B-9988"
+                  value={formData.driverName}
+                  onChange={(e) => setFormData({ ...formData, driverName: e.target.value })}
+                  placeholder="e.g. Murugan"
                   className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
                 />
               </div>
-            </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Driver Name</label>
-              <input
-                type="text"
-                value={formData.driverName}
-                onChange={(e) => setFormData({ ...formData, driverName: e.target.value })}
-                placeholder="e.g. Murugan"
-                className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
-              />
-            </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Notes / Remarks</label>
+                <textarea
+                  rows="2"
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Optional delivery comments..."
+                  className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
+                />
+              </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Notes / Remarks</label>
-              <textarea
-                rows="2"
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Optional delivery comments..."
-                className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
-              />
-            </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForm(false);
+                    setEditingFeedId(null);
+                    setFormData({
+                      feedType: 'Pre-Starter',
+                      driverName: '',
+                      vehicleNumber: '',
+                      bagsReceived: 5,
+                      date: new Date().toISOString().split('T')[0],
+                      notes: ''
+                    });
+                  }}
+                  className="w-1/3 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-amber-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-amber-700 disabled:opacity-50 transition-colors"
+                >
+                  <Save className="h-4 w-4" />
+                  {saving ? 'Processing...' : editingFeedId ? 'Update Arrival' : 'Add Feed Stock'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
 
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-amber-700 disabled:opacity-50 transition-colors"
-            >
-              <Save className="h-4 w-4" />
-              {saving ? 'Processing...' : 'Add Feed Stock'}
-            </button>
-          </form>
-        </div>
-
-        {/* Feed Arrival History */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-2">
+        {/* Feed Arrival History with Edit and Delete Action Controls */}
+        <div className={`rounded-2xl border border-slate-200 bg-white p-6 shadow-sm ${showForm ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
           <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4">
             Feed Arrival Log History ({selectedBatch?.batchNumber})
           </h2>
@@ -283,13 +381,13 @@ export const FeedPage = () => {
                   <th className="pb-3 px-2">Bags Received</th>
                   <th className="pb-3 px-2">Vehicle #</th>
                   <th className="pb-3 px-2">Driver</th>
-                  <th className="pb-3 px-2">Notes</th>
+                  <th className="pb-3 px-2 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
                 {feedArrivals.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="py-8 text-center text-slate-400">No feed arrivals recorded for this batch yet.</td>
+                    <td colSpan="6" className="py-8 text-center text-slate-400">No feed arrivals recorded for this batch yet. Click any Farm button or "+ Receive Feed Stock" to add data.</td>
                   </tr>
                 ) : (
                   feedArrivals.map((f) => {
@@ -301,7 +399,24 @@ export const FeedPage = () => {
                         <td className="py-3 px-2 font-bold text-emerald-700">+{bags} Bags</td>
                         <td className="py-3 px-2 text-slate-600">{f.vehicleNumber || '—'}</td>
                         <td className="py-3 px-2 text-slate-600">{f.driverName || '—'}</td>
-                        <td className="py-3 px-2 text-slate-500 text-[11px]">{f.notes || '—'}</td>
+                        <td className="py-3 px-2 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => handleEditArrival(f)}
+                              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                              title="Edit Arrival"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteArrival(f.id)}
+                              className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
+                              title="Delete Arrival"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     );
                   })

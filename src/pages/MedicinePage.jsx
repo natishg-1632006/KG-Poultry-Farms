@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { dbGetBatches, dbGetMedicineRecords, dbAddMedicineRecord, dbLogAuditEvent } from '../services/dbService';
+import { dbGetBatches, dbGetMedicineRecords, dbAddMedicineRecord, dbDeleteMedicineRecord, dbLogAuditEvent } from '../services/dbService';
 import { MEDICINE_UNITS } from '../constants/companyTargets';
-import { Syringe, Plus, Trash2, Save, CheckCircle2 } from 'lucide-react';
+import { Syringe, Plus, Trash2, Edit, Save, CheckCircle2, Layers, X } from 'lucide-react';
 
 export const MedicinePage = () => {
   const { userProfile, isFarmer } = useAuth();
@@ -12,17 +12,19 @@ export const MedicinePage = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [editingRecordId, setEditingRecordId] = useState(null);
+  const [showForm, setShowForm] = useState(false);
 
-  const [recordType, setRecordType] = useState('Vaccine'); // 'Medicine' or 'Vaccine'
+  const [recordType, setRecordType] = useState('Vaccine');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [reason, setReason] = useState('');
 
-  // Medicine mode state
+  // Medicine state
   const [medicineName, setMedicineName] = useState('');
   const [medicineQty, setMedicineQty] = useState('');
   const [medicineUnit, setMedicineUnit] = useState('ml');
 
-  // Vaccine mode state (Supports multiple vaccines given at same time & multiple vaccinators)
+  // Vaccine state
   const [vaccinesList, setVaccinesList] = useState([
     { name: '', quantity: '', unit: 'ml' },
     { name: '', quantity: '', unit: 'ml' }
@@ -74,7 +76,35 @@ export const MedicinePage = () => {
 
   const selectedBatch = batches.find(b => b.id === selectedBatchId);
 
-  // Dynamic vaccine functions
+  const handleEditRecord = (record) => {
+    setEditingRecordId(record.id);
+    setShowForm(true);
+    setRecordType(record.recordType || 'Vaccine');
+    setDate(record.date || new Date().toISOString().split('T')[0]);
+    setReason(record.reason || '');
+
+    if (record.recordType === 'Medicine') {
+      setMedicineName(record.medicineName || '');
+      setMedicineQty(record.quantity || '');
+      setMedicineUnit(record.unit || 'ml');
+    } else {
+      setVaccinesList(record.vaccines && record.vaccines.length > 0 ? record.vaccines : [{ name: '', quantity: '', unit: 'ml' }]);
+      setVaccinatorsList(record.vaccinatorNames && record.vaccinatorNames.length > 0 ? record.vaccinatorNames : ['']);
+    }
+  };
+
+  const handleDeleteRecord = async (recordId) => {
+    if (!confirm('Are you sure you want to delete this medication/vaccine log entry?')) return;
+    try {
+      await dbDeleteMedicineRecord(selectedBatchId, recordId);
+      await dbLogAuditEvent('MEDICINE_DELETED', `Deleted medicine/vaccine record for ${selectedBatch?.batchNumber}`, userProfile?.name);
+      setSuccessMsg('Record deleted successfully.');
+      loadRecords(selectedBatchId);
+    } catch (err) {
+      alert('Failed deleting record.');
+    }
+  };
+
   const handleAddVaccineField = () => {
     setVaccinesList([...vaccinesList, { name: '', quantity: '', unit: 'ml' }]);
   };
@@ -90,7 +120,6 @@ export const MedicinePage = () => {
     setVaccinesList(updated);
   };
 
-  // Dynamic vaccinator functions
   const handleAddVaccinatorField = () => {
     setVaccinatorsList([...vaccinatorsList, '']);
   };
@@ -114,6 +143,7 @@ export const MedicinePage = () => {
     setSaving(true);
     try {
       let recordPayload = {
+        id: editingRecordId || `med-${Date.now()}`,
         recordType,
         date,
         reason
@@ -137,15 +167,15 @@ export const MedicinePage = () => {
 
       await dbAddMedicineRecord(selectedBatch.id, recordPayload);
       await dbLogAuditEvent(
-        'MEDICINE_LOGGED',
-        `Logged ${recordType} for ${selectedBatch.batchNumber} on ${date}`,
+        editingRecordId ? 'MEDICINE_UPDATED' : 'MEDICINE_LOGGED',
+        `${editingRecordId ? 'Updated' : 'Logged'} ${recordType} for ${selectedBatch.batchNumber} on ${date}`,
         userProfile?.name
       );
 
-      setSuccessMsg(`Successfully logged ${recordType} record for ${selectedBatch.batchNumber}!`);
+      setSuccessMsg(`Successfully ${editingRecordId ? 'updated' : 'saved'} ${recordType} record for ${selectedBatch.batchNumber}!`);
+      setEditingRecordId(null);
       loadRecords(selectedBatch.id);
 
-      // Reset fields
       setReason('');
       setMedicineName('');
       setMedicineQty('');
@@ -165,25 +195,59 @@ export const MedicinePage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-slate-900">Medicine & Vaccination Log</h1>
           <p className="text-sm font-medium text-slate-500">Record scheduled vaccinations, dual vaccines, and flock medications.</p>
         </div>
-        {selectedBatch && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-500">Select Batch:</span>
-            <select
-              value={selectedBatchId}
-              onChange={(e) => setSelectedBatchId(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600"
-            >
-              {batches.map(b => (
-                <option key={b.id} value={b.id}>{b.batchNumber} - {b.batchName}</option>
-              ))}
-            </select>
-          </div>
-        )}
+      </div>
+
+      {/* Interactive Farm / Batch Button Selector Bar */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Select Farm Shed / Batch:</span>
+          <button
+            onClick={() => {
+              setShowForm(!showForm);
+              if (!showForm && !editingRecordId) {
+                setEditingRecordId(null);
+              }
+            }}
+            className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition-all shadow-sm ${
+              showForm
+                ? 'bg-slate-800 text-white hover:bg-slate-900'
+                : 'bg-purple-600 text-white hover:bg-purple-700 ring-2 ring-purple-600/20'
+            }`}
+          >
+            {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            <span>{showForm ? 'Hide Form' : '+ Log Medicine / Vaccine'}</span>
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {batches.length === 0 ? (
+            <p className="text-xs text-slate-400">No batches available.</p>
+          ) : (
+            batches.map((b) => (
+              <button
+                key={b.id}
+                onClick={() => {
+                  setSelectedBatchId(b.id);
+                  setEditingRecordId(null);
+                  setShowForm(true);
+                }}
+                className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all shadow-sm ${
+                  selectedBatchId === b.id
+                    ? 'bg-purple-600 border-purple-600 text-white shadow-purple-200 ring-2 ring-purple-600/30'
+                    : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
+                }`}
+              >
+                <Layers className="h-4 w-4" />
+                <span>{b.batchNumber}</span>
+                <span className="opacity-80">({b.batchName})</span>
+              </button>
+            ))
+          )}
+        </div>
       </div>
 
       {successMsg && (
@@ -194,201 +258,228 @@ export const MedicinePage = () => {
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Entry Form */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
-            <Syringe className="h-5 w-5 text-purple-600" />
-            New Medication / Vaccine Record
-          </h2>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
+        {/* Entry Form - Displayed when showForm is true */}
+        {showForm && (
+          <div className="rounded-2xl border-2 border-purple-500/30 bg-white p-6 shadow-md transition-all">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Syringe className="h-5 w-5 text-purple-600" />
+                {editingRecordId ? 'Edit Record' : 'New Medication / Vaccine Record'}
+              </h2>
               <button
                 type="button"
-                onClick={() => setRecordType('Vaccine')}
-                className={`rounded-lg py-2 text-xs font-bold transition-all ${
-                  recordType === 'Vaccine' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                }`}
+                onClick={() => {
+                  setShowForm(false);
+                  setEditingRecordId(null);
+                }}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                title="Close Form"
               >
-                Vaccine Mode
-              </button>
-              <button
-                type="button"
-                onClick={() => setRecordType('Medicine')}
-                className={`rounded-lg py-2 text-xs font-bold transition-all ${
-                  recordType === 'Medicine' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Medicine Mode
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Date *</label>
-              <input
-                type="date"
-                required
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
-              />
-            </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
+                <button
+                  type="button"
+                  onClick={() => setRecordType('Vaccine')}
+                  className={`rounded-lg py-2 text-xs font-bold transition-all ${
+                    recordType === 'Vaccine' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Vaccine Mode
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRecordType('Medicine')}
+                  className={`rounded-lg py-2 text-xs font-bold transition-all ${
+                    recordType === 'Medicine' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Medicine Mode
+                </button>
+              </div>
 
-            {/* MEDICINE DYNAMIC FIELDS */}
-            {recordType === 'Medicine' && (
-              <div className="space-y-3 rounded-xl border border-slate-200 p-3 bg-slate-50">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Medicine Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={medicineName}
-                    onChange={(e) => setMedicineName(e.target.value)}
-                    placeholder="e.g. Enrofloxacin 10%"
-                    className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Date *</label>
+                <input
+                  type="date"
+                  required
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
+                />
+              </div>
+
+              {recordType === 'Medicine' && (
+                <div className="space-y-3 rounded-xl border border-slate-200 p-3 bg-slate-50">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Quantity *</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Medicine Name *</label>
                     <input
-                      type="number"
+                      type="text"
                       required
-                      min="0.1"
-                      step="0.1"
-                      value={medicineQty}
-                      onChange={(e) => setMedicineQty(e.target.value)}
-                      placeholder="e.g. 500"
+                      value={medicineName}
+                      onChange={(e) => setMedicineName(e.target.value)}
+                      placeholder="e.g. Enrofloxacin 10%"
                       className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Unit *</label>
-                    <select
-                      value={medicineUnit}
-                      onChange={(e) => setMedicineUnit(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600"
-                    >
-                      {MEDICINE_UNITS.map(u => (
-                        <option key={u} value={u}>{u}</option>
-                      ))}
-                    </select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Quantity *</label>
+                      <input
+                        type="number"
+                        required
+                        min="0.1"
+                        step="0.1"
+                        value={medicineQty}
+                        onChange={(e) => setMedicineQty(e.target.value)}
+                        placeholder="e.g. 500"
+                        className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Unit *</label>
+                      <select
+                        value={medicineUnit}
+                        onChange={(e) => setMedicineUnit(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600"
+                      >
+                        {MEDICINE_UNITS.map(u => (
+                          <option key={u} value={u}>{u}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* VACCINE DYNAMIC MULTI-FIELDS */}
-            {recordType === 'Vaccine' && (
-              <div className="space-y-4">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-bold text-slate-700">Vaccine(s) Administered *</label>
-                    <button
-                      type="button"
-                      onClick={handleAddVaccineField}
-                      className="text-[11px] font-bold text-purple-600 hover:underline flex items-center gap-1"
-                    >
-                      <Plus className="h-3 w-3" /> Add Vaccine
-                    </button>
+              {recordType === 'Vaccine' && (
+                <div className="space-y-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold text-slate-700">Vaccine(s) Administered *</label>
+                      <button
+                        type="button"
+                        onClick={handleAddVaccineField}
+                        className="text-[11px] font-bold text-purple-600 hover:underline flex items-center gap-1"
+                      >
+                        <Plus className="h-3 w-3" /> Add Vaccine
+                      </button>
+                    </div>
+
+                    {vaccinesList.map((vac, idx) => (
+                      <div key={idx} className="rounded-xl border border-purple-100 p-3 bg-purple-50/50 space-y-2">
+                        <div className="flex items-center justify-between text-xs font-bold text-purple-900">
+                          <span>Vaccine {idx + 1}</span>
+                          {vaccinesList.length > 1 && (
+                            <button type="button" onClick={() => handleRemoveVaccineField(idx)} className="text-rose-500 hover:text-rose-700">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          type="text"
+                          placeholder={`Vaccine ${idx + 1} Name (e.g. Ranikhet / IBD)`}
+                          value={vac.name}
+                          onChange={(e) => handleVaccineChange(idx, 'name', e.target.value)}
+                          className="w-full rounded-lg border border-slate-200 bg-white py-1.5 px-3 text-xs font-medium"
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            type="number"
+                            placeholder="Quantity"
+                            value={vac.quantity}
+                            onChange={(e) => handleVaccineChange(idx, 'quantity', e.target.value)}
+                            className="w-full rounded-lg border border-slate-200 bg-white py-1.5 px-3 text-xs font-medium"
+                          />
+                          <select
+                            value={vac.unit}
+                            onChange={(e) => handleVaccineChange(idx, 'unit', e.target.value)}
+                            className="w-full rounded-lg border border-slate-200 bg-white py-1.5 px-3 text-xs font-bold"
+                          >
+                            {MEDICINE_UNITS.map(u => (
+                              <option key={u} value={u}>{u}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    ))}
                   </div>
 
-                  {vaccinesList.map((vac, idx) => (
-                    <div key={idx} className="rounded-xl border border-purple-100 p-3 bg-purple-50/50 space-y-2">
-                      <div className="flex items-center justify-between text-xs font-bold text-purple-900">
-                        <span>Vaccine {idx + 1} {idx === 1 ? '(Optional)' : ''}</span>
-                        {vaccinesList.length > 1 && (
-                          <button type="button" onClick={() => handleRemoveVaccineField(idx)} className="text-rose-500 hover:text-rose-700">
-                            <Trash2 className="h-3.5 w-3.5" />
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold text-slate-700">Vaccinator Name(s)</label>
+                      <button
+                        type="button"
+                        onClick={handleAddVaccinatorField}
+                        className="text-[11px] font-bold text-purple-600 hover:underline flex items-center gap-1"
+                      >
+                        <Plus className="h-3 w-3" /> Add Vaccinator
+                      </button>
+                    </div>
+                    {vaccinatorsList.map((vName, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder={`Vaccinator ${idx + 1} Name`}
+                          value={vName}
+                          onChange={(e) => handleVaccinatorChange(idx, e.target.value)}
+                          className="w-full rounded-xl border border-slate-200 py-1.5 px-3 text-xs font-medium"
+                        />
+                        {vaccinatorsList.length > 1 && (
+                          <button type="button" onClick={() => handleRemoveVaccinatorField(idx)} className="text-rose-500">
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         )}
                       </div>
-                      <input
-                        type="text"
-                        placeholder={`Vaccine ${idx + 1} Name (e.g. Ranikhet / IBD)`}
-                        value={vac.name}
-                        onChange={(e) => handleVaccineChange(idx, 'name', e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 bg-white py-1.5 px-3 text-xs font-medium"
-                      />
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="number"
-                          placeholder="Quantity"
-                          value={vac.quantity}
-                          onChange={(e) => handleVaccineChange(idx, 'quantity', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white py-1.5 px-3 text-xs font-medium"
-                        />
-                        <select
-                          value={vac.unit}
-                          onChange={(e) => handleVaccineChange(idx, 'unit', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white py-1.5 px-3 text-xs font-bold"
-                        >
-                          {MEDICINE_UNITS.map(u => (
-                            <option key={u} value={u}>{u}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Vaccinators list */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-bold text-slate-700">Vaccinator Name(s)</label>
-                    <button
-                      type="button"
-                      onClick={handleAddVaccinatorField}
-                      className="text-[11px] font-bold text-purple-600 hover:underline flex items-center gap-1"
-                    >
-                      <Plus className="h-3 w-3" /> Add Vaccinator
-                    </button>
+                    ))}
                   </div>
-                  {vaccinatorsList.map((vName, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        placeholder={`Vaccinator ${idx + 1} Name (e.g. Dr. Ramesh)`}
-                        value={vName}
-                        onChange={(e) => handleVaccinatorChange(idx, e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 py-1.5 px-3 text-xs font-medium"
-                      />
-                      {vaccinatorsList.length > 1 && (
-                        <button type="button" onClick={() => handleRemoveVaccinatorField(idx)} className="text-rose-500">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
                 </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Reason / Notes *</label>
+                <textarea
+                  rows="2"
+                  required
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="e.g. Day 7 Booster / Preventive treatment"
+                  className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
+                />
               </div>
-            )}
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Reason / Notes *</label>
-              <textarea
-                rows="2"
-                required
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="e.g. Day 7 Booster / Preventive treatment"
-                className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
-              />
-            </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForm(false);
+                    setEditingRecordId(null);
+                    setReason('');
+                    setMedicineName('');
+                    setMedicineQty('');
+                  }}
+                  className="w-1/3 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-purple-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-purple-700 disabled:opacity-50 transition-colors"
+                >
+                  <Save className="h-4 w-4" />
+                  {saving ? 'Saving...' : editingRecordId ? 'Update Record' : `Save ${recordType} Record`}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
 
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-purple-700 disabled:opacity-50 transition-colors"
-            >
-              <Save className="h-4 w-4" />
-              {saving ? 'Saving...' : `Save ${recordType} Record`}
-            </button>
-          </form>
-        </div>
-
-        {/* History Table */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-2">
+        {/* History Table with Edit & Delete Controls */}
+        <div className={`rounded-2xl border border-slate-200 bg-white p-6 shadow-sm ${showForm ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
           <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4">
             Medicine & Vaccination History ({selectedBatch?.batchNumber})
           </h2>
@@ -402,12 +493,13 @@ export const MedicinePage = () => {
                   <th className="pb-3 px-2">Medicine / Vaccines</th>
                   <th className="pb-3 px-2">Vaccinator(s)</th>
                   <th className="pb-3 px-2">Reason</th>
+                  <th className="pb-3 px-2 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
                 {records.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="py-8 text-center text-slate-400">No medicine/vaccination records for this batch yet.</td>
+                    <td colSpan="6" className="py-8 text-center text-slate-400">No medicine/vaccination records for this batch yet.</td>
                   </tr>
                 ) : (
                   records.map((r) => (
@@ -431,6 +523,24 @@ export const MedicinePage = () => {
                         {r.vaccinatorNames && r.vaccinatorNames.length > 0 ? r.vaccinatorNames.join(', ') : '—'}
                       </td>
                       <td className="py-3 px-2 text-slate-600">{r.reason}</td>
+                      <td className="py-3 px-2 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => handleEditRecord(r)}
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                            title="Edit Record"
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteRecord(r.id)}
+                            className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
+                            title="Delete Record"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}
