@@ -79,8 +79,8 @@ export const FarmerDashboard = () => {
           </p>
         </div>
         {activeBatch && (
-          <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2 text-xs font-bold text-emerald-800">
-            <span>Current Batch: {activeBatch.batchNumber} ({activeBatch.batchName})</span>
+          <div className="flex items-center gap-2.5 rounded-xl bg-emerald-50 border border-emerald-200/80 px-4 py-2 text-xs font-bold text-emerald-900 shadow-xs">
+            <span>Current Batch: {activeBatch.batchNumber} ({activeBatch.batchName}) • <strong className="text-emerald-700">Day {flockAgeDays}</strong></span>
             <Badge variant={activeBatch.status}>{activeBatch.status}</Badge>
           </div>
         )}
@@ -93,19 +93,12 @@ export const FarmerDashboard = () => {
         </div>
       ) : (
         <>
-          {/* Metrics Overview showing exact requested KPI Cards */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          {/* 4 Essential KPI Cards Grid */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
-              title="Total Chicks"
-              value={initialChicks.toLocaleString()}
-              subtext="Initial batch count"
-              icon={Layers}
-              color="emerald"
-            />
-            <StatCard
-              title="Current Chicks"
-              value={Number(remainingChicks).toLocaleString()}
-              subtext="Current live count"
+              title="Chicks Count"
+              value={`${Number(remainingChicks).toLocaleString()} / ${initialChicks.toLocaleString()}`}
+              subtext="Live / Initial Chicks"
               icon={Activity}
               color="emerald"
             />
@@ -129,13 +122,6 @@ export const FarmerDashboard = () => {
               subtext={latestRecord ? `Latest entry: ${latestRecord.recordDate}` : 'No daily records yet'}
               icon={Scale}
               color="emerald"
-            />
-            <StatCard
-              title="Current Day"
-              value={`Day ${flockAgeDays}`}
-              subtext={`Arrival: ${activeBatch?.chickArrivalDate || 'N/A'}`}
-              icon={Calendar}
-              color="blue"
             />
           </div>
 
