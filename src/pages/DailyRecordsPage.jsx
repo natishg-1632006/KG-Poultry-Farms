@@ -18,6 +18,7 @@ export const DailyRecordsPage = () => {
   const [successMsg, setSuccessMsg] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [showTargetsTable, setShowTargetsTable] = useState(false);
+  const [viewingRecord, setViewingRecord] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -319,6 +320,34 @@ export const DailyRecordsPage = () => {
     lastRecordWeightDiff = Number(lastRecord.averageWeight || 0) - lastRecordTargetWeightGram;
   }
 
+  // Compute viewingRecord breakdown metrics for popup modal
+  let viewingAgeDay = 1;
+  let viewingBags = 0;
+  let viewingTotalKg = 0;
+  let viewingChicks = 0;
+  let viewingPerBirdEat = 0;
+  let viewingTargetIntake = 20;
+  let viewingTargetWeight = 58;
+  let viewingEatDiff = 0;
+  let viewingWeightDiff = 0;
+
+  if (viewingRecord) {
+    if (selectedBatch?.chickArrivalDate && viewingRecord.recordDate) {
+      const arrDate = new Date(selectedBatch.chickArrivalDate);
+      const rDate = new Date(viewingRecord.recordDate);
+      const diffMs = Math.max(0, rDate.getTime() - arrDate.getTime());
+      viewingAgeDay = Math.min(45, Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1);
+    }
+    viewingTargetIntake = FEED_CONSUMPTION_TARGETS[viewingAgeDay] || 20;
+    viewingTargetWeight = AVERAGE_WEIGHT_TARGETS[viewingAgeDay] || 58;
+    viewingBags = Math.max(1, Math.round(viewingRecord.feedConsumptionBags || kgToBags(viewingRecord.feedConsumption || 0, KG_PER_BAG)));
+    viewingTotalKg = viewingBags * KG_PER_BAG;
+    viewingChicks = Number(viewingRecord.remainingChickCount || selectedBatch?.remainingChickCount || selectedBatch?.initialChickCount || 5000);
+    viewingPerBirdEat = viewingChicks > 0 ? Math.round((viewingTotalKg * 1000) / viewingChicks) : 0;
+    viewingEatDiff = viewingPerBirdEat - viewingTargetIntake;
+    viewingWeightDiff = Number(viewingRecord.averageWeight || 0) - viewingTargetWeight;
+  }
+
   if (loading) return <div className="p-8 text-center text-slate-500">Loading Daily Farm Records...</div>;
 
   return (
@@ -366,7 +395,7 @@ export const DailyRecordsPage = () => {
               <X className="h-5 w-5" />
             </button>
           </div>
-          <div className="max-h-72 overflow-auto rounded-xl border border-slate-100">
+          <div className="max-h-72 overflow-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden rounded-xl border border-slate-100">
             <table className="w-full min-w-[580px] text-left text-xs">
               <thead className="bg-slate-50 sticky top-0 border-b border-slate-100 text-slate-500 font-semibold whitespace-nowrap z-10">
                 <tr>
@@ -576,6 +605,126 @@ export const DailyRecordsPage = () => {
         </form>
       </Modal>
 
+      {/* Daily Record Detail Popup Modal */}
+      <Modal
+        isOpen={!!viewingRecord}
+        onClose={() => setViewingRecord(null)}
+        title={`Daily Farm Record (${viewingRecord?.recordDate})`}
+      >
+        {viewingRecord && (
+          <div className="space-y-4 text-xs">
+            {/* Header Badge Row */}
+            <div className="flex items-center justify-between rounded-xl bg-slate-50 p-3 border border-slate-100">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Batch Number</span>
+                <span className="text-sm font-black text-slate-900">{selectedBatch?.batchNumber} ({selectedBatch?.batchName})</span>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Flock Age</span>
+                <span className="inline-block rounded-full bg-emerald-600 px-2.5 py-0.5 text-xs font-black text-white shadow-2xs">Day {viewingAgeDay}</span>
+              </div>
+            </div>
+
+            {/* 3 Main Stat Summary Blocks */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-xl bg-amber-50/70 p-3 border border-amber-200/60 text-center">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-700 block mb-0.5">Mortality</span>
+                <span className="text-base sm:text-lg font-black text-amber-900 block">{viewingRecord.mortalityCount} birds</span>
+                <span className="text-[10px] font-medium text-amber-700 block mt-0.5">Remaining: {viewingChicks.toLocaleString()}</span>
+              </div>
+
+              <div className="rounded-xl bg-blue-50/70 p-3 border border-blue-200/60 text-center">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 block mb-0.5">Feed Consumed</span>
+                <span className="text-base sm:text-lg font-black text-blue-900 block">{viewingBags} Bags</span>
+                <span className="text-[10px] font-medium text-blue-700 block mt-0.5">({viewingTotalKg} kg total)</span>
+              </div>
+
+              <div className="rounded-xl bg-emerald-50/70 p-3 border border-emerald-200/60 text-center">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 block mb-0.5">Avg Weight</span>
+                <span className="text-base sm:text-lg font-black text-emerald-900 block">{viewingRecord.averageWeight} g</span>
+                <span className="text-[10px] font-medium text-emerald-700 block mt-0.5">({viewingWeightDiff > 0 ? '+' : ''}{viewingWeightDiff}g vs target)</span>
+              </div>
+            </div>
+
+            {/* Target Comparison Breakdown */}
+            <div className="rounded-xl border border-slate-200/80 p-3.5 bg-white space-y-2.5">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block border-b border-slate-100 pb-1.5">
+                Target vs Actual Analysis
+              </span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 space-y-1">
+                  <span className="font-bold text-slate-700 block">Feed Intake / Bird</span>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Actual:</span>
+                    <span className="font-black text-slate-900">{viewingPerBirdEat} g/bird</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Target (Day {viewingAgeDay}):</span>
+                    <span className="font-bold text-blue-600">{viewingTargetIntake} g/bird</span>
+                  </div>
+                  <div className="flex justify-between border-t border-slate-200 pt-1">
+                    <span className="text-slate-500">Difference:</span>
+                    <span className={`font-black ${viewingEatDiff >= 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {viewingEatDiff > 0 ? '+' : ''}{viewingEatDiff} g
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 space-y-1">
+                  <span className="font-bold text-slate-700 block">Body Weight</span>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Actual:</span>
+                    <span className="font-black text-slate-900">{viewingRecord.averageWeight} g</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Target (Day {viewingAgeDay}):</span>
+                    <span className="font-bold text-blue-600">{viewingTargetWeight} g</span>
+                  </div>
+                  <div className="flex justify-between border-t border-slate-200 pt-1">
+                    <span className="text-slate-500">Difference:</span>
+                    <span className={`font-black ${viewingWeightDiff >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {viewingWeightDiff > 0 ? '+' : ''}{viewingWeightDiff} g
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Additional Info Footer */}
+            <div className="flex items-center justify-between text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+              <span>Recorded By: <strong className="text-slate-700">{viewingRecord.recordedBy || 'Farmer'}</strong></span>
+              <span>Feed Type: <strong className="text-slate-700">{viewingRecord.feedType || 'Auto'}</strong></span>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setViewingRecord(null)}
+                className="flex-1 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                Close
+              </button>
+              {!isReadOnly && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const r = viewingRecord;
+                    setViewingRecord(null);
+                    handleEditRecord(r);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 transition-colors shadow-sm"
+                >
+                  <Edit className="h-4 w-4" />
+                  <span>Edit Record</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
+
       {/* History Table with Edit and Delete Actions - Fixed Header & Paginated */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm min-w-0">
         <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 mb-4">
@@ -610,7 +759,7 @@ export const DailyRecordsPage = () => {
           </div>
         </div>
 
-        <div className="w-full overflow-auto max-h-[440px] rounded-xl border border-slate-100">
+        <div className="w-full overflow-auto max-h-[440px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden rounded-xl border border-slate-100">
           <table className="w-full min-w-[500px] text-left text-xs">
             <thead className="bg-slate-50 sticky top-0 border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold whitespace-nowrap z-10 shadow-2xs">
               <tr>
@@ -645,7 +794,12 @@ export const DailyRecordsPage = () => {
                   const rDiffStr = rWeightDiff > 0 ? `+${rWeightDiff}g` : `${rWeightDiff}g`;
 
                   return (
-                    <tr key={r.recordDate} className="hover:bg-slate-50">
+                    <tr
+                      key={r.recordDate}
+                      onClick={() => setViewingRecord(r)}
+                      className="hover:bg-emerald-50/50 cursor-pointer transition-colors"
+                      title="Click to view detailed daily record breakdown"
+                    >
                       <td className="p-3 font-bold text-slate-900" title={r.recordDate}>{r.recordDate}</td>
                       <td className="p-3 font-bold text-rose-600" title={r.mortalityCount}>{r.mortalityCount}</td>
                       <td className="p-3 text-slate-700 font-bold" title={`${bags} Bags (${perBirdEat} g/bird)`}>
@@ -657,14 +811,20 @@ export const DailyRecordsPage = () => {
                       <td className="p-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => handleEditRecord(r)}
-                            className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditRecord(r);
+                            }}
+                            className="rounded-lg p-1 text-slate-500 hover:bg-slate-200/60 hover:text-slate-900"
                             title="Edit Record"
                           >
                             <Edit className="h-3.5 w-3.5" />
                           </button>
                           <button
-                            onClick={() => handleDeleteRecord(r.recordDate)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteRecord(r.recordDate);
+                            }}
                             className="rounded-lg p-1 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
                             title="Delete Record"
                           >
