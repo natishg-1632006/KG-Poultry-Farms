@@ -103,7 +103,7 @@ export const CompanyTargetsPage = () => {
             {!editingMode ? (
               <button
                 onClick={() => setEditingMode(true)}
-                className="flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-purple-700"
+                className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700"
               >
                 <Edit2 className="h-4 w-4" /> Edit Target Benchmarks
               </button>
@@ -140,7 +140,7 @@ export const CompanyTargetsPage = () => {
           <button
             onClick={() => setActiveTab('feed')}
             className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
-              activeTab === 'feed' ? 'bg-amber-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              activeTab === 'feed' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
             }`}
           >
             <Wheat className="h-4 w-4" /> Feed Consumption Target (Days 1–45)
@@ -228,7 +228,7 @@ export const CompanyTargetsPage = () => {
                           className="w-20 rounded-lg border border-slate-300 py-1 px-2 text-xs font-bold"
                         />
                       ) : (
-                        <span className="font-bold text-purple-700">{targetVal} g</span>
+                        <span className="font-bold text-emerald-700">{targetVal} g</span>
                       )}
                     </td>
                     <td className="py-2.5 px-2 font-bold text-slate-800">

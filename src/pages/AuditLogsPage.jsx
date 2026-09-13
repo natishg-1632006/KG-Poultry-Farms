@@ -75,7 +75,7 @@ export const AuditLogsPage = () => {
                       {new Date(log.timestamp).toLocaleString()}
                     </td>
                     <td className="py-3 px-2">
-                      <span className="rounded-md bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-800">
+                      <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
                         {log.action}
                       </span>
                     </td>

@@ -173,7 +173,7 @@ export const ReportsPage = () => {
           {/* Chart 3: Feed Consumption vs Target per Bird */}
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
-              <Wheat className="h-5 w-5 text-amber-600" />
+              <Wheat className="h-5 w-5 text-emerald-600" />
               Feed Consumption per Bird vs Target (g/bird)
             </h2>
             <div className="h-72 w-full">
@@ -184,8 +184,8 @@ export const ReportsPage = () => {
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="actualFeedGramPerBird" stroke="#d97706" strokeWidth={3} name="Actual Feed (g/bird)" />
-                  <Line type="monotone" dataKey="targetFeed" stroke="#2563eb" strokeDasharray="5 5" strokeWidth={2} name="Company Target (g)" />
+                  <Line type="monotone" dataKey="actualFeedGramPerBird" stroke="#059669" strokeWidth={3} name="Actual Feed (g/bird)" />
+                  <Line type="monotone" dataKey="targetFeed" stroke="#10b981" strokeDasharray="5 5" strokeWidth={2} name="Company Target (g)" />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -194,7 +194,7 @@ export const ReportsPage = () => {
           {/* Chart 4: Daily Total Feed Consumed (kg) */}
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-indigo-600" />
+              <BarChart3 className="h-5 w-5 text-emerald-600" />
               Daily Total Feed Consumed (kg)
             </h2>
             <div className="h-72 w-full">

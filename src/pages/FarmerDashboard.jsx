@@ -69,7 +69,7 @@ export const FarmerDashboard = () => {
       </div>
 
       {!activeBatch ? (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center text-amber-800">
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-8 text-center text-emerald-900">
           <p className="font-bold text-base">No Active Batch Assigned</p>
           <p className="text-xs mt-1">Please contact your Administrator to assign you an active farm batch.</p>
         </div>
@@ -89,14 +89,14 @@ export const FarmerDashboard = () => {
               value={formatFeedStock(feedStock['Pre-Starter'] || 0)}
               subtext="First phase feed"
               icon={Wheat}
-              color="amber"
+              color="emerald"
             />
             <StatCard
               title="Starter Stock"
               value={formatFeedStock(feedStock['Starter'] || 0)}
               subtext="Growth phase feed"
               icon={Wheat}
-              color="indigo"
+              color="emerald"
             />
             <StatCard
               title="Finisher Stock"
@@ -127,48 +127,48 @@ export const FarmerDashboard = () => {
 
             <Link
               to="/feed"
-              className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-amber-500 hover:shadow-md transition-all group"
+              className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-emerald-500 hover:shadow-md transition-all group"
             >
               <div>
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
                   <Wheat className="h-5 w-5" />
                 </div>
                 <h3 className="mt-4 font-bold text-slate-900">Feed Stock Receive</h3>
                 <p className="mt-1 text-xs text-slate-500">Log incoming feed bags & vehicle records.</p>
               </div>
-              <div className="mt-4 flex items-center text-xs font-bold text-amber-600">
+              <div className="mt-4 flex items-center text-xs font-bold text-emerald-600">
                 Receive Feed Bags <ArrowRight className="ml-1 h-3.5 w-3.5" />
               </div>
             </Link>
 
             <Link
               to="/medicine"
-              className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-purple-500 hover:shadow-md transition-all group"
+              className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-emerald-500 hover:shadow-md transition-all group"
             >
               <div>
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 text-purple-700 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
                   <Syringe className="h-5 w-5" />
                 </div>
                 <h3 className="mt-4 font-bold text-slate-900">Medicine & Vaccine</h3>
                 <p className="mt-1 text-xs text-slate-500">Log medicines, multiple vaccines & vaccinator details.</p>
               </div>
-              <div className="mt-4 flex items-center text-xs font-bold text-purple-600">
+              <div className="mt-4 flex items-center text-xs font-bold text-emerald-600">
                 Record Medication <ArrowRight className="ml-1 h-3.5 w-3.5" />
               </div>
             </Link>
 
             <Link
               to="/dispatch"
-              className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-indigo-500 hover:shadow-md transition-all group"
+              className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-emerald-500 hover:shadow-md transition-all group"
             >
               <div>
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
                   <Truck className="h-5 w-5" />
                 </div>
                 <h3 className="mt-4 font-bold text-slate-900">Dispatch Box Sets</h3>
                 <p className="mt-1 text-xs text-slate-500">Log vehicle dispatches, box empty/loaded weights and chicken counts.</p>
               </div>
-              <div className="mt-4 flex items-center text-xs font-bold text-indigo-600">
+              <div className="mt-4 flex items-center text-xs font-bold text-emerald-600">
                 Dispatch Weighing <ArrowRight className="ml-1 h-3.5 w-3.5" />
               </div>
             </Link>

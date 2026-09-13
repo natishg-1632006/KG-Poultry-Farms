@@ -72,24 +72,24 @@ export const AdminDashboard = () => {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Active Batches"
-          value={activeBatches.length}
-          subtext={`${batches.length} total recorded batches`}
+          value={batches.filter(b => b.status === 'Active').length}
+          subtext="In production shed"
           icon={Layers}
           color="emerald"
         />
         <StatCard
-          title="Active Farmers"
+          title="Total Farmers"
           value={farmersCount}
-          subtext="Assigned operational staff"
+          subtext="Registered active accounts"
           icon={Users}
-          color="indigo"
+          color="emerald"
         />
         <StatCard
-          title="Current Live Chicks"
+          title="Total Live Chicks"
           value={totalChicks.toLocaleString()}
           subtext="Across active batches"
-          icon={Activity}
-          color="amber"
+          icon={TrendingUp}
+          color="emerald"
         />
         <StatCard
           title="Total Dispatched Weight"
@@ -151,10 +151,10 @@ export const AdminDashboard = () => {
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-purple-600" />
+              <ShieldCheck className="h-5 w-5 text-emerald-600" />
               Audit Log Feed
             </h2>
-            <Link to="/admin/audit-logs" className="text-xs font-bold text-purple-600 hover:underline">
+            <Link to="/admin/audit-logs" className="text-xs font-bold text-emerald-600 hover:underline">
               Logs
             </Link>
           </div>

@@ -301,7 +301,7 @@ export const DispatchPage = () => {
             className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition-all shadow-sm ${
               showForm
                 ? 'bg-slate-800 text-white hover:bg-slate-900'
-                : 'bg-indigo-600 text-white hover:bg-indigo-700 ring-2 ring-indigo-600/20'
+                : 'bg-emerald-600 text-white hover:bg-emerald-700 ring-2 ring-emerald-600/20'
             }`}
           >
             {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
@@ -321,7 +321,7 @@ export const DispatchPage = () => {
                 }}
                 className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all shadow-sm ${
                   selectedBatchId === b.id
-                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-indigo-200 ring-2 ring-indigo-600/30'
+                    ? 'bg-emerald-600 border-emerald-600 text-white shadow-emerald-200 ring-2 ring-emerald-600/30'
                     : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
                 }`}
               >
@@ -354,7 +354,7 @@ export const DispatchPage = () => {
               }}
               className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition-all shrink-0 ${
                 activeDispatch?.id === d.id
-                  ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
+                  ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm'
                   : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
               }`}
             >
@@ -376,10 +376,10 @@ export const DispatchPage = () => {
       {showForm && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* Step 1: Dispatch Header Form */}
-          <div className="rounded-2xl border-2 border-indigo-500/30 bg-white p-6 shadow-md">
+          <div className="rounded-2xl border-2 border-emerald-500/30 bg-white p-6 shadow-md">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Truck className="h-5 w-5 text-indigo-600" />
+                <Truck className="h-5 w-5 text-emerald-600" />
                 Step 1: Dispatch Header Information
               </h2>
               <button
@@ -484,14 +484,14 @@ export const DispatchPage = () => {
                 min="1"
                 value={dispatchHeader.totalChickenCount}
                 onChange={(e) => setDispatchHeader({ ...dispatchHeader, totalChickenCount: Number(e.target.value) })}
-                className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-bold text-indigo-700 bg-indigo-50/50 focus:border-emerald-600"
+                className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-bold text-emerald-700 bg-emerald-50/50 focus:border-emerald-600"
               />
             </div>
 
             <button
               type="submit"
               disabled={saving}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
             >
               <Save className="h-4 w-4" />
               {activeDispatch ? 'Update Dispatch Header' : 'Create Dispatch Header'}
@@ -512,7 +512,7 @@ export const DispatchPage = () => {
             </div>
           ) : (
             <form onSubmit={handleSaveBoxSet} className="space-y-4">
-              <div className="rounded-xl bg-indigo-50 border border-indigo-100 p-3 flex items-center justify-between text-xs font-bold text-indigo-900">
+              <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 flex items-center justify-between text-xs font-bold text-emerald-900">
                 <span>Active Dispatch: {activeDispatch.vehicleNumber}</span>
                 <span>Box Sets Saved: {boxSets.length} / {activeDispatch.totalBoxCount}</span>
               </div>
@@ -628,7 +628,7 @@ export const DispatchPage = () => {
             </h2>
             <div className="flex items-center gap-4 text-xs font-bold">
               <span className="text-slate-600">Total Weight: <strong className="text-emerald-700">{activeDispatch.totalWeight} kg</strong></span>
-              <span className="text-slate-600">Avg Weight: <strong className="text-indigo-700">{activeDispatch.averageWeight} kg</strong></span>
+              <span className="text-slate-600">Avg Weight: <strong className="text-emerald-700">{activeDispatch.averageWeight} kg</strong></span>
               <Badge variant={activeDispatch.status}>{activeDispatch.status}</Badge>
             </div>
           </div>
@@ -657,7 +657,7 @@ export const DispatchPage = () => {
                       <td className="py-3 px-2 font-bold text-slate-900">Box Set #{s.boxSetNumber}</td>
                       <td className="py-3 px-2 text-slate-600">{s.emptyBoxWeight} kg</td>
                       <td className="py-3 px-2 text-slate-900 font-bold">{s.loadedWeight} kg</td>
-                      <td className="py-3 px-2 text-indigo-700 font-bold">{s.chickenCount}</td>
+                      <td className="py-3 px-2 text-emerald-700 font-bold">{s.chickenCount}</td>
                       <td className="py-3 px-2 text-emerald-600 font-black">{s.totalChickenWeight} kg</td>
                       <td className="py-3 px-2 font-bold text-slate-900">{s.averageChickenWeight} kg</td>
                       <td className="py-3 px-2 text-right">

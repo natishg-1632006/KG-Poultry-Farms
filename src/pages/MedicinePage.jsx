@@ -216,7 +216,7 @@ export const MedicinePage = () => {
             className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition-all shadow-sm ${
               showForm
                 ? 'bg-slate-800 text-white hover:bg-slate-900'
-                : 'bg-purple-600 text-white hover:bg-purple-700 ring-2 ring-purple-600/20'
+                : 'bg-emerald-600 text-white hover:bg-emerald-700 ring-2 ring-emerald-600/20'
             }`}
           >
             {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
@@ -237,7 +237,7 @@ export const MedicinePage = () => {
                 }}
                 className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all shadow-sm ${
                   selectedBatchId === b.id
-                    ? 'bg-purple-600 border-purple-600 text-white shadow-purple-200 ring-2 ring-purple-600/30'
+                    ? 'bg-emerald-600 border-emerald-600 text-white shadow-emerald-200 ring-2 ring-emerald-600/30'
                     : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
                 }`}
               >
@@ -260,10 +260,10 @@ export const MedicinePage = () => {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Entry Form - Displayed when showForm is true */}
         {showForm && (
-          <div className="rounded-2xl border-2 border-purple-500/30 bg-white p-6 shadow-md transition-all">
+          <div className="rounded-2xl border-2 border-emerald-500/30 bg-white p-6 shadow-md transition-all">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Syringe className="h-5 w-5 text-purple-600" />
+                <Syringe className="h-5 w-5 text-emerald-600" />
                 {editingRecordId ? 'Edit Record' : 'New Medication / Vaccine Record'}
               </h2>
               <button
@@ -285,7 +285,7 @@ export const MedicinePage = () => {
                   type="button"
                   onClick={() => setRecordType('Vaccine')}
                   className={`rounded-lg py-2 text-xs font-bold transition-all ${
-                    recordType === 'Vaccine' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                    recordType === 'Vaccine' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   Vaccine Mode
@@ -363,15 +363,15 @@ export const MedicinePage = () => {
                       <button
                         type="button"
                         onClick={handleAddVaccineField}
-                        className="text-[11px] font-bold text-purple-600 hover:underline flex items-center gap-1"
+                        className="text-[11px] font-bold text-emerald-600 hover:underline flex items-center gap-1"
                       >
                         <Plus className="h-3 w-3" /> Add Vaccine
                       </button>
                     </div>
 
                     {vaccinesList.map((vac, idx) => (
-                      <div key={idx} className="rounded-xl border border-purple-100 p-3 bg-purple-50/50 space-y-2">
-                        <div className="flex items-center justify-between text-xs font-bold text-purple-900">
+                      <div key={idx} className="rounded-xl border border-emerald-100 p-3 bg-emerald-50/50 space-y-2">
+                        <div className="flex items-center justify-between text-xs font-bold text-emerald-900">
                           <span>Vaccine {idx + 1}</span>
                           {vaccinesList.length > 1 && (
                             <button type="button" onClick={() => handleRemoveVaccineField(idx)} className="text-rose-500 hover:text-rose-700">
@@ -414,7 +414,7 @@ export const MedicinePage = () => {
                       <button
                         type="button"
                         onClick={handleAddVaccinatorField}
-                        className="text-[11px] font-bold text-purple-600 hover:underline flex items-center gap-1"
+                        className="text-[11px] font-bold text-emerald-600 hover:underline flex items-center gap-1"
                       >
                         <Plus className="h-3 w-3" /> Add Vaccinator
                       </button>
@@ -468,7 +468,7 @@ export const MedicinePage = () => {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-purple-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-purple-700 disabled:opacity-50 transition-colors"
+                  className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
                 >
                   <Save className="h-4 w-4" />
                   {saving ? 'Saving...' : editingRecordId ? 'Update Record' : `Save ${recordType} Record`}
@@ -505,14 +505,14 @@ export const MedicinePage = () => {
                   records.map((r) => (
                     <tr key={r.id} className="hover:bg-slate-50">
                       <td className="py-3 px-2 font-bold text-slate-900">{r.date}</td>
-                      <td className="py-3 px-2 font-bold text-purple-700">{r.recordType}</td>
+                      <td className="py-3 px-2 font-bold text-emerald-700">{r.recordType}</td>
                       <td className="py-3 px-2">
                         {r.recordType === 'Medicine' ? (
                           <span className="font-bold text-emerald-800">{r.medicineName} ({r.quantity} {r.unit})</span>
                         ) : (
                           <div className="space-y-0.5">
                             {r.vaccines && r.vaccines.map((v, i) => (
-                              <div key={i} className="text-xs font-bold text-purple-900">
+                              <div key={i} className="text-xs font-bold text-emerald-900">
                                 • {v.name} ({v.quantity} {v.unit})
                               </div>
                             ))}

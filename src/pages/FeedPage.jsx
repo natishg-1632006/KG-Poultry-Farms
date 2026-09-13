@@ -172,7 +172,7 @@ export const FeedPage = () => {
             className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition-all shadow-sm ${
               showForm
                 ? 'bg-slate-800 text-white hover:bg-slate-900'
-                : 'bg-amber-600 text-white hover:bg-amber-700 ring-2 ring-amber-600/20'
+                : 'bg-emerald-600 text-white hover:bg-emerald-700 ring-2 ring-emerald-600/20'
             }`}
           >
             {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
@@ -213,21 +213,21 @@ export const FeedPage = () => {
           value={formatFeedStock(feedStock['Pre-Starter'] || 0)}
           subtext="First deduction priority"
           icon={Wheat}
-          color="amber"
+          color="emerald"
         />
         <StatCard
           title="2. Starter Stock"
           value={formatFeedStock(feedStock['Starter'] || 0)}
           subtext="Second deduction priority"
           icon={Wheat}
-          color="indigo"
+          color="emerald"
         />
         <StatCard
           title="3. Finisher Stock"
           value={formatFeedStock(feedStock['Finisher'] || 0)}
           subtext="Third deduction priority"
           icon={Wheat}
-          color="blue"
+          color="emerald"
         />
       </div>
 
@@ -241,10 +241,10 @@ export const FeedPage = () => {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Feed Arrival Entry Form - Displayed when showForm is true */}
         {showForm && (
-          <div className="rounded-2xl border-2 border-amber-500/30 bg-white p-6 shadow-md transition-all">
+          <div className="rounded-2xl border-2 border-emerald-500/30 bg-white p-6 shadow-md transition-all">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Truck className="h-5 w-5 text-amber-600" />
+                <Truck className="h-5 w-5 text-emerald-600" />
                 {editingFeedId ? 'Edit Feed Stock Arrival' : 'Receive Feed Stock Arrival'}
               </h2>
               <button
@@ -356,7 +356,7 @@ export const FeedPage = () => {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-amber-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-amber-700 disabled:opacity-50 transition-colors"
+                  className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
                 >
                   <Save className="h-4 w-4" />
                   {saving ? 'Processing...' : editingFeedId ? 'Update Arrival' : 'Add Feed Stock'}
@@ -395,7 +395,7 @@ export const FeedPage = () => {
                     return (
                       <tr key={f.id} className="hover:bg-slate-50">
                         <td className="py-3 px-2 font-bold text-slate-900">{f.date}</td>
-                        <td className="py-3 px-2 font-bold text-amber-700">{f.feedType}</td>
+                        <td className="py-3 px-2 font-bold text-emerald-700">{f.feedType}</td>
                         <td className="py-3 px-2 font-bold text-emerald-700">+{bags} Bags</td>
                         <td className="py-3 px-2 text-slate-600">{f.vehicleNumber || '—'}</td>
                         <td className="py-3 px-2 text-slate-600">{f.driverName || '—'}</td>

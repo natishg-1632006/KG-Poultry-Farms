@@ -285,7 +285,7 @@ export const DailyRecordsPage = () => {
       )}
 
       {isReadOnly && (
-        <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-xs font-bold text-amber-800">
+        <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-xs font-bold text-emerald-900">
           Batch status is <strong>{selectedBatch?.status}</strong>. Farmers cannot add or edit records on completed batches.
         </div>
       )}

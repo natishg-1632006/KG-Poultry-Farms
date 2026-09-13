@@ -125,15 +125,15 @@ export const LoginPage = () => {
               disabled={loadingState}
               className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 transition-colors"
             >
-              <ShieldCheck className="h-4 w-4 text-purple-600" />
+              <ShieldCheck className="h-4 w-4 text-emerald-600" />
               Demo Admin
             </button>
             <button
               onClick={() => handleDemoLogin('Farmer')}
               disabled={loadingState}
-              className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-800 transition-colors"
+              className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-800 transition-colors"
             >
-              <UserCheck className="h-4 w-4 text-indigo-600" />
+              <UserCheck className="h-4 w-4 text-emerald-600" />
               Demo Farmer
             </button>
           </div>

@@ -111,7 +111,7 @@ export const InvoicesPage = () => {
                     <td className="py-3 px-2 text-slate-600">{inv.vehicleNumber}</td>
                     <td className="py-3 px-2 font-bold text-emerald-600">{inv.totalWeightKg} kg</td>
                     <td className="py-3 px-2 text-slate-700 font-medium">₹ {inv.ratePerKg || 135}</td>
-                    <td className="py-3 px-2 font-black text-indigo-700">₹ {(inv.totalAmount || (inv.totalWeightKg * 135)).toLocaleString()}</td>
+                    <td className="py-3 px-2 font-black text-emerald-700">₹ {(inv.totalAmount || (inv.totalWeightKg * 135)).toLocaleString()}</td>
                     <td className="py-3 px-2 text-right">
                       <button
                         onClick={() => setSelectedInvoice(inv)}

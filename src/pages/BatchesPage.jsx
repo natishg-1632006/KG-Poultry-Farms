@@ -249,7 +249,7 @@ export const BatchesPage = () => {
                         {b.status === 'Active' && (
                           <button
                             onClick={() => handleChangeStatus(b, 'Completed')}
-                            className="rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 hover:bg-blue-100"
+                            className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100"
                           >
                             Complete
                           </button>
@@ -257,7 +257,7 @@ export const BatchesPage = () => {
                         {b.status === 'Completed' && (
                           <button
                             onClick={() => handleChangeStatus(b, 'Active')}
-                            className="rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 hover:bg-amber-100 flex items-center gap-1"
+                            className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100 flex items-center gap-1"
                             title="Reopen Batch"
                           >
                             <RotateCcw className="h-3 w-3" /> Reopen
