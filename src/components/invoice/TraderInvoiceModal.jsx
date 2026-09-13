@@ -65,12 +65,38 @@ export const TraderInvoiceModal = ({
         logging: false,
         backgroundColor: '#ffffff',
         onclone: (clonedDoc) => {
-          // 1. Sanitize all <style> tags in cloned document by replacing oklch(...) with hex colors
+          const mapOklchToHex = (text) => {
+            if (!text || !text.includes('oklch')) return text;
+            return text
+              .replace(/--color-slate-950:\s*oklch\([^)]+\)/gi, '--color-slate-950: #020617')
+              .replace(/--color-slate-900:\s*oklch\([^)]+\)/gi, '--color-slate-900: #0f172a')
+              .replace(/--color-slate-800:\s*oklch\([^)]+\)/gi, '--color-slate-800: #1e293b')
+              .replace(/--color-slate-700:\s*oklch\([^)]+\)/gi, '--color-slate-700: #334155')
+              .replace(/--color-slate-600:\s*oklch\([^)]+\)/gi, '--color-slate-600: #475569')
+              .replace(/--color-slate-500:\s*oklch\([^)]+\)/gi, '--color-slate-500: #64748b')
+              .replace(/--color-slate-400:\s*oklch\([^)]+\)/gi, '--color-slate-400: #94a3b8')
+              .replace(/--color-slate-300:\s*oklch\([^)]+\)/gi, '--color-slate-300: #cbd5e1')
+              .replace(/--color-slate-200:\s*oklch\([^)]+\)/gi, '--color-slate-200: #e2e8f0')
+              .replace(/--color-slate-100:\s*oklch\([^)]+\)/gi, '--color-slate-100: #f1f5f9')
+              .replace(/--color-slate-50:\s*oklch\([^)]+\)/gi, '--color-slate-50: #f8fafc')
+              .replace(/--color-emerald-900:\s*oklch\([^)]+\)/gi, '--color-emerald-900: #064e3b')
+              .replace(/--color-emerald-800:\s*oklch\([^)]+\)/gi, '--color-emerald-800: #065f46')
+              .replace(/--color-emerald-700:\s*oklch\([^)]+\)/gi, '--color-emerald-700: #047857')
+              .replace(/--color-emerald-600:\s*oklch\([^)]+\)/gi, '--color-emerald-600: #059669')
+              .replace(/--color-emerald-500:\s*oklch\([^)]+\)/gi, '--color-emerald-500: #10b981')
+              .replace(/--color-emerald-100:\s*oklch\([^)]+\)/gi, '--color-emerald-100: #d1fae5')
+              .replace(/--color-emerald-50:\s*oklch\([^)]+\)/gi, '--color-emerald-50: #f0fdf4')
+              .replace(/--color-teal-900:\s*oklch\([^)]+\)/gi, '--color-teal-900: #134e4a')
+              .replace(/--color-teal-700:\s*oklch\([^)]+\)/gi, '--color-teal-700: #0f766e')
+              .replace(/oklch\([^)]+\)/gi, '#334155');
+          };
+
+          // 1. Sanitize all <style> tags in cloned document by replacing oklch(...) with exact hex colors
           const styleTags = clonedDoc.getElementsByTagName('style');
           for (let i = 0; i < styleTags.length; i++) {
             const styleTag = styleTags[i];
             if (styleTag.textContent && styleTag.textContent.includes('oklch')) {
-              styleTag.textContent = styleTag.textContent.replace(/oklch\([^)]+\)/gi, '#10b981');
+              styleTag.textContent = mapOklchToHex(styleTag.textContent);
             }
           }
 
@@ -81,7 +107,7 @@ export const TraderInvoiceModal = ({
             nodes.forEach((node) => {
               const inlineStyle = node.getAttribute('style') || '';
               if (inlineStyle.includes('oklch')) {
-                node.setAttribute('style', inlineStyle.replace(/oklch\([^)]+\)/gi, '#10b981'));
+                node.setAttribute('style', mapOklchToHex(inlineStyle));
               }
             });
           }
