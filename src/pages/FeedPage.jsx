@@ -76,6 +76,13 @@ export const FeedPage = () => {
   const selectedBatch = batches.find(b => b.id === selectedBatchId);
   const feedStock = selectedBatch?.feedStock || { 'Pre-Starter': 0, 'Starter': 0, 'Finisher': 0 };
 
+  const totalArrivedBags = feedArrivals.reduce((acc, f) => {
+    const type = f.feedType || 'Pre-Starter';
+    const bags = Number(f.bagsReceived) || kgToBags(f.quantityReceived || 0, KG_PER_BAG);
+    acc[type] = (acc[type] || 0) + bags;
+    return acc;
+  }, { 'Pre-Starter': 0, 'Starter': 0, 'Finisher': 0 });
+
   const handleEditArrival = (arrival) => {
     setEditingFeedId(arrival.id);
     setShowForm(true);
@@ -177,6 +184,7 @@ export const FeedPage = () => {
         <StatCard
           title="1. Pre-Starter Stock"
           value={formatFeedStock(feedStock['Pre-Starter'] || 0)}
+          secondaryValue={formatFeedStock(totalArrivedBags['Pre-Starter'] || 0)}
           subtext="First deduction priority (Blue Bag)"
           icon={Package}
           color="blue"
@@ -184,6 +192,7 @@ export const FeedPage = () => {
         <StatCard
           title="2. Starter Stock"
           value={formatFeedStock(feedStock['Starter'] || 0)}
+          secondaryValue={formatFeedStock(totalArrivedBags['Starter'] || 0)}
           subtext="Second deduction priority (Green Bag)"
           icon={Package}
           color="emerald"
@@ -191,6 +200,7 @@ export const FeedPage = () => {
         <StatCard
           title="3. Finisher Stock"
           value={formatFeedStock(feedStock['Finisher'] || 0)}
+          secondaryValue={formatFeedStock(totalArrivedBags['Finisher'] || 0)}
           subtext="Third deduction priority (Orange Bag)"
           icon={Package}
           color="orange"

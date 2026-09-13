@@ -1,6 +1,14 @@
 import React from 'react';
 
-export const StatCard = ({ title, value, subtext, icon: Icon, color = 'emerald' }) => {
+export const StatCard = ({
+  title,
+  value,
+  subtext,
+  secondaryValue,
+  secondaryLabel = "Total Arrived",
+  icon: Icon,
+  color = 'emerald'
+}) => {
   const colorStyles = {
     blue: {
       bar: 'from-blue-600 to-blue-400',
@@ -45,9 +53,20 @@ export const StatCard = ({ title, value, subtext, icon: Icon, color = 'emerald' 
         )}
       </div>
       <div className="mt-3">
-        <div className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">{value}</div>
+        <div className="flex items-baseline justify-between gap-2">
+          <div>
+            {secondaryValue && <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Available</span>}
+            <div className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">{value}</div>
+          </div>
+          {secondaryValue && (
+            <div className="text-right bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-100">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">{secondaryLabel}</span>
+              <div className="text-xs font-black text-slate-800">{secondaryValue}</div>
+            </div>
+          )}
+        </div>
         {subtext && (
-          <div className="mt-1.5 flex items-center gap-1.5">
+          <div className="mt-2.5 flex items-center gap-1.5 border-t border-slate-100/80 pt-2">
             <span className={`inline-block h-1.5 w-1.5 rounded-full ${currentStyle.dot}`} />
             <p className="text-xs font-medium text-slate-500">{subtext}</p>
           </div>
