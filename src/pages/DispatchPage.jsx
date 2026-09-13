@@ -57,6 +57,11 @@ export const DispatchPage = () => {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [ratePerKg, setRatePerKg] = useState(135);
 
+  // Quick Load Weight Popup Modal
+  const [showLoadWeightModal, setShowLoadWeightModal] = useState(false);
+  const [loadWeightSet, setLoadWeightSet] = useState(null);
+  const [quickLoadedWeight, setQuickLoadedWeight] = useState('');
+
   const [dispatchHeader, setDispatchHeader] = useState({
     vehicleName: 'Eicher Pro 2049',
     vehicleNumber: 'TN-38-C-5544',
@@ -372,6 +377,93 @@ export const DispatchPage = () => {
     }
   };
 
+  const handleEnterLoadWeight = (s) => {
+    setLoadWeightSet(s);
+    setQuickLoadedWeight(s.loadedWeight || '');
+    setShowLoadWeightModal(true);
+  };
+
+  const handleSaveQuickLoadWeight = async (e) => {
+    e.preventDefault();
+    if (!loadWeightSet || !activeDispatch) return;
+
+    const grossVal = Number(quickLoadedWeight);
+    if (!grossVal || grossVal <= 0) {
+      alert('Please enter a valid loaded gross weight.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const setWeights = calculateBoxSetWeights(
+        grossVal,
+        loadWeightSet.emptyBoxWeight,
+        loadWeightSet.chickenCount
+      );
+
+      const setPayload = {
+        ...loadWeightSet,
+        loadedWeight: grossVal,
+        totalChickenWeight: setWeights.totalChickenWeight,
+        averageChickenWeight: setWeights.averageChickenWeight,
+        isPendingLoad: false
+      };
+
+      await dbSaveBoxSet(activeDispatch.id, setPayload);
+
+      const updatedSets = await dbGetBoxSets(activeDispatch.id);
+      const loadedSets = updatedSets.filter(s => Number(s.loadedWeight) > 0);
+      const combinedWeight = loadedSets.reduce((acc, s) => acc + (s.totalChickenWeight || 0), 0);
+      const combinedChicks = loadedSets.reduce((acc, s) => acc + (s.chickenCount || 0), 0);
+      const combinedLoadedBoxes = loadedSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
+      const combinedAvg = combinedChicks > 0 ? parseFloat((combinedWeight / combinedChicks).toFixed(3)) : 0;
+
+      const updatedDispatch = {
+        ...activeDispatch,
+        totalWeight: parseFloat(combinedWeight.toFixed(2)),
+        averageWeight: combinedAvg,
+        status: combinedLoadedBoxes >= activeDispatch.totalBoxCount ? 'Completed' : 'In Progress'
+      };
+
+      await dbSaveDispatch(updatedDispatch);
+
+      if (updatedDispatch.status === 'Completed') {
+        const invPayload = {
+          dispatchId: updatedDispatch.id,
+          batchId: selectedBatch.id,
+          invoiceDate: updatedDispatch.dispatchDate,
+          customerName: updatedDispatch.vehicleName || 'KG Wholesale Poultry Traders',
+          customerPhone: updatedDispatch.driverMobileNumber || '',
+          vehicleNumber: updatedDispatch.vehicleNumber,
+          driverName: updatedDispatch.driverName,
+          totalChickens: combinedChicks,
+          totalWeightKg: combinedWeight,
+          ratePerKg: ratePerKg,
+          totalAmount: combinedWeight * ratePerKg
+        };
+        await dbSaveInvoice(invPayload);
+      }
+
+      await dbLogAuditEvent(
+        'BOX_SET_LOADED',
+        `Updated Loaded Weight (${grossVal} kg, Net: ${setWeights.totalChickenWeight} kg) for Box Set #${setPayload.boxSetNumber} on vehicle ${activeDispatch.vehicleNumber}`,
+        userProfile?.name
+      );
+
+      setSuccessMsg(`Box Set #${setPayload.boxSetNumber} Loaded Weight (${grossVal} kg) updated!`);
+      setShowLoadWeightModal(false);
+      setLoadWeightSet(null);
+      setQuickLoadedWeight('');
+      setActiveDispatch(updatedDispatch);
+      await loadDispatchesForBatch(selectedBatch.id);
+      await loadBoxSetsForDispatch(activeDispatch.id, updatedDispatch);
+    } catch (err) {
+      alert('Failed saving loaded weight: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleDeleteBoxSet = async (setId) => {
     if (!confirm('Are you sure you want to delete this box set?')) return;
     try {
@@ -408,18 +500,6 @@ export const DispatchPage = () => {
       boxesInSet: s.boxesInSet || 5,
       emptyBoxWeight: s.emptyBoxWeight || 25,
       loadedWeight: s.loadedWeight || '',
-      chickenCount: s.chickenCount || 60
-    });
-    setShowSetForm(true);
-  };
-
-  const handleEnterLoadWeight = (s) => {
-    setEditingBoxSetId(s.id);
-    setSetForm({
-      boxSetNumber: s.boxSetNumber,
-      boxesInSet: s.boxesInSet || 5,
-      emptyBoxWeight: s.emptyBoxWeight || 25,
-      loadedWeight: '',
       chickenCount: s.chickenCount || 60
     });
     setShowSetForm(true);
@@ -670,7 +750,7 @@ export const DispatchPage = () => {
               <Badge variant={activeDispatch.status}>{activeDispatch.status}</Badge>
             </div>
 
-            {/* Vehicle Title & Details (Clean full width on mobile) */}
+            {/* Vehicle Title & Details */}
             <div>
               <h1 className="text-lg sm:text-2xl font-black tracking-tight text-slate-900 break-words">
                 Vehicle {activeDispatch.vehicleNumber}
@@ -972,7 +1052,7 @@ export const DispatchPage = () => {
                             Net Chicken Wt
                           </span>
                           <span className={`font-black ${isPending ? 'text-amber-900 text-xs' : 'text-emerald-900 text-sm'}`}>
-                            {isPending ? 'Enter Load Wt' : `${s.totalChickenWeight} kg`}
+                            {isPending ? 'Click button below' : `${s.totalChickenWeight} kg`}
                           </span>
                         </div>
                       </div>
@@ -980,10 +1060,10 @@ export const DispatchPage = () => {
                       {isPending ? (
                         <button
                           onClick={() => handleEnterLoadWeight(s)}
-                          className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 py-2 text-xs font-bold text-white shadow-2xs hover:from-amber-700 hover:to-orange-700 transition-all"
+                          className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 py-2 text-xs font-bold text-white shadow-2xs hover:from-amber-700 hover:to-orange-700 transition-all active:scale-95"
                         >
                           <Scale className="h-3.5 w-3.5" />
-                          <span>+ Enter Loaded Gross Weight</span>
+                          <span>+ Enter Loaded Weight (Popup)</span>
                         </button>
                       ) : (
                         <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-200/60 text-slate-600 font-medium">
@@ -1032,9 +1112,9 @@ export const DispatchPage = () => {
                             {isPending ? (
                               <button
                                 onClick={() => handleEnterLoadWeight(s)}
-                                className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700 border border-amber-200 hover:bg-amber-100"
+                                className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors"
                               >
-                                <Plus className="h-3 w-3" /> Add Load Wt
+                                <Plus className="h-3 w-3" /> Add Load Wt (Popup)
                               </button>
                             ) : (
                               <span className="font-bold text-slate-900">{s.loadedWeight} kg</span>
@@ -1078,6 +1158,104 @@ export const DispatchPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* QUICK LOAD WEIGHT ENTRY POPUP MODAL */}
+      {loadWeightSet && (
+        <Modal
+          isOpen={showLoadWeightModal}
+          onClose={() => {
+            setShowLoadWeightModal(false);
+            setLoadWeightSet(null);
+          }}
+          title={`Enter Loaded Weight: Box Set #${loadWeightSet.boxSetNumber}`}
+          maxWidth="max-w-md"
+        >
+          <form onSubmit={handleSaveQuickLoadWeight} className="space-y-4">
+            {/* Set Context Pill */}
+            <div className="rounded-xl bg-slate-50 p-3 border border-slate-200 grid grid-cols-3 gap-2 text-center text-xs">
+              <div>
+                <span className="text-[10px] uppercase font-extrabold text-slate-400 block">Boxes</span>
+                <span className="font-bold text-slate-800">{loadWeightSet.boxesInSet || 5} Boxes</span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-extrabold text-slate-400 block">Tare Weight</span>
+                <span className="font-bold text-slate-800">{loadWeightSet.emptyBoxWeight} kg</span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-extrabold text-slate-400 block">Chickens</span>
+                <span className="font-bold text-emerald-700">{loadWeightSet.chickenCount} Birds</span>
+              </div>
+            </div>
+
+            {/* Main Loaded Gross Weight Input */}
+            <div>
+              <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                Loaded Gross Weight (kg) *
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  required
+                  autoFocus
+                  min={(Number(loadWeightSet.emptyBoxWeight) + 0.1).toString()}
+                  step="0.1"
+                  placeholder="e.g. 145.0 kg"
+                  value={quickLoadedWeight}
+                  onChange={(e) => setQuickLoadedWeight(e.target.value)}
+                  className="w-full rounded-xl border-2 border-emerald-500 bg-white py-3 px-3.5 text-base font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                />
+                <span className="absolute right-3.5 top-3.5 text-xs font-extrabold text-slate-400">kg</span>
+              </div>
+            </div>
+
+            {/* Live Net Weight Calculation Preview */}
+            {(() => {
+              const preview = calculateBoxSetWeights(quickLoadedWeight, loadWeightSet.emptyBoxWeight, loadWeightSet.chickenCount);
+              if (preview.isPendingLoad) {
+                return (
+                  <div className="rounded-xl bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-800 font-medium text-center">
+                    Enter the gross scale weight when all {loadWeightSet.boxesInSet || 5} boxes are loaded.
+                  </div>
+                );
+              }
+
+              return (
+                <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-emerald-700 block">Net Chicken Weight</span>
+                    <span className="text-base sm:text-lg font-black text-emerald-950">{preview.totalChickenWeight} kg</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-emerald-700 block">Avg Weight / Bird</span>
+                    <span className="text-base sm:text-lg font-black text-emerald-950">{preview.averageChickenWeight} kg</span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLoadWeightModal(false);
+                  setLoadWeightSet(null);
+                }}
+                className="w-1/3 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+              >
+                <Save className="h-4 w-4" />
+                <span>{saving ? 'Saving...' : 'Save Loaded Weight (Instantly)'}</span>
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       {/* Vehicle Header Form Modal (Create / Edit Vehicle Card) */}
