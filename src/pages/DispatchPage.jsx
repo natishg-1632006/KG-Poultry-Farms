@@ -62,6 +62,9 @@ export const DispatchPage = () => {
   const [loadWeightSet, setLoadWeightSet] = useState(null);
   const [quickLoadedWeight, setQuickLoadedWeight] = useState('');
 
+  // Custom Extra Set Prompt Popup Modal
+  const [showExtraSetPromptModal, setShowExtraSetPromptModal] = useState(false);
+
   const [dispatchHeader, setDispatchHeader] = useState({
     vehicleName: 'Eicher Pro 2049',
     vehicleNumber: 'TN-38-C-5544',
@@ -278,22 +281,9 @@ export const DispatchPage = () => {
     const currentWeighedBoxes = boxSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
     const totalHeaderBoxes = activeDispatch?.totalBoxCount || 20;
 
-    // VALIDATION: If all target boxes are already weighed, prompt user to update Total Box Count first
+    // CUSTOM POPUP VALIDATION: If all target boxes are weighed, open custom popup modal
     if (currentWeighedBoxes >= totalHeaderBoxes) {
-      if (confirm(
-        `All ${totalHeaderBoxes} target boxes for Vehicle ${activeDispatch?.vehicleNumber} have already been weighed (${currentWeighedBoxes} / ${totalHeaderBoxes} boxes).\n\nTo add extra box sets, click OK to update the Vehicle Total Box Count first.`
-      )) {
-        setDispatchHeader({
-          vehicleName: activeDispatch.vehicleName || '',
-          vehicleNumber: activeDispatch.vehicleNumber || '',
-          driverName: activeDispatch.driverName || '',
-          driverMobileNumber: activeDispatch.driverMobileNumber || '',
-          dispatchDate: activeDispatch.dispatchDate || new Date().toISOString().split('T')[0],
-          totalBoxCount: totalHeaderBoxes + 5, // Auto-suggest adding +5 extra boxes!
-          chickenCountPerBox: activeDispatch.chickenCountPerBox || 12
-        });
-        setShowHeaderForm(true);
-      }
+      setShowExtraSetPromptModal(true);
       return;
     }
 
@@ -310,6 +300,22 @@ export const DispatchPage = () => {
       chickenCount: defaultBoxesInSet * perBoxCount
     });
     setShowSetForm(true);
+  };
+
+  const handleConfirmUpdateBoxCountForExtraSet = () => {
+    setShowExtraSetPromptModal(false);
+    const currentTotal = activeDispatch?.totalBoxCount || 20;
+
+    setDispatchHeader({
+      vehicleName: activeDispatch?.vehicleName || '',
+      vehicleNumber: activeDispatch?.vehicleNumber || '',
+      driverName: activeDispatch?.driverName || '',
+      driverMobileNumber: activeDispatch?.driverMobileNumber || '',
+      dispatchDate: activeDispatch?.dispatchDate || new Date().toISOString().split('T')[0],
+      totalBoxCount: currentTotal + 5, // Auto add +5 extra boxes
+      chickenCountPerBox: activeDispatch?.chickenCountPerBox || 12
+    });
+    setShowHeaderForm(true);
   };
 
   const handleSaveBoxSet = async (e) => {
@@ -1265,6 +1271,53 @@ export const DispatchPage = () => {
               </button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* CUSTOM EXTRA SET PROMPT POPUP MODAL */}
+      {activeDispatch && (
+        <Modal
+          isOpen={showExtraSetPromptModal}
+          onClose={() => setShowExtraSetPromptModal(false)}
+          title={`Target Box Count Reached (${totalWeighedBoxes} / ${activeDispatch.totalBoxCount} Boxes)`}
+          maxWidth="max-w-md"
+        >
+          <div className="space-y-4 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 border border-amber-200">
+              <AlertCircle className="h-7 w-7" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-base font-bold text-slate-900">
+                All {activeDispatch.totalBoxCount} Target Boxes Weighed
+              </h3>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+                You have reached the setup target of <strong>{activeDispatch.totalBoxCount} boxes</strong> for vehicle <strong>{activeDispatch.vehicleNumber}</strong>. To add an extra set of boxes, please update the vehicle total box count first.
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-slate-50 p-3 border border-slate-200 text-xs text-slate-700 font-medium">
+              Current Target: <strong className="text-slate-900">{activeDispatch.totalBoxCount} Boxes</strong> → New Suggested: <strong className="text-emerald-700">{activeDispatch.totalBoxCount + 5} Boxes</strong> (+5 boxes)
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowExtraSetPromptModal(false)}
+                className="w-1/3 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmUpdateBoxCountForExtraSet}
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-700 transition-colors"
+              >
+                <Edit className="h-4 w-4" />
+                <span>Update Setup (+5 Boxes)</span>
+              </button>
+            </div>
+          </div>
         </Modal>
       )}
 
