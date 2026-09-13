@@ -82,14 +82,15 @@ export function calculateBoxSetWeights(loadedWeight, emptyBoxWeight = 5, chicken
   const empty = Number(emptyBoxWeight) || 0;
   const count = Number(chickenCount) || 0;
 
-  const totalChickenWeight = Math.max(0, parseFloat((loaded - empty).toFixed(2)));
-  const averageChickenWeight = count > 0 
+  const totalChickenWeight = loaded > 0 ? Math.max(0, parseFloat((loaded - empty).toFixed(2))) : 0;
+  const averageChickenWeight = count > 0 && loaded > 0 
     ? parseFloat((totalChickenWeight / count).toFixed(3)) 
     : 0;
 
   return {
     totalChickenWeight,
-    averageChickenWeight
+    averageChickenWeight,
+    isPendingLoad: !loaded || loaded <= 0
   };
 }
 

@@ -30,7 +30,8 @@ import {
   Calendar,
   Layers,
   ArrowLeft,
-  X
+  X,
+  AlertCircle
 } from 'lucide-react';
 
 export const DispatchPage = () => {
@@ -292,8 +293,11 @@ export const DispatchPage = () => {
 
     setSaving(true);
     try {
+      const hasLoadWeight = setForm.loadedWeight !== '' && setForm.loadedWeight !== null && setForm.loadedWeight !== undefined && Number(setForm.loadedWeight) > 0;
+      const loadedVal = hasLoadWeight ? Number(setForm.loadedWeight) : null;
+
       const setWeights = calculateBoxSetWeights(
-        setForm.loadedWeight,
+        loadedVal,
         setForm.emptyBoxWeight,
         setForm.chickenCount
       );
@@ -304,25 +308,27 @@ export const DispatchPage = () => {
         boxSetNumber: Number(setForm.boxSetNumber),
         boxesInSet: Number(setForm.boxesInSet || 5),
         emptyBoxWeight: Number(setForm.emptyBoxWeight),
-        loadedWeight: Number(setForm.loadedWeight),
+        loadedWeight: loadedVal,
         chickenCount: Number(setForm.chickenCount),
         totalChickenWeight: setWeights.totalChickenWeight,
-        averageChickenWeight: setWeights.averageChickenWeight
+        averageChickenWeight: setWeights.averageChickenWeight,
+        isPendingLoad: setWeights.isPendingLoad
       };
 
       await dbSaveBoxSet(activeDispatch.id, setPayload);
 
       const updatedSets = await dbGetBoxSets(activeDispatch.id);
-      const combinedWeight = updatedSets.reduce((acc, s) => acc + (s.totalChickenWeight || 0), 0);
-      const combinedChicks = updatedSets.reduce((acc, s) => acc + (s.chickenCount || 0), 0);
-      const combinedBoxes = updatedSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
+      const loadedSets = updatedSets.filter(s => Number(s.loadedWeight) > 0);
+      const combinedWeight = loadedSets.reduce((acc, s) => acc + (s.totalChickenWeight || 0), 0);
+      const combinedChicks = loadedSets.reduce((acc, s) => acc + (s.chickenCount || 0), 0);
+      const combinedLoadedBoxes = loadedSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
       const combinedAvg = combinedChicks > 0 ? parseFloat((combinedWeight / combinedChicks).toFixed(3)) : 0;
 
       const updatedDispatch = {
         ...activeDispatch,
         totalWeight: parseFloat(combinedWeight.toFixed(2)),
         averageWeight: combinedAvg,
-        status: combinedBoxes >= activeDispatch.totalBoxCount ? 'Completed' : 'In Progress'
+        status: combinedLoadedBoxes >= activeDispatch.totalBoxCount ? 'Completed' : 'In Progress'
       };
 
       await dbSaveDispatch(updatedDispatch);
@@ -346,11 +352,15 @@ export const DispatchPage = () => {
 
       await dbLogAuditEvent(
         'BOX_SET_SAVED',
-        `Saved Box Set #${setPayload.boxSetNumber} (${setPayload.boxesInSet} boxes, Net: ${setPayload.totalChickenWeight}kg) for vehicle ${activeDispatch.vehicleNumber}`,
+        `Saved Box Set #${setPayload.boxSetNumber} (${setPayload.boxesInSet} boxes, ${hasLoadWeight ? `Net: ${setPayload.totalChickenWeight}kg` : 'Tare Weight Saved, Pending Gross Wt'}) for vehicle ${activeDispatch.vehicleNumber}`,
         userProfile?.name
       );
 
-      setSuccessMsg(`Box Set #${setPayload.boxSetNumber} created and saved instantly!`);
+      setSuccessMsg(
+        hasLoadWeight
+          ? `Box Set #${setPayload.boxSetNumber} with Loaded Weight saved instantly!`
+          : `Box Set #${setPayload.boxSetNumber} Tare Weight saved! Update Loaded Weight when birds are filled.`
+      );
       setEditingBoxSetId(null);
       setShowSetForm(false);
       setActiveDispatch(updatedDispatch);
@@ -370,16 +380,17 @@ export const DispatchPage = () => {
       setSuccessMsg('Box set deleted.');
 
       const updatedSets = await dbGetBoxSets(activeDispatch.id);
-      const combinedWeight = updatedSets.reduce((acc, s) => acc + (s.totalChickenWeight || 0), 0);
-      const combinedChicks = updatedSets.reduce((acc, s) => acc + (s.chickenCount || 0), 0);
-      const combinedBoxes = updatedSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
+      const loadedSets = updatedSets.filter(s => Number(s.loadedWeight) > 0);
+      const combinedWeight = loadedSets.reduce((acc, s) => acc + (s.totalChickenWeight || 0), 0);
+      const combinedChicks = loadedSets.reduce((acc, s) => acc + (s.chickenCount || 0), 0);
+      const combinedLoadedBoxes = loadedSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
       const combinedAvg = combinedChicks > 0 ? parseFloat((combinedWeight / combinedChicks).toFixed(3)) : 0;
 
       const updatedDispatch = {
         ...activeDispatch,
         totalWeight: parseFloat(combinedWeight.toFixed(2)),
         averageWeight: combinedAvg,
-        status: combinedBoxes >= activeDispatch.totalBoxCount ? 'Completed' : 'In Progress'
+        status: combinedLoadedBoxes >= activeDispatch.totalBoxCount ? 'Completed' : 'In Progress'
       };
 
       await dbSaveDispatch(updatedDispatch);
@@ -403,9 +414,23 @@ export const DispatchPage = () => {
     setShowSetForm(true);
   };
 
+  const handleEnterLoadWeight = (s) => {
+    setEditingBoxSetId(s.id);
+    setSetForm({
+      boxSetNumber: s.boxSetNumber,
+      boxesInSet: s.boxesInSet || 5,
+      emptyBoxWeight: s.emptyBoxWeight || 25,
+      loadedWeight: '',
+      chickenCount: s.chickenCount || 60
+    });
+    setShowSetForm(true);
+  };
+
   const totalWeighedBoxes = boxSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
-  const totalDispatchedBirds = boxSets.reduce((acc, s) => acc + (Number(s.chickenCount) || 0), 0);
-  const totalNetWeight = boxSets.reduce((acc, s) => acc + (Number(s.totalChickenWeight) || 0), 0);
+  const loadedBoxSets = boxSets.filter(s => Number(s.loadedWeight) > 0);
+  const loadedBoxesCount = loadedBoxSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
+  const totalDispatchedBirds = loadedBoxSets.reduce((acc, s) => acc + (Number(s.chickenCount) || 0), 0);
+  const totalNetWeight = loadedBoxSets.reduce((acc, s) => acc + (Number(s.totalChickenWeight) || 0), 0);
   const avgBirdWeight = totalDispatchedBirds > 0 ? parseFloat((totalNetWeight / totalDispatchedBirds).toFixed(3)) : 0;
 
   if (loading) return <div className="p-8 text-center text-slate-500 font-semibold">Loading Dispatch Management...</div>;
@@ -493,9 +518,10 @@ export const DispatchPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {dispatches.map((d) => {
                   const dSets = allBoxSetsMap[d.id] || [];
+                  const loadedSets = dSets.filter(s => Number(s.loadedWeight) > 0);
                   const weighedBoxes = dSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
-                  const totalWeight = dSets.reduce((acc, s) => acc + (Number(s.totalChickenWeight) || 0), 0);
-                  const totalBirds = dSets.reduce((acc, s) => acc + (Number(s.chickenCount) || 0), 0);
+                  const totalWeight = loadedSets.reduce((acc, s) => acc + (Number(s.totalChickenWeight) || 0), 0);
+                  const totalBirds = loadedSets.reduce((acc, s) => acc + (Number(s.chickenCount) || 0), 0);
                   const avgWeight = totalBirds > 0 ? (totalWeight / totalBirds).toFixed(3) : '0.000';
                   const progressPct = Math.min(100, Math.round((weighedBoxes / (d.totalBoxCount || 1)) * 100));
                   const isCompleted = d.status === 'Completed' || weighedBoxes >= d.totalBoxCount;
@@ -707,12 +733,14 @@ export const DispatchPage = () => {
               <span className="text-xl font-black text-teal-700">{avgBirdWeight} <span className="text-xs font-medium text-slate-500">kg/bird</span></span>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
-              <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Progress</span>
-              <span className="text-xl font-black text-slate-900">{totalWeighedBoxes} <span className="text-xs font-medium text-slate-500">/ {activeDispatch.totalBoxCount} boxes</span></span>
+              <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Weighed Boxes</span>
+              <span className="text-xl font-black text-slate-900">
+                {totalWeighedBoxes} <span className="text-xs font-medium text-slate-500">/ {activeDispatch.totalBoxCount} boxes ({loadedBoxesCount} loaded)</span>
+              </span>
             </div>
           </div>
 
-          {/* CREATE SET WEIGHING FORM (Toggled by clicking "+ Create Set" or Editing a set) */}
+          {/* CREATE / EDIT SET FORM */}
           {showSetForm && (
             <div className="rounded-2xl border-2 border-emerald-500/30 bg-white p-6 shadow-md space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -795,14 +823,13 @@ export const DispatchPage = () => {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Loaded Gross Weight (kg) *
+                      Loaded Gross Weight (kg) <span className="text-amber-600 font-medium">(Optional now, update when filled)</span>
                     </label>
                     <input
                       type="number"
-                      required
                       min="0.1"
                       step="0.1"
-                      placeholder="e.g. 145.0 kg"
+                      placeholder="e.g. 145.0 kg (leave blank for Tare only)"
                       value={setForm.loadedWeight}
                       onChange={(e) => setSetForm({ ...setForm, loadedWeight: e.target.value })}
                       className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-black text-slate-900 focus:border-emerald-600"
@@ -813,6 +840,18 @@ export const DispatchPage = () => {
                 {/* Live Preview Box */}
                 {(() => {
                   const preview = calculateBoxSetWeights(setForm.loadedWeight, setForm.emptyBoxWeight, setForm.chickenCount);
+                  if (preview.isPendingLoad) {
+                    return (
+                      <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 flex items-center gap-3 text-xs text-amber-900">
+                        <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
+                        <div>
+                          <span className="font-bold block">Stage 1: Saving Tare Weight Only ({setForm.emptyBoxWeight || 25} kg)</span>
+                          <span className="text-[11px] text-amber-700">You can save this empty set now and update the Loaded Gross Weight later when birds are loaded into boxes.</span>
+                        </div>
+                      </div>
+                    );
+                  }
+
                   return (
                     <div className="rounded-xl bg-emerald-50/70 border border-emerald-100 p-3 grid grid-cols-2 gap-3 text-xs">
                       <div>
@@ -844,7 +883,11 @@ export const DispatchPage = () => {
                     className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
                   >
                     <Save className="h-4 w-4" />
-                    {saving ? 'Saving Set...' : editingBoxSetId ? 'Update Set Weight' : `Save Box Set #${setForm.boxSetNumber} (Instantly)`}
+                    {saving
+                      ? 'Saving Set...'
+                      : setForm.loadedWeight
+                      ? `Save Box Set #${setForm.boxSetNumber} (Tare + Loaded Wt)`
+                      : `Save Box Set #${setForm.boxSetNumber} (Tare Weight Only)`}
                   </button>
                 </div>
               </form>
@@ -859,7 +902,7 @@ export const DispatchPage = () => {
                 <span>Box Sets History ({activeDispatch.vehicleNumber})</span>
               </h3>
               <div className="flex items-center gap-3">
-                <span className="text-xs font-semibold text-slate-500">{boxSets.length} Sets Recorded</span>
+                <span className="text-xs font-semibold text-slate-500">{boxSets.length} Sets Created</span>
                 {!showSetForm && (
                   <button
                     onClick={handleOpenCreateSetForm}
@@ -880,49 +923,76 @@ export const DispatchPage = () => {
                     onClick={handleOpenCreateSetForm}
                     className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm"
                   >
-                    <Plus className="h-4 w-4" /> Create First Set
+                    <Plus className="h-4 w-4" /> Create First Set (Tare Wt)
                   </button>
                 </div>
               ) : (
-                boxSets.map((s) => (
-                  <div key={s.id} className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-2.5 shadow-2xs">
-                    <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
-                      <span className="text-xs font-black text-slate-900">Box Set #{s.boxSetNumber} ({s.boxesInSet || 5} Boxes)</span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleEditBoxSet(s)}
-                          className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-200/60"
-                          title="Edit Box Set"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteBoxSet(s.id)}
-                          className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-100/60"
-                          title="Delete Box Set"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
+                boxSets.map((s) => {
+                  const isPending = !s.loadedWeight || Number(s.loadedWeight) <= 0;
 
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="bg-white p-2 rounded-lg border border-slate-100">
-                        <span className="text-[10px] text-slate-400 font-bold block uppercase">Tare / Loaded Wt</span>
-                        <span className="font-bold text-slate-700">{s.emptyBoxWeight} kg / {s.loadedWeight} kg</span>
+                  return (
+                    <div key={s.id} className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-2.5 shadow-2xs">
+                      <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-slate-900">Box Set #{s.boxSetNumber} ({s.boxesInSet || 5} Boxes)</span>
+                          <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${
+                            isPending ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-100 text-emerald-800'
+                          }`}>
+                            {isPending ? 'Pending Load Wt' : 'Loaded ✓'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleEditBoxSet(s)}
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-200/60"
+                            title="Edit Box Set"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteBoxSet(s.id)}
+                            className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-100/60"
+                            title="Delete Box Set"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="bg-emerald-50 p-2 rounded-lg border border-emerald-100">
-                        <span className="text-[10px] text-emerald-700 font-bold block uppercase">Net Chicken Wt</span>
-                        <span className="font-black text-emerald-900">{s.totalChickenWeight} kg</span>
-                      </div>
-                    </div>
 
-                    <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-200/60 text-slate-600 font-medium">
-                      <span>Birds: <strong className="text-slate-900">{s.chickenCount}</strong></span>
-                      <span>Avg: <strong className="text-slate-900">{s.averageChickenWeight} kg/bird</strong></span>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="bg-white p-2 rounded-lg border border-slate-100">
+                          <span className="text-[10px] text-slate-400 font-bold block uppercase">Tare / Loaded Wt</span>
+                          <span className="font-bold text-slate-700">
+                            {s.emptyBoxWeight} kg / {isPending ? <em className="text-amber-600 font-normal">Pending</em> : `${s.loadedWeight} kg`}
+                          </span>
+                        </div>
+                        <div className={`p-2 rounded-lg border ${isPending ? 'bg-amber-50 border-amber-100' : 'bg-emerald-50 border-emerald-100'}`}>
+                          <span className={`text-[10px] font-bold block uppercase ${isPending ? 'text-amber-700' : 'text-emerald-700'}`}>
+                            Net Chicken Wt
+                          </span>
+                          <span className={`font-black ${isPending ? 'text-amber-900 text-xs' : 'text-emerald-900 text-sm'}`}>
+                            {isPending ? 'Enter Load Weight' : `${s.totalChickenWeight} kg`}
+                          </span>
+                        </div>
+                      </div>
+
+                      {isPending ? (
+                        <button
+                          onClick={() => handleEnterLoadWeight(s)}
+                          className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 py-1.5 text-xs font-bold text-white shadow-2xs hover:from-amber-700 hover:to-orange-700"
+                        >
+                          <Scale className="h-3.5 w-3.5" />
+                          <span>+ Enter Loaded Gross Weight</span>
+                        </button>
+                      ) : (
+                        <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-200/60 text-slate-600 font-medium">
+                          <span>Birds: <strong className="text-slate-900">{s.chickenCount}</strong></span>
+                          <span>Avg: <strong className="text-slate-900">{s.averageChickenWeight} kg/bird</strong></span>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
@@ -945,39 +1015,62 @@ export const DispatchPage = () => {
                   {boxSets.length === 0 ? (
                     <tr>
                       <td colSpan="8" className="py-8 text-center text-slate-400">
-                        No box sets recorded for this vehicle yet. Click <strong>+ Create Set</strong> above to add set weights.
+                        No box sets recorded for this vehicle yet. Click <strong>+ Create Set</strong> above to add set tare weights.
                       </td>
                     </tr>
                   ) : (
-                    boxSets.map((s) => (
-                      <tr key={s.id} className="hover:bg-slate-50">
-                        <td className="py-3 px-2 font-bold text-slate-900">Box Set #{s.boxSetNumber}</td>
-                        <td className="py-3 px-2 text-slate-700 font-bold">{s.boxesInSet || 5} Boxes</td>
-                        <td className="py-3 px-2 text-slate-600">{s.emptyBoxWeight} kg</td>
-                        <td className="py-3 px-2 text-slate-900 font-bold">{s.loadedWeight} kg</td>
-                        <td className="py-3 px-2 text-emerald-700 font-bold">{s.chickenCount}</td>
-                        <td className="py-3 px-2 text-emerald-600 font-black">{s.totalChickenWeight} kg</td>
-                        <td className="py-3 px-2 font-bold text-slate-900">{s.averageChickenWeight} kg</td>
-                        <td className="py-3 px-2 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={() => handleEditBoxSet(s)}
-                              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                              title="Edit Box Set"
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteBoxSet(s.id)}
-                              className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
-                              title="Delete Box Set"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                    boxSets.map((s) => {
+                      const isPending = !s.loadedWeight || Number(s.loadedWeight) <= 0;
+
+                      return (
+                        <tr key={s.id} className="hover:bg-slate-50">
+                          <td className="py-3 px-2 font-bold text-slate-900">Box Set #{s.boxSetNumber}</td>
+                          <td className="py-3 px-2 text-slate-700 font-bold">{s.boxesInSet || 5} Boxes</td>
+                          <td className="py-3 px-2 text-slate-600">{s.emptyBoxWeight} kg</td>
+                          <td className="py-3 px-2">
+                            {isPending ? (
+                              <button
+                                onClick={() => handleEnterLoadWeight(s)}
+                                className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700 border border-amber-200 hover:bg-amber-100"
+                              >
+                                <Plus className="h-3 w-3" /> Add Load Wt
+                              </button>
+                            ) : (
+                              <span className="font-bold text-slate-900">{s.loadedWeight} kg</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-2 text-emerald-700 font-bold">{s.chickenCount}</td>
+                          <td className="py-3 px-2">
+                            {isPending ? (
+                              <span className="text-amber-600 font-semibold italic text-[11px]">Pending Load</span>
+                            ) : (
+                              <span className="text-emerald-600 font-black">{s.totalChickenWeight} kg</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-2 font-bold text-slate-900">
+                            {isPending ? '—' : `${s.averageChickenWeight} kg`}
+                          </td>
+                          <td className="py-3 px-2 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => handleEditBoxSet(s)}
+                                className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                                title="Edit Box Set"
+                              >
+                                <Edit className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteBoxSet(s.id)}
+                                className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
+                                title="Delete Box Set"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
