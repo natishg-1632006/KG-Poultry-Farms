@@ -100,17 +100,25 @@ export const FeedPage = () => {
   const starterAvailableBags = kgToBags(Number(feedStock['Starter'] || 0), KG_PER_BAG);
   const finisherAvailableBags = kgToBags(Number(feedStock['Finisher'] || 0), KG_PER_BAG);
 
-  const preArrivedBags = parseFloat(Math.max(feedStats.arrived['Pre-Starter'] || 0, preAvailableBags).toFixed(1));
-  const starterArrivedBags = parseFloat(Math.max(feedStats.arrived['Starter'] || 0, starterAvailableBags).toFixed(1));
-  const finisherArrivedBags = parseFloat(Math.max(feedStats.arrived['Finisher'] || 0, finisherAvailableBags).toFixed(1));
+  const preGrossArrived = parseFloat((feedStats.arrived['Pre-Starter'] || 0).toFixed(1));
+  const starterGrossArrived = parseFloat((feedStats.arrived['Starter'] || 0).toFixed(1));
+  const finisherGrossArrived = parseFloat((feedStats.arrived['Finisher'] || 0).toFixed(1));
 
   const preReturnedBags = parseFloat((feedStats.returned['Pre-Starter'] || 0).toFixed(1));
   const starterReturnedBags = parseFloat((feedStats.returned['Starter'] || 0).toFixed(1));
   const finisherReturnedBags = parseFloat((feedStats.returned['Finisher'] || 0).toFixed(1));
 
-  const preConsumedBags = Math.max(0, parseFloat((preArrivedBags - preReturnedBags - preAvailableBags).toFixed(1)));
-  const starterConsumedBags = Math.max(0, parseFloat((starterArrivedBags - starterReturnedBags - starterAvailableBags).toFixed(1)));
-  const finisherConsumedBags = Math.max(0, parseFloat((finisherArrivedBags - finisherReturnedBags - finisherAvailableBags).toFixed(1)));
+  const preNetArrivedBags = parseFloat(Math.max(0, preGrossArrived - preReturnedBags).toFixed(1));
+  const starterNetArrivedBags = parseFloat(Math.max(0, starterGrossArrived - starterReturnedBags).toFixed(1));
+  const finisherNetArrivedBags = parseFloat(Math.max(0, finisherGrossArrived - finisherReturnedBags).toFixed(1));
+
+  const preArrivedBags = Math.max(preNetArrivedBags, preAvailableBags);
+  const starterArrivedBags = Math.max(starterNetArrivedBags, starterAvailableBags);
+  const finisherArrivedBags = Math.max(finisherNetArrivedBags, finisherAvailableBags);
+
+  const preConsumedBags = Math.max(0, parseFloat((preArrivedBags - preAvailableBags).toFixed(1)));
+  const starterConsumedBags = Math.max(0, parseFloat((starterArrivedBags - starterAvailableBags).toFixed(1)));
+  const finisherConsumedBags = Math.max(0, parseFloat((finisherArrivedBags - finisherAvailableBags).toFixed(1)));
 
   const handleEditArrival = (arrival) => {
     setEditingFeedId(arrival.id);

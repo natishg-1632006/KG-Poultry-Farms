@@ -64,11 +64,17 @@ export const FarmerDashboard = () => {
   }, 0);
 
   const totalFeedArrivedBags = feedArrivals.reduce((acc, f) => {
-    const bags = Number(f.bagsReceived) || kgToBags(f.quantityReceived || 0, KG_PER_BAG);
-    return acc + Number(bags || 0);
+    const isReturn = f.transactionType === 'Return';
+    const totalKg = Number(f.quantityReceivedKg ?? f.quantityReceived ?? ((Number(f.bagsReceived || 0) * KG_PER_BAG) + Number(f.additionalKg || 0)));
+    const bags = totalKg / KG_PER_BAG;
+    if (isReturn) {
+      return acc - bags;
+    } else {
+      return acc + bags;
+    }
   }, 0);
 
-  const totalArrivedBagsFinal = Math.max(totalFeedArrivedBags, totalFeedConsumedBags);
+  const totalArrivedBagsFinal = Math.max(0, totalFeedArrivedBags);
 
   const consumedStr = Number.isInteger(totalFeedConsumedBags) ? totalFeedConsumedBags : parseFloat(totalFeedConsumedBags.toFixed(1));
   const arrivedStr = Number.isInteger(totalArrivedBagsFinal) ? totalArrivedBagsFinal : parseFloat(totalArrivedBagsFinal.toFixed(1));
