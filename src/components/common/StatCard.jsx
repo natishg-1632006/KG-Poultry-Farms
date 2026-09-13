@@ -51,34 +51,34 @@ export const StatCard = ({
   ] : null);
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
+    <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md min-w-0">
       {/* Top accent bar */}
       <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${currentStyle.bar}`} />
       
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{title}</span>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-bold uppercase tracking-wider text-slate-500 truncate">{title}</span>
         {Icon && (
-          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border shadow-2xs ${currentStyle.icon}`}>
-            <Icon className="h-5 w-5" />
+          <div className={`flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl border shadow-2xs ${currentStyle.icon}`}>
+            <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
           </div>
         )}
       </div>
-      <div className="mt-3 space-y-3">
+      <div className="mt-3 space-y-3 min-w-0">
         {!items && (
           <div>
             {valueLabel && <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">{valueLabel}</span>}
-            <div className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">{availableValue || value}</div>
+            <div className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-slate-900 break-words">{availableValue || value}</div>
           </div>
         )}
 
         {items ? (
-          <div className="grid grid-cols-3 divide-x divide-slate-200/80 rounded-xl bg-slate-50/70 p-2.5 border border-slate-200/60 text-center shadow-2xs">
+          <div className="grid grid-cols-3 divide-x divide-slate-200/80 rounded-xl bg-slate-50/70 p-1.5 sm:p-2.5 border border-slate-200/60 text-center shadow-2xs min-w-0">
             {items.map((item, idx) => (
-              <div key={idx} className="px-1 py-0.5">
-                <span className={`text-[10px] font-black uppercase tracking-wider block mb-0.5 ${item.labelColor || 'text-slate-500'}`}>
+              <div key={idx} className="px-1 py-0.5 min-w-0 overflow-hidden">
+                <span className={`text-[9px] sm:text-[10px] font-black uppercase tracking-wider block mb-0.5 truncate ${item.labelColor || 'text-slate-500'}`}>
                   {item.label}
                 </span>
-                <span className={`text-xs sm:text-sm font-black ${item.valueColor || 'text-slate-900'}`}>
+                <span className={`text-xs sm:text-sm font-black block truncate ${item.valueColor || 'text-slate-900'}`}>
                   {item.value}
                 </span>
               </div>
@@ -94,9 +94,9 @@ export const StatCard = ({
         ) : null}
 
         {subtext && (
-          <div className="flex items-center gap-1.5 border-t border-slate-100/80 pt-2">
-            <span className={`inline-block h-1.5 w-1.5 rounded-full ${currentStyle.dot}`} />
-            <p className="text-xs font-medium text-slate-500">{subtext}</p>
+          <div className="flex items-center gap-1.5 border-t border-slate-100/80 pt-2 min-w-0">
+            <span className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${currentStyle.dot}`} />
+            <p className="text-xs font-medium text-slate-500 truncate">{subtext}</p>
           </div>
         )}
       </div>

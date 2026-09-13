@@ -311,26 +311,26 @@ export const DailyRecordsPage = () => {
   return (
     <div className="space-y-6">
       {/* Page Header with Action Button */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900">Daily Farm Records</h1>
-          <p className="text-sm font-medium text-slate-500">Record daily mortality, feed consumption in Bags, and chicken growth weights.</p>
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">Daily Farm Records</h1>
+          <p className="text-xs sm:text-sm font-medium text-slate-500">Record daily mortality, feed consumption in Bags, and chicken growth weights.</p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
           <button
             onClick={() => setShowTargetsTable(!showTargetsTable)}
-            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all shrink-0 shadow-xs"
+            className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-xs w-full sm:w-auto"
           >
-            <Target className="h-4 w-4 text-emerald-600" />
+            <Target className="h-4 w-4 text-emerald-600 shrink-0" />
             <span>{showTargetsTable ? 'Hide Target Reference' : 'Target Feed Standards (Day 1-45)'}</span>
           </button>
 
           {!isReadOnly && (
             <button
               onClick={handleOpenNewForm}
-              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95 shrink-0"
+              className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-3.5 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95 w-full sm:w-auto"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4 shrink-0" />
               <span>Record Daily Log</span>
             </button>
           )}
@@ -540,12 +540,12 @@ export const DailyRecordsPage = () => {
       </Modal>
 
       {/* History Table with Edit and Delete Actions - Full Width */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm min-w-0">
         <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4">
           Daily Record Log History ({selectedBatch?.batchNumber})
         </h2>
 
-        <div className="w-full overflow-hidden">
+        <div className="w-full overflow-x-auto">
           <table className="w-full text-left text-xs table-fixed">
             <thead>
               <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
