@@ -3,8 +3,9 @@ import { useAuth } from '../context/AuthContext';
 import { dbGetBatches, dbGetDailyRecords, dbSaveDailyRecord, dbDeleteDailyRecord, dbUpdateBatchFeedStockPool, dbLogAuditEvent } from '../services/dbService';
 import { calculateRemainingChickens, validateRecordDate, deductFeedStock, bagsToKg, kgToBags } from '../utils/calculations';
 import { KG_PER_BAG } from '../constants/companyTargets';
+import { StatCard } from '../components/common/StatCard';
 import { Modal } from '../components/common/Modal';
-import { ClipboardList, AlertCircle, Save, CheckCircle2, Edit, Trash2, Layers, Plus, X } from 'lucide-react';
+import { ClipboardList, AlertCircle, Save, CheckCircle2, Edit, Trash2, Layers, Plus, X, Calendar, Package, Scale } from 'lucide-react';
 
 export const DailyRecordsPage = () => {
   const { userProfile, isFarmer } = useAuth();
@@ -257,6 +258,7 @@ export const DailyRecordsPage = () => {
   };
 
   const recordsList = Object.values(recordsMap).sort((a, b) => b.recordDate.localeCompare(a.recordDate));
+  const lastRecord = recordsList.length > 0 ? recordsList[0] : null;
 
   if (loading) return <div className="p-8 text-center text-slate-500">Loading Daily Farm Records...</div>;
 
@@ -277,6 +279,38 @@ export const DailyRecordsPage = () => {
             <span>Record Daily Log</span>
           </button>
         )}
+      </div>
+
+      {/* Last Updated Record KPI Summary Cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Last Entry Date"
+          value={lastRecord ? lastRecord.recordDate : 'No Entries'}
+          subtext={lastRecord ? 'Most recent record date' : 'No daily records logged yet'}
+          icon={Calendar}
+          color="emerald"
+        />
+        <StatCard
+          title="Last Daily Mortality"
+          value={lastRecord ? `${lastRecord.mortalityCount}` : '0'}
+          subtext={lastRecord ? `Logged on ${lastRecord.recordDate}` : 'No mortality logged'}
+          icon={AlertCircle}
+          color="amber"
+        />
+        <StatCard
+          title="Last Feed Consumed"
+          value={lastRecord ? `${lastRecord.feedConsumptionBags || kgToBags(lastRecord.feedConsumption || 0, KG_PER_BAG)} Bags` : '0 Bags'}
+          subtext={lastRecord ? `Daily consumption on ${lastRecord.recordDate}` : 'No feed logged'}
+          icon={Package}
+          color="blue"
+        />
+        <StatCard
+          title="Last Avg Weight"
+          value={lastRecord ? `${lastRecord.averageWeight} g` : '0 g'}
+          subtext={lastRecord ? `Body weight on ${lastRecord.recordDate}` : 'No weight logged'}
+          icon={Scale}
+          color="emerald"
+        />
       </div>
 
       {errorMsg && (
