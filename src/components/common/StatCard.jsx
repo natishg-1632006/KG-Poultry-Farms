@@ -3,6 +3,7 @@ import React from 'react';
 export const StatCard = ({
   title,
   value,
+  valueLabel,
   subtext,
   availableValue,
   consumedValue,
