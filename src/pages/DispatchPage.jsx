@@ -31,7 +31,8 @@ import {
   Layers,
   ArrowLeft,
   X,
-  AlertCircle
+  AlertCircle,
+  Filter
 } from 'lucide-react';
 
 export const DispatchPage = () => {
@@ -45,6 +46,7 @@ export const DispatchPage = () => {
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'detail'
   const [activeDispatch, setActiveDispatch] = useState(null);
   const [boxSets, setBoxSets] = useState([]);
+  const [setFilter, setSetFilter] = useState('all'); // 'all' | 'pending' | 'loaded'
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -190,6 +192,7 @@ export const DispatchPage = () => {
     setViewMode('detail');
     setShowSetForm(false);
     setEditingBoxSetId(null);
+    setSetFilter('all');
     await loadBoxSetsForDispatch(dispatch.id, dispatch);
   };
 
@@ -198,6 +201,7 @@ export const DispatchPage = () => {
     setActiveDispatch(null);
     setShowSetForm(false);
     setEditingBoxSetId(null);
+    setSetFilter('all');
   };
 
   const handleDeleteDispatch = async (dId, e) => {
@@ -535,12 +539,32 @@ export const DispatchPage = () => {
     setShowSetForm(true);
   };
 
+  // Box Sets Calculation & Filtering Engine
   const totalWeighedBoxes = boxSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
   const loadedBoxSets = boxSets.filter(s => Number(s.loadedWeight) > 0);
+  const pendingBoxSets = boxSets.filter(s => !s.loadedWeight || Number(s.loadedWeight) <= 0);
+  
   const loadedBoxesCount = loadedBoxSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
   const totalDispatchedBirds = loadedBoxSets.reduce((acc, s) => acc + (Number(s.chickenCount) || 0), 0);
   const totalNetWeight = loadedBoxSets.reduce((acc, s) => acc + (Number(s.totalChickenWeight) || 0), 0);
   const avgBirdWeight = totalDispatchedBirds > 0 ? parseFloat((totalNetWeight / totalDispatchedBirds).toFixed(3)) : 0;
+
+  // SORTING: Place Pending Sets AT THE TOP so workers can quickly find and update them!
+  const sortedBoxSets = [...boxSets].sort((a, b) => {
+    const aPending = !a.loadedWeight || Number(a.loadedWeight) <= 0;
+    const bPending = !b.loadedWeight || Number(b.loadedWeight) <= 0;
+    if (aPending && !bPending) return -1;
+    if (!aPending && bPending) return 1;
+    return (a.boxSetNumber || 0) - (b.boxSetNumber || 0);
+  });
+
+  // FILTERING: All / Pending / Loaded
+  const filteredBoxSets = sortedBoxSets.filter((s) => {
+    const isPending = !s.loadedWeight || Number(s.loadedWeight) <= 0;
+    if (setFilter === 'pending') return isPending;
+    if (setFilter === 'loaded') return !isPending;
+    return true;
+  });
 
   if (loading) return <div className="p-8 text-center text-slate-500 font-semibold">Loading Dispatch Management...</div>;
 
@@ -850,30 +874,59 @@ export const DispatchPage = () => {
             </div>
           </div>
 
-          {/* Box Sets History - Mobile Cards & Desktop Table */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm space-y-3">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3">
+          {/* Box Sets History Header with Filters & Status Sort */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3">
               <div>
                 <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
                   <Layers className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 shrink-0" />
                   <span>Box Sets History</span>
                 </h3>
-                <p className="text-xs font-medium text-slate-500 mt-0.5">Vehicle: {activeDispatch.vehicleNumber} • {boxSets.length} Sets Recorded</p>
+                <p className="text-xs font-medium text-slate-500 mt-0.5">
+                  Vehicle: {activeDispatch.vehicleNumber} • Pending sets automatically appear at the top!
+                </p>
               </div>
 
-              <button
-                onClick={handleOpenCreateSetForm}
-                className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-50 px-3.5 py-2 text-xs font-bold text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors w-full sm:w-auto"
-              >
-                <Plus className="h-4 w-4" /> + Create Set
-              </button>
+              {/* Filter Tabs Bar */}
+              <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl shrink-0 self-start sm:self-auto">
+                <button
+                  onClick={() => setSetFilter('all')}
+                  className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                    setFilter === 'all' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  All ({boxSets.length})
+                </button>
+                <button
+                  onClick={() => setSetFilter('pending')}
+                  className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                    setFilter === 'pending' ? 'bg-amber-500 text-white shadow-2xs' : 'text-amber-700 hover:text-amber-900'
+                  }`}
+                >
+                  Pending ({pendingBoxSets.length})
+                </button>
+                <button
+                  onClick={() => setSetFilter('loaded')}
+                  className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                    setFilter === 'loaded' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-emerald-700 hover:text-emerald-900'
+                  }`}
+                >
+                  Loaded ({loadedBoxSets.length})
+                </button>
+              </div>
             </div>
 
-            {/* Mobile Cards */}
+            {/* Mobile Cards View */}
             <div className="sm:hidden space-y-3">
-              {boxSets.length === 0 ? (
+              {filteredBoxSets.length === 0 ? (
                 <div className="py-8 text-center text-xs text-slate-400 space-y-2">
-                  <p>No box sets recorded for this vehicle yet.</p>
+                  <p>
+                    {setFilter === 'pending'
+                      ? 'No pending sets! All recorded box sets have loaded weight entered.'
+                      : setFilter === 'loaded'
+                      ? 'No loaded sets recorded yet. Enter gross weight on pending sets.'
+                      : 'No box sets recorded for this vehicle yet.'}
+                  </p>
                   <button
                     onClick={handleOpenCreateSetForm}
                     className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm"
@@ -882,7 +935,7 @@ export const DispatchPage = () => {
                   </button>
                 </div>
               ) : (
-                boxSets.map((s) => {
+                filteredBoxSets.map((s) => {
                   const isPending = !s.loadedWeight || Number(s.loadedWeight) <= 0;
 
                   return (
@@ -957,6 +1010,7 @@ export const DispatchPage = () => {
                 <thead>
                   <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
                     <th className="pb-3 px-2">Set #</th>
+                    <th className="pb-3 px-2">Status</th>
                     <th className="pb-3 px-2">Boxes in Set</th>
                     <th className="pb-3 px-2">Empty Box Wt</th>
                     <th className="pb-3 px-2">Loaded Wt</th>
@@ -967,19 +1021,30 @@ export const DispatchPage = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
-                  {boxSets.length === 0 ? (
+                  {filteredBoxSets.length === 0 ? (
                     <tr>
-                      <td colSpan="8" className="py-8 text-center text-slate-400">
-                        No box sets recorded for this vehicle yet. Click <strong>+ Create Set</strong> above to add set tare weights.
+                      <td colSpan="9" className="py-8 text-center text-slate-400">
+                        {setFilter === 'pending'
+                          ? 'No pending sets! All recorded box sets have loaded weight entered.'
+                          : setFilter === 'loaded'
+                          ? 'No loaded sets recorded yet. Enter gross weight on pending sets.'
+                          : 'No box sets recorded for this vehicle yet. Click + Create Set above.'}
                       </td>
                     </tr>
                   ) : (
-                    boxSets.map((s) => {
+                    filteredBoxSets.map((s) => {
                       const isPending = !s.loadedWeight || Number(s.loadedWeight) <= 0;
 
                       return (
                         <tr key={s.id} className="hover:bg-slate-50">
                           <td className="py-3 px-2 font-bold text-slate-900">Box Set #{s.boxSetNumber}</td>
+                          <td className="py-3 px-2">
+                            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${
+                              isPending ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-100 text-emerald-800'
+                            }`}>
+                              {isPending ? 'Pending Load Wt' : 'Loaded ✓'}
+                            </span>
+                          </td>
                           <td className="py-3 px-2 text-slate-700 font-bold">{s.boxesInSet || 5} Boxes</td>
                           <td className="py-3 px-2 text-slate-600">{s.emptyBoxWeight} kg</td>
                           <td className="py-3 px-2">
@@ -1292,7 +1357,7 @@ export const DispatchPage = () => {
                 All {activeDispatch.totalBoxCount} Target Boxes Weighed
               </h3>
               <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                You have reached the setup target of <strong>{activeDispatch.totalBoxCount} boxes</strong> for vehicle <strong>{activeDispatch.vehicleNumber}</strong>. To add an extra set of boxes, please update the vehicle total box count first.
+                You have reached the setup target of <strong>{activeDispatch.totalBoxCount} boxes</strong> for vehicle <strong>{activeDispatch.vehicleNumber}</strong>. To add an extra set of boxes, please update the vehicle total box count.
               </p>
             </div>
 
