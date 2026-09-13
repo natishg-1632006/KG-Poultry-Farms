@@ -2,7 +2,6 @@ import { ref, get, set, update, remove, push, child } from 'firebase/database';
 import { db } from './firebase';
 import { FEED_CONSUMPTION_TARGETS, AVERAGE_WEIGHT_TARGETS } from '../constants/companyTargets';
 
-// Storage keys for local fallback state
 const MOCK_STORAGE_KEY = 'kg_poultry_local_db_v1';
 
 // Initial seed state for local fallback mode
@@ -184,7 +183,16 @@ const INITIAL_LOCAL_STATE = {
   ]
 };
 
-// Local storage helper functions
+// Helper: Wrap promises with a timeout to prevent hanging UI
+function withTimeout(promise, ms = 1500) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Network timeout')), ms);
+    promise
+      .then((res) => { clearTimeout(timer); resolve(res); })
+      .catch((err) => { clearTimeout(timer); reject(err); });
+  });
+}
+
 function getLocalDB() {
   try {
     const raw = localStorage.getItem(MOCK_STORAGE_KEY);
@@ -193,7 +201,7 @@ function getLocalDB() {
       return INITIAL_LOCAL_STATE;
     }
     return JSON.parse(raw);
-  } catch (err) {
+  } catch (_err) {
     return INITIAL_LOCAL_STATE;
   }
 }
@@ -206,32 +214,13 @@ function saveLocalDB(data) {
   }
 }
 
-/**
- * Checks if Firebase RTDB is active & connected
- */
-async function isFirebaseOnline() {
-  try {
-    if (!import.meta.env.VITE_FIREBASE_DATABASE_URL || import.meta.env.VITE_FIREBASE_DATABASE_URL.includes('demo')) {
-      return false;
-    }
-    const snapshot = await get(child(ref(db), '.info/connected'));
-    return snapshot.val() === true;
-  } catch (err) {
-    return false;
-  }
-}
-
-// ==================== USER MANAGEMENT ====================
-
+// USER MANAGEMENT
 export async function dbGetUsers() {
   try {
-    const isOnline = await isFirebaseOnline();
-    if (isOnline) {
-      const snap = await get(ref(db, 'users'));
-      return snap.exists() ? Object.values(snap.val()) : [];
-    }
-  } catch (err) {
-    console.warn('Firebase DB get users failed, falling back to local state:', err);
+    const snap = await withTimeout(get(ref(db, 'users')));
+    if (snap.exists()) return Object.values(snap.val());
+  } catch (_err) {
+    // fallback
   }
   const local = getLocalDB();
   return Object.values(local.users || {});
@@ -242,12 +231,9 @@ export async function dbSaveUser(userData) {
   const record = { ...userData, uid, updatedAt: new Date().toISOString() };
 
   try {
-    const isOnline = await isFirebaseOnline();
-    if (isOnline) {
-      await set(ref(db, `users/${uid}`), record);
-    }
-  } catch (err) {
-    console.warn('Firebase set user failed:', err);
+    await withTimeout(set(ref(db, `users/${uid}`), record));
+  } catch (_err) {
+    // fallback
   }
 
   const local = getLocalDB();
@@ -256,17 +242,13 @@ export async function dbSaveUser(userData) {
   return record;
 }
 
-// ==================== BATCH MANAGEMENT ====================
-
+// BATCH MANAGEMENT
 export async function dbGetBatches() {
   try {
-    const isOnline = await isFirebaseOnline();
-    if (isOnline) {
-      const snap = await get(ref(db, 'batches'));
-      return snap.exists() ? Object.values(snap.val()) : [];
-    }
-  } catch (err) {
-    console.warn('Firebase get batches failed:', err);
+    const snap = await withTimeout(get(ref(db, 'batches')));
+    if (snap.exists()) return Object.values(snap.val());
+  } catch (_err) {
+    // fallback
   }
   const local = getLocalDB();
   return Object.values(local.batches || {});
@@ -282,12 +264,9 @@ export async function dbSaveBatch(batchData) {
   };
 
   try {
-    const isOnline = await isFirebaseOnline();
-    if (isOnline) {
-      await set(ref(db, `batches/${batchId}`), record);
-    }
-  } catch (err) {
-    console.warn('Firebase set batch failed:', err);
+    await withTimeout(set(ref(db, `batches/${batchId}`), record));
+  } catch (_err) {
+    // fallback
   }
 
   const local = getLocalDB();
@@ -298,12 +277,9 @@ export async function dbSaveBatch(batchData) {
 
 export async function dbDeleteBatch(batchId) {
   try {
-    const isOnline = await isFirebaseOnline();
-    if (isOnline) {
-      await remove(ref(db, `batches/${batchId}`));
-    }
-  } catch (err) {
-    console.warn('Firebase delete batch failed:', err);
+    await withTimeout(remove(ref(db, `batches/${batchId}`)));
+  } catch (_err) {
+    // fallback
   }
 
   const local = getLocalDB();
@@ -314,17 +290,13 @@ export async function dbDeleteBatch(batchId) {
   saveLocalDB(local);
 }
 
-// ==================== DAILY FARM RECORDS ====================
-
+// DAILY FARM RECORDS
 export async function dbGetDailyRecords(batchId) {
   try {
-    const isOnline = await isFirebaseOnline();
-    if (isOnline) {
-      const snap = await get(ref(db, `dailyRecords/${batchId}`));
-      return snap.exists() ? snap.val() : {};
-    }
-  } catch (err) {
-    console.warn('Firebase get daily records failed:', err);
+    const snap = await withTimeout(get(ref(db, `dailyRecords/${batchId}`)));
+    if (snap.exists()) return snap.val();
+  } catch (_err) {
+    // fallback
   }
   const local = getLocalDB();
   return local.dailyRecords[batchId] || {};
@@ -339,12 +311,9 @@ export async function dbSaveDailyRecord(batchId, recordDate, recordData) {
   };
 
   try {
-    const isOnline = await isFirebaseOnline();
-    if (isOnline) {
-      await set(ref(db, `dailyRecords/${batchId}/${recordDate}`), record);
-    }
-  } catch (err) {
-    console.warn('Firebase save daily record failed:', err);
+    await withTimeout(set(ref(db, `dailyRecords/${batchId}/${recordDate}`), record));
+  } catch (_err) {
+    // fallback
   }
 
   const local = getLocalDB();
@@ -353,7 +322,6 @@ export async function dbSaveDailyRecord(batchId, recordDate, recordData) {
   }
   local.dailyRecords[batchId][recordDate] = record;
 
-  // Also update remaining chick count in batch object
   if (local.batches[batchId]) {
     local.batches[batchId].remainingChickCount = record.remainingChickCount;
   }
@@ -361,17 +329,13 @@ export async function dbSaveDailyRecord(batchId, recordDate, recordData) {
   return record;
 }
 
-// ==================== FEED MANAGEMENT ====================
-
+// FEED MANAGEMENT
 export async function dbGetFeedArrivals(batchId) {
   try {
-    const isOnline = await isFirebaseOnline();
-    if (isOnline) {
-      const snap = await get(ref(db, `feedStocks/${batchId}`));
-      return snap.exists() ? (Array.isArray(snap.val()) ? snap.val() : Object.values(snap.val())) : [];
-    }
-  } catch (err) {
-    console.warn('Firebase get feed arrivals failed:', err);
+    const snap = await withTimeout(get(ref(db, `feedStocks/${batchId}`)));
+    if (snap.exists()) return Array.isArray(snap.val()) ? snap.val() : Object.values(snap.val());
+  } catch (_err) {
+    // fallback
   }
   const local = getLocalDB();
   return local.feedStocks[batchId] || [];
@@ -387,12 +351,9 @@ export async function dbAddFeedArrival(batchId, feedData) {
   };
 
   try {
-    const isOnline = await isFirebaseOnline();
-    if (isOnline) {
-      await push(ref(db, `feedStocks/${batchId}`), record);
-    }
-  } catch (err) {
-    console.warn('Firebase push feed arrival failed:', err);
+    await withTimeout(push(ref(db, `feedStocks/${batchId}`), record));
+  } catch (_err) {
+    // fallback
   }
 
   const local = getLocalDB();
@@ -401,7 +362,6 @@ export async function dbAddFeedArrival(batchId, feedData) {
   }
   local.feedStocks[batchId].push(record);
 
-  // Update batch feed stock pool
   if (local.batches[batchId]) {
     const type = feedData.feedType;
     const current = local.batches[batchId].feedStock[type] || 0;
@@ -414,12 +374,9 @@ export async function dbAddFeedArrival(batchId, feedData) {
 
 export async function dbUpdateBatchFeedStockPool(batchId, updatedStock) {
   try {
-    const isOnline = await isFirebaseOnline();
-    if (isOnline) {
-      await update(ref(db, `batches/${batchId}/feedStock`), updatedStock);
-    }
-  } catch (err) {
-    console.warn('Firebase update feed stock pool failed:', err);
+    await withTimeout(update(ref(db, `batches/${batchId}/feedStock`), updatedStock));
+  } catch (_err) {
+    // fallback
   }
 
   const local = getLocalDB();
@@ -429,17 +386,13 @@ export async function dbUpdateBatchFeedStockPool(batchId, updatedStock) {
   }
 }
 
-// ==================== MEDICINE & VACCINATION ====================
-
+// MEDICINE & VACCINATION
 export async function dbGetMedicineRecords(batchId) {
   try {
-    const isOnline = await isFirebaseOnline();
-    if (isOnline) {
-      const snap = await get(ref(db, `medicineRecords/${batchId}`));
-      return snap.exists() ? (Array.isArray(snap.val()) ? snap.val() : Object.values(snap.val())) : [];
-    }
-  } catch (err) {
-    console.warn('Firebase get medicine records failed:', err);
+    const snap = await withTimeout(get(ref(db, `medicineRecords/${batchId}`)));
+    if (snap.exists()) return Array.isArray(snap.val()) ? snap.val() : Object.values(snap.val());
+  } catch (_err) {
+    // fallback
   }
   const local = getLocalDB();
   return local.medicineRecords[batchId] || [];
@@ -455,12 +408,9 @@ export async function dbAddMedicineRecord(batchId, recordData) {
   };
 
   try {
-    const isOnline = await isFirebaseOnline();
-    if (isOnline) {
-      await push(ref(db, `medicineRecords/${batchId}`), record);
-    }
-  } catch (err) {
-    console.warn('Firebase push medicine record failed:', err);
+    await withTimeout(push(ref(db, `medicineRecords/${batchId}`), record));
+  } catch (_err) {
+    // fallback
   }
 
   const local = getLocalDB();
@@ -472,17 +422,13 @@ export async function dbAddMedicineRecord(batchId, recordData) {
   return record;
 }
 
-// ==================== DISPATCH & BOX SETS ====================
-
+// DISPATCH & BOX SETS
 export async function dbGetDispatches() {
   try {
-    const isOnline = await isFirebaseOnline();
-    if (isOnline) {
-      const snap = await get(ref(db, 'dispatches'));
-      return snap.exists() ? Object.values(snap.val()) : [];
-    }
-  } catch (err) {
-    console.warn('Firebase get dispatches failed:', err);
+    const snap = await withTimeout(get(ref(db, 'dispatches')));
+    if (snap.exists()) return Object.values(snap.val());
+  } catch (_err) {
+    // fallback
   }
   const local = getLocalDB();
   return Object.values(local.dispatches || {});
@@ -498,12 +444,9 @@ export async function dbSaveDispatch(dispatchData) {
   };
 
   try {
-    const isOnline = await isFirebaseOnline();
-    if (isOnline) {
-      await set(ref(db, `dispatches/${id}`), record);
-    }
-  } catch (err) {
-    console.warn('Firebase set dispatch failed:', err);
+    await withTimeout(set(ref(db, `dispatches/${id}`), record));
+  } catch (_err) {
+    // fallback
   }
 
   const local = getLocalDB();
@@ -514,13 +457,10 @@ export async function dbSaveDispatch(dispatchData) {
 
 export async function dbGetBoxSets(dispatchId) {
   try {
-    const isOnline = await isFirebaseOnline();
-    if (isOnline) {
-      const snap = await get(ref(db, `boxSets/${dispatchId}`));
-      return snap.exists() ? (Array.isArray(snap.val()) ? snap.val() : Object.values(snap.val())) : [];
-    }
-  } catch (err) {
-    console.warn('Firebase get box sets failed:', err);
+    const snap = await withTimeout(get(ref(db, `boxSets/${dispatchId}`)));
+    if (snap.exists()) return Array.isArray(snap.val()) ? snap.val() : Object.values(snap.val());
+  } catch (_err) {
+    // fallback
   }
   const local = getLocalDB();
   return local.boxSets[dispatchId] || [];
@@ -536,12 +476,9 @@ export async function dbSaveBoxSet(dispatchId, boxSetData) {
   };
 
   try {
-    const isOnline = await isFirebaseOnline();
-    if (isOnline) {
-      await set(ref(db, `boxSets/${dispatchId}/${boxSetData.boxSetNumber - 1}`), record);
-    }
-  } catch (err) {
-    console.warn('Firebase set box set failed:', err);
+    await withTimeout(set(ref(db, `boxSets/${dispatchId}/${boxSetData.boxSetNumber - 1}`), record));
+  } catch (_err) {
+    // fallback
   }
 
   const local = getLocalDB();
@@ -558,17 +495,13 @@ export async function dbSaveBoxSet(dispatchId, boxSetData) {
   return record;
 }
 
-// ==================== COMPANY TARGETS ====================
-
+// COMPANY TARGETS
 export async function dbGetCompanyTargets() {
   try {
-    const isOnline = await isFirebaseOnline();
-    if (isOnline) {
-      const snap = await get(ref(db, 'targets'));
-      if (snap.exists()) return snap.val();
-    }
-  } catch (err) {
-    console.warn('Firebase get company targets failed:', err);
+    const snap = await withTimeout(get(ref(db, 'targets')));
+    if (snap.exists()) return snap.val();
+  } catch (_err) {
+    // fallback
   }
   const local = getLocalDB();
   return local.targets || { feedConsumption: FEED_CONSUMPTION_TARGETS, averageWeight: AVERAGE_WEIGHT_TARGETS };
@@ -576,12 +509,9 @@ export async function dbGetCompanyTargets() {
 
 export async function dbSaveCompanyTargets(targets) {
   try {
-    const isOnline = await isFirebaseOnline();
-    if (isOnline) {
-      await set(ref(db, 'targets'), targets);
-    }
-  } catch (err) {
-    console.warn('Firebase set company targets failed:', err);
+    await withTimeout(set(ref(db, 'targets'), targets));
+  } catch (_err) {
+    // fallback
   }
 
   const local = getLocalDB();
@@ -589,17 +519,13 @@ export async function dbSaveCompanyTargets(targets) {
   saveLocalDB(local);
 }
 
-// ==================== INVOICE HISTORY ====================
-
+// INVOICE HISTORY
 export async function dbGetInvoices() {
   try {
-    const isOnline = await isFirebaseOnline();
-    if (isOnline) {
-      const snap = await get(ref(db, 'invoices'));
-      return snap.exists() ? (Array.isArray(snap.val()) ? snap.val() : Object.values(snap.val())) : [];
-    }
-  } catch (err) {
-    console.warn('Firebase get invoices failed:', err);
+    const snap = await withTimeout(get(ref(db, 'invoices')));
+    if (snap.exists()) return Array.isArray(snap.val()) ? snap.val() : Object.values(snap.val());
+  } catch (_err) {
+    // fallback
   }
   const local = getLocalDB();
   return local.invoices || [];
@@ -614,12 +540,9 @@ export async function dbSaveInvoice(invoiceData) {
   };
 
   try {
-    const isOnline = await isFirebaseOnline();
-    if (isOnline) {
-      await push(ref(db, 'invoices'), record);
-    }
-  } catch (err) {
-    console.warn('Firebase push invoice failed:', err);
+    await withTimeout(push(ref(db, 'invoices'), record));
+  } catch (_err) {
+    // fallback
   }
 
   const local = getLocalDB();
@@ -629,17 +552,13 @@ export async function dbSaveInvoice(invoiceData) {
   return record;
 }
 
-// ==================== AUDIT LOGGING ====================
-
+// AUDIT LOGS
 export async function dbGetAuditLogs() {
   try {
-    const isOnline = await isFirebaseOnline();
-    if (isOnline) {
-      const snap = await get(ref(db, 'auditLogs'));
-      return snap.exists() ? (Array.isArray(snap.val()) ? snap.val() : Object.values(snap.val())) : [];
-    }
-  } catch (err) {
-    console.warn('Firebase get audit logs failed:', err);
+    const snap = await withTimeout(get(ref(db, 'auditLogs')));
+    if (snap.exists()) return Array.isArray(snap.val()) ? snap.val() : Object.values(snap.val());
+  } catch (_err) {
+    // fallback
   }
   const local = getLocalDB();
   return local.auditLogs || [];
@@ -656,12 +575,9 @@ export async function dbLogAuditEvent(action, details, actorName = 'System User'
   };
 
   try {
-    const isOnline = await isFirebaseOnline();
-    if (isOnline) {
-      await push(ref(db, 'auditLogs'), record);
-    }
-  } catch (err) {
-    console.warn('Firebase push audit log failed:', err);
+    await withTimeout(push(ref(db, 'auditLogs'), record));
+  } catch (_err) {
+    // fallback
   }
 
   const local = getLocalDB();

@@ -104,22 +104,25 @@ export const AuthProvider = ({ children }) => {
 
   const loginAsDemo = async (role = 'Admin') => {
     setError(null);
-    const users = await dbGetUsers();
-    const target = users.find(u => u.role === role) || {
-      uid: `${role.toLowerCase()}-demo-uid`,
-      name: `Demo ${role}`,
-      email: `${role.toLowerCase()}@kgpoultry.com`,
+    const demoUser = {
+      uid: role === 'Admin' ? 'admin-uid-1' : 'farmer-uid-1',
+      name: role === 'Admin' ? 'System Admin' : 'Ramesh Kumar',
+      email: role === 'Admin' ? 'admin@kgpoultry.com' : 'farmer@kgpoultry.com',
       role,
       active: true,
-      farmName: 'KG Demo Farm',
+      farmName: role === 'Admin' ? 'KG Central Farm' : 'KG North Shed',
       assignedBatches: role === 'Farmer' ? ['KG001'] : []
     };
 
-    setCurrentUser({ uid: target.uid, email: target.email });
-    setUserProfile(target);
-    localStorage.setItem('kg_poultry_active_session', JSON.stringify(target));
-    dbLogAuditEvent('DEMO_LOGIN', `Logged in as Demo ${role}`, target.name);
-    return target;
+    setCurrentUser({ uid: demoUser.uid, email: demoUser.email });
+    setUserProfile(demoUser);
+    localStorage.setItem('kg_poultry_active_session', JSON.stringify(demoUser));
+    try {
+      dbLogAuditEvent('DEMO_LOGIN', `Logged in as Demo ${role}`, demoUser.name);
+    } catch (_e) {
+      // ignore
+    }
+    return demoUser;
   };
 
   const logout = async () => {
