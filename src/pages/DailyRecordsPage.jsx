@@ -396,12 +396,12 @@ export const DailyRecordsPage = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
-                <th className="pb-3 px-2">Date</th>
-                <th className="pb-3 px-2">Mortality</th>
-                <th className="pb-3 px-2">Bags Consumed</th>
-                <th className="pb-3 px-2">Avg Weight (g)</th>
-                <th className="pb-3 px-2 text-right">Actions</th>
+              <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold whitespace-nowrap">
+                <th className="pb-3 px-2 whitespace-nowrap">Date</th>
+                <th className="pb-3 px-2 whitespace-nowrap">Mortality</th>
+                <th className="pb-3 px-2 whitespace-nowrap">Bags Consumed</th>
+                <th className="pb-3 px-2 whitespace-nowrap">Avg Weight (g)</th>
+                <th className="pb-3 px-2 text-right whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
@@ -413,12 +413,12 @@ export const DailyRecordsPage = () => {
                 recordsList.map((r) => {
                   const bags = r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG);
                   return (
-                    <tr key={r.recordDate} className="hover:bg-slate-50">
-                      <td className="py-3 px-2 font-bold text-slate-900">{r.recordDate}</td>
-                      <td className="py-3 px-2 font-bold text-rose-600">{r.mortalityCount}</td>
-                      <td className="py-3 px-2 text-slate-700 font-bold">{bags} Bags</td>
-                      <td className="py-3 px-2 font-bold text-slate-900">{r.averageWeight} g</td>
-                      <td className="py-3 px-2 text-right">
+                    <tr key={r.recordDate} className="hover:bg-slate-50 whitespace-nowrap">
+                      <td className="py-3 px-2 font-bold text-slate-900 whitespace-nowrap">{r.recordDate}</td>
+                      <td className="py-3 px-2 font-bold text-rose-600 whitespace-nowrap">{r.mortalityCount}</td>
+                      <td className="py-3 px-2 text-slate-700 font-bold whitespace-nowrap">{bags} Bags</td>
+                      <td className="py-3 px-2 font-bold text-slate-900 whitespace-nowrap">{r.averageWeight} g</td>
+                      <td className="py-3 px-2 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => handleEditRecord(r)}
