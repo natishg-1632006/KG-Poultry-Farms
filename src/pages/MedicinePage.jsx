@@ -5,6 +5,12 @@ import { MEDICINE_UNITS } from '../constants/companyTargets';
 import { Modal } from '../components/common/Modal';
 import { Syringe, Plus, Trash2, Edit, Save, CheckCircle2, Layers, Pill } from 'lucide-react';
 
+const formatMedicineUnit = (unit) => {
+  if (!unit) return '';
+  if (unit.toLowerCase() === 'l' || unit.toLowerCase() === 'liter' || unit.toLowerCase() === 'liters') return 'Liter';
+  return unit;
+};
+
 export const MedicinePage = () => {
   const { userProfile, isFarmer } = useAuth();
   const [batches, setBatches] = useState([]);
@@ -481,131 +487,262 @@ export const MedicinePage = () => {
           </div>
         </div>
 
-        {/* Separate Vaccination History Table */}
+        {/* Vaccination History - Mobile Cards & Desktop Table */}
         {activeHistoryTab === 'Vaccine' ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
-                  <th className="pb-3 px-2">Date</th>
-                  <th className="pb-3 px-2">Vaccine(s) Administered & Dosage</th>
-                  <th className="pb-3 px-2">Vaccinator Name(s)</th>
-                  <th className="pb-3 px-2">Reason / Notes</th>
-                  <th className="pb-3 px-2 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-medium">
-                {vaccineRecords.length === 0 ? (
-                  <tr>
-                    <td colSpan="5" className="py-8 text-center text-slate-400">
-                      No vaccination records logged for this batch yet. Click "+ Log Medicine / Vaccine" to add one.
-                    </td>
-                  </tr>
-                ) : (
-                  vaccineRecords.map((r) => (
-                    <tr key={r.id} className="hover:bg-slate-50">
-                      <td className="py-3 px-2 font-bold text-slate-900">{r.date}</td>
-                      <td className="py-3 px-2">
-                        <div className="space-y-1">
-                          {r.vaccines && r.vaccines.map((v, i) => (
-                            <div key={i} className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-                              <span>{v.name}</span>
-                              {v.quantity ? <span className="text-slate-500 font-normal">({v.quantity} {v.unit})</span> : null}
-                            </div>
+          <div>
+            {/* Mobile Card View */}
+            <div className="sm:hidden space-y-3">
+              {vaccineRecords.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400">
+                  No vaccination records logged for this batch yet. Click "+ Log Medicine / Vaccine" to add one.
+                </div>
+              ) : (
+                vaccineRecords.map((r) => (
+                  <div key={r.id} className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-3 shadow-2xs">
+                    <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+                      <span className="text-xs font-bold text-slate-900">{r.date}</span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleEditRecord(r)}
+                          className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-200/60"
+                          title="Edit Record"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteRecord(r.id)}
+                          className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-100/60"
+                          title="Delete Record"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Vaccine(s) & Quantity</span>
+                      <div className="space-y-1.5">
+                        {r.vaccines && r.vaccines.map((v, i) => (
+                          <div key={i} className="text-xs font-bold text-emerald-900 flex items-center justify-between bg-white rounded-lg p-2 border border-emerald-100">
+                            <span className="flex items-center gap-1.5">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                              {v.name}
+                            </span>
+                            {v.quantity ? (
+                              <span className="text-xs font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+                                {v.quantity} {formatMedicineUnit(v.unit)}
+                              </span>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {r.vaccinatorNames && r.vaccinatorNames.length > 0 && (
+                      <div>
+                        <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Vaccinator Name(s)</span>
+                        <div className="flex flex-wrap gap-1">
+                          {r.vaccinatorNames.map((vn, i) => (
+                            <span key={i} className="inline-flex items-center rounded-md bg-white border border-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
+                              {vn}
+                            </span>
                           ))}
                         </div>
+                      </div>
+                    )}
+
+                    {r.reason && (
+                      <div>
+                        <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-0.5">Reason / Notes</span>
+                        <p className="text-xs text-slate-600 bg-white rounded-lg p-2 border border-slate-100">{r.reason}</p>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
+                    <th className="pb-3 px-2">Date</th>
+                    <th className="pb-3 px-2">Vaccine(s) Administered & Dosage</th>
+                    <th className="pb-3 px-2">Vaccinator Name(s)</th>
+                    <th className="pb-3 px-2">Reason / Notes</th>
+                    <th className="pb-3 px-2 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium">
+                  {vaccineRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="py-8 text-center text-slate-400">
+                        No vaccination records logged for this batch yet. Click "+ Log Medicine / Vaccine" to add one.
                       </td>
-                      <td className="py-3 px-2 text-slate-700 font-semibold">
-                        {r.vaccinatorNames && r.vaccinatorNames.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {r.vaccinatorNames.map((vn, i) => (
-                              <span key={i} className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
-                                {vn}
-                              </span>
+                    </tr>
+                  ) : (
+                    vaccineRecords.map((r) => (
+                      <tr key={r.id} className="hover:bg-slate-50">
+                        <td className="py-3 px-2 font-bold text-slate-900">{r.date}</td>
+                        <td className="py-3 px-2">
+                          <div className="space-y-1">
+                            {r.vaccines && r.vaccines.map((v, i) => (
+                              <div key={i} className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                                <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                                <span>{v.name}</span>
+                                {v.quantity ? <span className="text-slate-500 font-normal">({v.quantity} {formatMedicineUnit(v.unit)})</span> : null}
+                              </div>
                             ))}
                           </div>
-                        ) : (
-                          <span className="text-slate-400 font-normal">—</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-2 text-slate-600">{r.reason}</td>
-                      <td className="py-3 px-2 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => handleEditRecord(r)}
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                            title="Edit Record"
-                          >
-                            <Edit className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteRecord(r.id)}
-                            className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
-                            title="Delete Record"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="py-3 px-2 text-slate-700 font-semibold">
+                          {r.vaccinatorNames && r.vaccinatorNames.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {r.vaccinatorNames.map((vn, i) => (
+                                <span key={i} className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                                  {vn}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 font-normal">—</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-2 text-slate-600">{r.reason}</td>
+                        <td className="py-3 px-2 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => handleEditRecord(r)}
+                              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                              title="Edit Record"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteRecord(r.id)}
+                              className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
+                              title="Delete Record"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : (
-          /* Separate Medicine History Table */
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
-                  <th className="pb-3 px-2">Date</th>
-                  <th className="pb-3 px-2">Medicine Name</th>
-                  <th className="pb-3 px-2">Dosage / Quantity</th>
-                  <th className="pb-3 px-2">Reason / Notes</th>
-                  <th className="pb-3 px-2 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-medium">
-                {medicineRecords.length === 0 ? (
-                  <tr>
-                    <td colSpan="5" className="py-8 text-center text-slate-400">
-                      No medication records logged for this batch yet. Click "+ Log Medicine / Vaccine" to add one.
-                    </td>
+          /* Medicine History - Mobile Cards & Desktop Table */
+          <div>
+            {/* Mobile Card View */}
+            <div className="sm:hidden space-y-3">
+              {medicineRecords.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400">
+                  No medication records logged for this batch yet. Click "+ Log Medicine / Vaccine" to add one.
+                </div>
+              ) : (
+                medicineRecords.map((r) => (
+                  <div key={r.id} className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-3 shadow-2xs">
+                    <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+                      <span className="text-xs font-bold text-slate-900">{r.date}</span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleEditRecord(r)}
+                          className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-200/60"
+                          title="Edit Record"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteRecord(r.id)}
+                          className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-100/60"
+                          title="Delete Record"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between bg-white rounded-lg p-2.5 border border-slate-200">
+                      <div>
+                        <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">Medicine Name</span>
+                        <span className="text-xs font-bold text-teal-900">{r.medicineName}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">Quantity</span>
+                        <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200/60 inline-block">
+                          {r.quantity} {formatMedicineUnit(r.unit)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {r.reason && (
+                      <div>
+                        <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-0.5">Reason / Notes</span>
+                        <p className="text-xs text-slate-600 bg-white rounded-lg p-2 border border-slate-100">{r.reason}</p>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
+                    <th className="pb-3 px-2">Date</th>
+                    <th className="pb-3 px-2">Medicine Name</th>
+                    <th className="pb-3 px-2">Dosage / Quantity</th>
+                    <th className="pb-3 px-2">Reason / Notes</th>
+                    <th className="pb-3 px-2 text-right">Actions</th>
                   </tr>
-                ) : (
-                  medicineRecords.map((r) => (
-                    <tr key={r.id} className="hover:bg-slate-50">
-                      <td className="py-3 px-2 font-bold text-slate-900">{r.date}</td>
-                      <td className="py-3 px-2 font-bold text-teal-800">{r.medicineName}</td>
-                      <td className="py-3 px-2 font-bold text-slate-700">
-                        {r.quantity} <span className="font-normal text-slate-500">{r.unit}</span>
-                      </td>
-                      <td className="py-3 px-2 text-slate-600">{r.reason}</td>
-                      <td className="py-3 px-2 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => handleEditRecord(r)}
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                            title="Edit Record"
-                          >
-                            <Edit className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteRecord(r.id)}
-                            className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
-                            title="Delete Record"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium">
+                  {medicineRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="py-8 text-center text-slate-400">
+                        No medication records logged for this batch yet. Click "+ Log Medicine / Vaccine" to add one.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    medicineRecords.map((r) => (
+                      <tr key={r.id} className="hover:bg-slate-50">
+                        <td className="py-3 px-2 font-bold text-slate-900">{r.date}</td>
+                        <td className="py-3 px-2 font-bold text-teal-800">{r.medicineName}</td>
+                        <td className="py-3 px-2 font-bold text-slate-700">
+                          {r.quantity} <span className="font-normal text-slate-500">{formatMedicineUnit(r.unit)}</span>
+                        </td>
+                        <td className="py-3 px-2 text-slate-600">{r.reason}</td>
+                        <td className="py-3 px-2 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => handleEditRecord(r)}
+                              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                              title="Edit Record"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteRecord(r.id)}
+                              className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
+                              title="Delete Record"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

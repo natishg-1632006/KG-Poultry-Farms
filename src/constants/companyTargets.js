@@ -42,7 +42,7 @@ export const USER_ROLES = {
   FARMER: 'Farmer'
 };
 
-export const MEDICINE_UNITS = ['g', 'kg', 'ml', 'l'];
+export const MEDICINE_UNITS = ['g', 'kg', 'ml', 'Liter'];
 
 export const KG_PER_BAG = 70;
 
