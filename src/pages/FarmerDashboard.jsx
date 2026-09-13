@@ -75,7 +75,7 @@ export const FarmerDashboard = () => {
         </div>
       ) : (
         <>
-          {/* Metrics Overview showing Bags & Kg */}
+          {/* Metrics Overview showing Bags */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
               title="Remaining Chickens"
@@ -87,21 +87,21 @@ export const FarmerDashboard = () => {
             <StatCard
               title="Pre-Starter Stock"
               value={formatFeedStock(feedStock['Pre-Starter'] || 0)}
-              subtext="First phase (70kg/bag)"
+              subtext="First phase feed"
               icon={Wheat}
               color="amber"
             />
             <StatCard
               title="Starter Stock"
               value={formatFeedStock(feedStock['Starter'] || 0)}
-              subtext="Growth phase (70kg/bag)"
+              subtext="Growth phase feed"
               icon={Wheat}
               color="indigo"
             />
             <StatCard
               title="Finisher Stock"
               value={formatFeedStock(feedStock['Finisher'] || 0)}
-              subtext="Final phase (70kg/bag)"
+              subtext="Final phase feed"
               icon={Wheat}
               color="blue"
             />
@@ -118,7 +118,7 @@ export const FarmerDashboard = () => {
                   <ClipboardList className="h-5 w-5" />
                 </div>
                 <h3 className="mt-4 font-bold text-slate-900">Daily Farm Entry</h3>
-                <p className="mt-1 text-xs text-slate-500">Record mortality, daily feed consumption & average chicken weight.</p>
+                <p className="mt-1 text-xs text-slate-500">Record mortality, daily feed consumption in Bags & average weight.</p>
               </div>
               <div className="mt-4 flex items-center text-xs font-bold text-emerald-600">
                 Log Today's Entry <ArrowRight className="ml-1 h-3.5 w-3.5" />
@@ -134,7 +134,7 @@ export const FarmerDashboard = () => {
                   <Wheat className="h-5 w-5" />
                 </div>
                 <h3 className="mt-4 font-bold text-slate-900">Feed Stock Receive</h3>
-                <p className="mt-1 text-xs text-slate-500">Log incoming feed bags (70 kg/bag) & vehicle records.</p>
+                <p className="mt-1 text-xs text-slate-500">Log incoming feed bags & vehicle records.</p>
               </div>
               <div className="mt-4 flex items-center text-xs font-bold text-amber-600">
                 Receive Feed Bags <ArrowRight className="ml-1 h-3.5 w-3.5" />
@@ -185,7 +185,7 @@ export const FarmerDashboard = () => {
                     <th className="pb-3 px-2">Mortality</th>
                     <th className="pb-3 px-2">Remaining Chicks</th>
                     <th className="pb-3 px-2">Feed Type Used</th>
-                    <th className="pb-3 px-2">Feed Consumed</th>
+                    <th className="pb-3 px-2">Bags Consumed</th>
                     <th className="pb-3 px-2 text-right">Avg Weight (g)</th>
                   </tr>
                 </thead>
@@ -196,14 +196,14 @@ export const FarmerDashboard = () => {
                     </tr>
                   ) : (
                     records.map((r) => {
-                      const bagsUsed = kgToBags(r.feedConsumption || 0, KG_PER_BAG);
+                      const bagsUsed = r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG);
                       return (
                         <tr key={r.recordDate} className="hover:bg-slate-50">
                           <td className="py-3 px-2 font-bold text-slate-900">{r.recordDate}</td>
                           <td className="py-3 px-2 font-bold text-rose-600">{r.mortalityCount}</td>
                           <td className="py-3 px-2 text-emerald-700 font-bold">{r.remainingChickCount}</td>
                           <td className="py-3 px-2 text-slate-700">{r.feedType}</td>
-                          <td className="py-3 px-2 text-slate-700">{bagsUsed} Bags ({r.feedConsumption} kg)</td>
+                          <td className="py-3 px-2 text-slate-700 font-bold">{bagsUsed} Bags</td>
                           <td className="py-3 px-2 text-right font-bold text-slate-900">{r.averageWeight} g</td>
                         </tr>
                       );

@@ -20,7 +20,6 @@ export const FeedPage = () => {
     driverName: '',
     vehicleNumber: '',
     bagsReceived: 5,
-    quantityReceivedKg: 350,
     date: new Date().toISOString().split('T')[0],
     notes: ''
   });
@@ -68,16 +67,6 @@ export const FeedPage = () => {
     }
   }
 
-  const handleBagsChange = (bagsVal) => {
-    const b = Number(bagsVal) || 0;
-    const calculatedKg = bagsToKg(b, KG_PER_BAG);
-    setFormData({
-      ...formData,
-      bagsReceived: bagsVal,
-      quantityReceivedKg: calculatedKg
-    });
-  };
-
   const selectedBatch = batches.find(b => b.id === selectedBatchId);
   const feedStock = selectedBatch?.feedStock || { 'Pre-Starter': 0, 'Starter': 0, 'Finisher': 0 };
 
@@ -88,8 +77,8 @@ export const FeedPage = () => {
 
     setSaving(true);
     try {
-      const totalKg = Number(formData.quantityReceivedKg) || bagsToKg(formData.bagsReceived, KG_PER_BAG);
-      const bags = Number(formData.bagsReceived) || kgToBags(totalKg, KG_PER_BAG);
+      const bags = Number(formData.bagsReceived) || 0;
+      const totalKg = bagsToKg(bags, KG_PER_BAG);
 
       const feedObj = {
         feedType: formData.feedType,
@@ -105,11 +94,11 @@ export const FeedPage = () => {
       await dbAddFeedArrival(selectedBatch.id, feedObj);
       await dbLogAuditEvent(
         'FEED_ARRIVED',
-        `Received ${bags} bags (${totalKg} kg) of ${formData.feedType} for ${selectedBatch.batchNumber} (Vehicle: ${formData.vehicleNumber})`,
+        `Received ${bags} bags of ${formData.feedType} for ${selectedBatch.batchNumber} (Vehicle: ${formData.vehicleNumber})`,
         userProfile?.name
       );
 
-      setSuccessMsg(`Successfully added ${bags} bags (${totalKg} kg) of ${formData.feedType}!`);
+      setSuccessMsg(`Successfully added ${bags} bags of ${formData.feedType}!`);
       loadFeedArrivals(selectedBatch.id);
       loadBatches();
       setFormData({
@@ -117,7 +106,6 @@ export const FeedPage = () => {
         driverName: '',
         vehicleNumber: '',
         bagsReceived: 5,
-        quantityReceivedKg: 350,
         date: new Date().toISOString().split('T')[0],
         notes: ''
       });
@@ -135,7 +123,7 @@ export const FeedPage = () => {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-slate-900">Feed Stock & Arrival Management</h1>
-          <p className="text-sm font-medium text-slate-500">Log feed bags arrival (70 kg/bag), vehicle numbers, and view live stock KPI cards.</p>
+          <p className="text-sm font-medium text-slate-500">Log incoming feed bags arrival and view live available stock in Bags.</p>
         </div>
         {selectedBatch && (
           <div className="flex items-center gap-2">
@@ -153,7 +141,7 @@ export const FeedPage = () => {
         )}
       </div>
 
-      {/* Dynamic KPI Stock Cards displaying in Bags and Kg */}
+      {/* KPI Stock Cards in Bags */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
           title="1. Pre-Starter Stock"
@@ -207,34 +195,18 @@ export const FeedPage = () => {
               </select>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Bags Received *</label>
-                <input
-                  type="number"
-                  required
-                  min="0.5"
-                  step="0.5"
-                  value={formData.bagsReceived}
-                  onChange={(e) => handleBagsChange(e.target.value)}
-                  placeholder="e.g. 5"
-                  className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600"
-                />
-                <span className="text-[10px] text-slate-400 mt-1 block">1 Bag = 70 kg</span>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Total Weight (kg)</label>
-                <input
-                  type="number"
-                  required
-                  min="1"
-                  step="0.5"
-                  value={formData.quantityReceivedKg}
-                  onChange={(e) => setFormData({ ...formData, quantityReceivedKg: e.target.value, bagsReceived: kgToBags(e.target.value, KG_PER_BAG) })}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-emerald-700"
-                />
-              </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Feed Bags Received *</label>
+              <input
+                type="number"
+                required
+                min="0.5"
+                step="0.5"
+                value={formData.bagsReceived}
+                onChange={(e) => setFormData({ ...formData, bagsReceived: e.target.value })}
+                placeholder="e.g. 5"
+                className="w-full rounded-xl border border-slate-200 py-2.5 px-3 text-sm font-bold text-slate-900 focus:border-emerald-600"
+              />
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -306,10 +278,10 @@ export const FeedPage = () => {
                 <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
                   <th className="pb-3 px-2">Date</th>
                   <th className="pb-3 px-2">Feed Type</th>
-                  <th className="pb-3 px-2">Bags Recv</th>
-                  <th className="pb-3 px-2">Total Weight</th>
+                  <th className="pb-3 px-2">Bags Received</th>
                   <th className="pb-3 px-2">Vehicle #</th>
                   <th className="pb-3 px-2">Driver</th>
+                  <th className="pb-3 px-2">Notes</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
@@ -319,16 +291,15 @@ export const FeedPage = () => {
                   </tr>
                 ) : (
                   feedArrivals.map((f) => {
-                    const totalKg = f.quantityReceivedKg || f.quantityReceived || 0;
-                    const bags = f.bagsReceived || kgToBags(totalKg, KG_PER_BAG);
+                    const bags = f.bagsReceived || kgToBags(f.quantityReceived || 0, KG_PER_BAG);
                     return (
                       <tr key={f.id} className="hover:bg-slate-50">
                         <td className="py-3 px-2 font-bold text-slate-900">{f.date}</td>
                         <td className="py-3 px-2 font-bold text-amber-700">{f.feedType}</td>
                         <td className="py-3 px-2 font-bold text-emerald-700">+{bags} Bags</td>
-                        <td className="py-3 px-2 text-slate-700">+{totalKg} kg</td>
                         <td className="py-3 px-2 text-slate-600">{f.vehicleNumber || '—'}</td>
                         <td className="py-3 px-2 text-slate-600">{f.driverName || '—'}</td>
+                        <td className="py-3 px-2 text-slate-500 text-[11px]">{f.notes || '—'}</td>
                       </tr>
                     );
                   })

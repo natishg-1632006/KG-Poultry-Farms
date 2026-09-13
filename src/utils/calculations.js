@@ -27,14 +27,14 @@ export function kgToBags(kg, kgPerBag = KG_PER_BAG) {
 }
 
 /**
- * Format feed stock string in Bags & Kg
+ * Format feed stock string cleanly in Bags only
  * @param {number} kgAmount 
- * @returns {string} e.g. "7.1 Bags (500 kg)"
+ * @returns {string} e.g. "7.1 Bags"
  */
 export function formatFeedStock(kgAmount) {
   const k = Number(kgAmount) || 0;
-  const bags = (k / KG_PER_BAG).toFixed(1);
-  return `${bags} Bags (${k} kg)`;
+  const bags = parseFloat((k / KG_PER_BAG).toFixed(1));
+  return `${bags} Bags`;
 }
 
 /**
