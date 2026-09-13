@@ -154,20 +154,35 @@ function saveLocalDB(data) {
 export function computeBatchFeedStock(batchId, local = getLocalDB()) {
   const stock = { 'Pre-Starter': 0, 'Starter': 0, 'Finisher': 0 };
 
-  const arrivals = local.feedStocks[batchId] || [];
-  arrivals.forEach(a => {
-    const type = a.feedType || 'Pre-Starter';
-    const kg = Number(a.quantityReceivedKg ?? a.quantityReceived ?? (a.bagsReceived ? Number(a.bagsReceived) * 70 : 0));
-    stock[type] = (stock[type] || 0) + kg;
-  });
+  const arrivals = (local.feedStocks[batchId] || []).map(a => ({
+    eventType: 'ARRIVAL',
+    timeKey: a.createdAt || a.date || '2000-01-01',
+    date: a.date || (a.createdAt ? a.createdAt.split('T')[0] : '2000-01-01'),
+    feedType: a.feedType || 'Pre-Starter',
+    kg: Number(a.quantityReceivedKg ?? a.quantityReceived ?? (a.bagsReceived ? Number(a.bagsReceived) * 70 : 0))
+  }));
 
   const dailyMap = local.dailyRecords[batchId] || {};
-  const recordsSorted = Object.values(dailyMap).sort((a, b) => (a.recordDate || '').localeCompare(b.recordDate || ''));
+  const dailyRecords = Object.values(dailyMap).map(r => ({
+    eventType: 'DAILY_LOG',
+    timeKey: r.createdAt || r.updatedAt || r.recordDate || '2000-01-01',
+    date: r.recordDate || (r.createdAt ? r.createdAt.split('T')[0] : '2000-01-01'),
+    kg: Number(r.feedConsumption || 0)
+  }));
 
-  recordsSorted.forEach(r => {
-    const kg = Number(r.feedConsumption || 0);
-    if (kg > 0) {
-      const deductionResult = deductFeedStock(stock, null, kg);
+  const events = [...arrivals, ...dailyRecords].sort((a, b) => {
+    if (a.date !== b.date) {
+      return a.date.localeCompare(b.date);
+    }
+    return (a.timeKey || '').localeCompare(b.timeKey || '');
+  });
+
+  events.forEach(evt => {
+    if (evt.eventType === 'ARRIVAL') {
+      const fType = evt.feedType || 'Pre-Starter';
+      stock[fType] = (stock[fType] || 0) + evt.kg;
+    } else if (evt.eventType === 'DAILY_LOG' && evt.kg > 0) {
+      const deductionResult = deductFeedStock(stock, null, evt.kg);
       stock['Pre-Starter'] = deductionResult.updatedStock['Pre-Starter'];
       stock['Starter'] = deductionResult.updatedStock['Starter'];
       stock['Finisher'] = deductionResult.updatedStock['Finisher'];
