@@ -28,6 +28,7 @@ export const DailyRecordsPage = () => {
     recordDate: todayStr,
     mortalityCount: '',
     feedConsumptionBags: '',
+    additionalLooseKg: '',
     averageWeight: ''
   });
 
@@ -71,11 +72,13 @@ export const DailyRecordsPage = () => {
       setRecordsMap(map || {});
       if (map && map[todayStr]) {
         const r = map[todayStr];
-        const bags = Math.max(1, Math.round(r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG)));
+        const bags = r.feedConsumptionBags !== undefined ? r.feedConsumptionBags : (r.feedConsumption ? Math.floor(r.feedConsumption / KG_PER_BAG) : '');
+        const looseKg = r.additionalLooseKg !== undefined && r.additionalLooseKg !== null ? r.additionalLooseKg : (r.feedConsumption ? parseFloat((r.feedConsumption % KG_PER_BAG).toFixed(1)) : '');
         setFormData({
           recordDate: r.recordDate,
           mortalityCount: r.mortalityCount !== undefined ? r.mortalityCount : '',
-          feedConsumptionBags: bags,
+          feedConsumptionBags: bags !== 0 ? bags : '',
+          additionalLooseKg: looseKg > 0 ? looseKg : '',
           averageWeight: r.averageWeight !== undefined ? r.averageWeight : ''
         });
       } else {
@@ -83,6 +86,7 @@ export const DailyRecordsPage = () => {
           recordDate: todayStr,
           mortalityCount: '',
           feedConsumptionBags: '',
+          additionalLooseKg: '',
           averageWeight: ''
         });
       }
@@ -101,6 +105,7 @@ export const DailyRecordsPage = () => {
       recordDate: todayStr,
       mortalityCount: '',
       feedConsumptionBags: '',
+      additionalLooseKg: '',
       averageWeight: ''
     });
     setShowForm(true);
@@ -110,11 +115,13 @@ export const DailyRecordsPage = () => {
     setErrorMsg('');
     setSuccessMsg('');
     setShowForm(true);
-    const bags = Math.max(1, Math.round(record.feedConsumptionBags || kgToBags(record.feedConsumption || 0, KG_PER_BAG)));
+    const bags = record.feedConsumptionBags !== undefined ? record.feedConsumptionBags : (record.feedConsumption ? Math.floor(record.feedConsumption / KG_PER_BAG) : '');
+    const looseKg = record.additionalLooseKg !== undefined && record.additionalLooseKg !== null ? record.additionalLooseKg : (record.feedConsumption ? parseFloat((record.feedConsumption % KG_PER_BAG).toFixed(1)) : '');
     setFormData({
       recordDate: record.recordDate,
       mortalityCount: record.mortalityCount !== undefined ? record.mortalityCount : '',
-      feedConsumptionBags: bags,
+      feedConsumptionBags: bags !== 0 ? bags : '',
+      additionalLooseKg: looseKg > 0 ? looseKg : '',
       averageWeight: record.averageWeight !== undefined ? record.averageWeight : ''
     });
   };
@@ -143,11 +150,13 @@ export const DailyRecordsPage = () => {
 
     if (recordsMap && recordsMap[newDate]) {
       const existing = recordsMap[newDate];
-      const bags = Math.max(1, Math.round(existing.feedConsumptionBags || kgToBags(existing.feedConsumption || 0, KG_PER_BAG)));
+      const bags = existing.feedConsumptionBags !== undefined ? existing.feedConsumptionBags : (existing.feedConsumption ? Math.floor(existing.feedConsumption / KG_PER_BAG) : '');
+      const looseKg = existing.additionalLooseKg !== undefined && existing.additionalLooseKg !== null ? existing.additionalLooseKg : (existing.feedConsumption ? parseFloat((existing.feedConsumption % KG_PER_BAG).toFixed(1)) : '');
       setFormData({
         recordDate: newDate,
         mortalityCount: existing.mortalityCount !== undefined ? existing.mortalityCount : '',
-        feedConsumptionBags: bags,
+        feedConsumptionBags: bags !== 0 ? bags : '',
+        additionalLooseKg: looseKg > 0 ? looseKg : '',
         averageWeight: existing.averageWeight !== undefined ? existing.averageWeight : ''
       });
     } else {
@@ -155,6 +164,7 @@ export const DailyRecordsPage = () => {
         recordDate: newDate,
         mortalityCount: '',
         feedConsumptionBags: '',
+        additionalLooseKg: '',
         averageWeight: ''
       });
     }
@@ -198,8 +208,14 @@ export const DailyRecordsPage = () => {
       return;
     }
 
-    const totalBags = Math.max(1, Math.round(Number(formData.feedConsumptionBags)));
-    const totalKg = bagsToKg(totalBags, KG_PER_BAG);
+    const bags = Number(formData.feedConsumptionBags || 0);
+    const looseKg = Number(formData.additionalLooseKg || 0);
+    const totalKg = (bags * KG_PER_BAG) + looseKg;
+
+    if (bags <= 0 && looseKg <= 0) {
+      setErrorMsg('Please enter valid feed consumption (at least 1 whole bag or loose kg).');
+      return;
+    }
 
     const currentFeedStock = selectedBatch.feedStock || { 'Pre-Starter': 0, 'Starter': 0, 'Finisher': 0 };
     const totalAvailableKg = (Number(currentFeedStock['Pre-Starter']) || 0) + (Number(currentFeedStock['Starter']) || 0) + (Number(currentFeedStock['Finisher']) || 0);
@@ -213,7 +229,7 @@ export const DailyRecordsPage = () => {
 
     // Stock availability validation
     if (effectiveAvailableKg < totalKg) {
-      setErrorMsg(`Insufficient feed stock available in farm pool! Available: ${effectiveAvailableBags.toFixed(1)} Bags. Requested: ${totalBags} Bags. Please receive feed stock first.`);
+      setErrorMsg(`Insufficient feed stock available in farm pool! Available: ${effectiveAvailableBags.toFixed(1)} Bags (${effectiveAvailableKg} kg). Requested: ${bags} Bags${looseKg > 0 ? ` & ${looseKg} kg` : ''} (${totalKg} kg). Please receive feed stock first.`);
       return;
     }
 
@@ -235,7 +251,8 @@ export const DailyRecordsPage = () => {
         mortalityCount: Number(formData.mortalityCount),
         feedType: autoFeedType,
         feedConsumption: totalKg,
-        feedConsumptionBags: totalBags,
+        feedConsumptionBags: bags,
+        additionalLooseKg: looseKg,
         averageWeight: weightVal,
         remainingChickCount: calculatedRemaining,
         recordedBy: userProfile?.name || 'Farmer',
@@ -247,7 +264,7 @@ export const DailyRecordsPage = () => {
 
       await dbLogAuditEvent(
         'DAILY_RECORD_SAVED',
-        `Logged daily record for ${selectedBatch.batchNumber} on ${formData.recordDate} (Mortality: ${formData.mortalityCount}, Feed: ${totalBags} Bags, Weight: ${weightVal}g)`,
+        `Logged daily record for ${selectedBatch.batchNumber} on ${formData.recordDate} (Mortality: ${formData.mortalityCount}, Feed: ${bags} Bags ${looseKg > 0 ? `& ${looseKg} kg` : ''}, Weight: ${weightVal}g)`,
         userProfile?.name
       );
 
@@ -313,8 +330,9 @@ export const DailyRecordsPage = () => {
     }
     lastRecordTargetGram = FEED_CONSUMPTION_TARGETS[lastRecordFlockAgeDay] || 20;
     lastRecordTargetWeightGram = AVERAGE_WEIGHT_TARGETS[lastRecordFlockAgeDay] || 58;
-    lastRecordBags = Math.max(1, Math.round(lastRecord.feedConsumptionBags || kgToBags(lastRecord.feedConsumption || 0, KG_PER_BAG)));
-    lastRecordTotalKg = lastRecordBags * KG_PER_BAG; // 1 Bag = 70 kg
+    lastRecordBags = lastRecord.feedConsumptionBags !== undefined ? lastRecord.feedConsumptionBags : (lastRecord.feedConsumption ? Math.floor(lastRecord.feedConsumption / KG_PER_BAG) : 0);
+    const lastRecordLooseKg = lastRecord.additionalLooseKg || (lastRecord.feedConsumption ? parseFloat((lastRecord.feedConsumption % KG_PER_BAG).toFixed(1)) : 0);
+    lastRecordTotalKg = Number(lastRecord.feedConsumption || ((lastRecordBags * KG_PER_BAG) + lastRecordLooseKg));
     const chicksCount = Number(lastRecord.remainingChickCount || selectedBatch?.remainingChickCount || selectedBatch?.initialChickCount || 5000);
     lastRecordPerBirdGram = chicksCount > 0 ? Math.round((lastRecordTotalKg * 1000) / chicksCount) : 0;
     lastRecordWeightDiff = Number(lastRecord.averageWeight || 0) - lastRecordTargetWeightGram;
@@ -323,6 +341,7 @@ export const DailyRecordsPage = () => {
   // Compute viewingRecord breakdown metrics for popup modal
   let viewingAgeDay = 1;
   let viewingBags = 0;
+  let viewingLooseKg = 0;
   let viewingTotalKg = 0;
   let viewingChicks = 0;
   let viewingPerBirdEat = 0;
@@ -340,8 +359,9 @@ export const DailyRecordsPage = () => {
     }
     viewingTargetIntake = FEED_CONSUMPTION_TARGETS[viewingAgeDay] || 20;
     viewingTargetWeight = AVERAGE_WEIGHT_TARGETS[viewingAgeDay] || 58;
-    viewingBags = Math.max(1, Math.round(viewingRecord.feedConsumptionBags || kgToBags(viewingRecord.feedConsumption || 0, KG_PER_BAG)));
-    viewingTotalKg = viewingBags * KG_PER_BAG;
+    viewingBags = viewingRecord.feedConsumptionBags !== undefined ? viewingRecord.feedConsumptionBags : (viewingRecord.feedConsumption ? Math.floor(viewingRecord.feedConsumption / KG_PER_BAG) : 0);
+    viewingLooseKg = viewingRecord.additionalLooseKg || (viewingRecord.feedConsumption ? parseFloat((viewingRecord.feedConsumption % KG_PER_BAG).toFixed(1)) : 0);
+    viewingTotalKg = Number(viewingRecord.feedConsumption || ((viewingBags * KG_PER_BAG) + viewingLooseKg));
     viewingChicks = Number(viewingRecord.remainingChickCount || selectedBatch?.remainingChickCount || selectedBatch?.initialChickCount || 5000);
     viewingPerBirdEat = viewingChicks > 0 ? Math.round((viewingTotalKg * 1000) / viewingChicks) : 0;
     viewingEatDiff = viewingPerBirdEat - viewingTargetIntake;
@@ -454,13 +474,13 @@ export const DailyRecordsPage = () => {
           statsBreakdown={
             lastRecord
               ? [
-                  { label: 'CONSUMED', value: `${lastRecordBags} Bags`, labelColor: 'text-emerald-600', valueColor: 'text-slate-900' },
+                  { label: 'CONSUMED', value: `${lastRecordBags} Bags${lastRecordLooseKg > 0 ? ` & ${lastRecordLooseKg}k` : ''}`, labelColor: 'text-emerald-600', valueColor: 'text-slate-900' },
                   { label: 'EAT / BIRD', value: `${lastRecordPerBirdGram} g`, labelColor: 'text-orange-600', valueColor: 'text-orange-600' },
                   { label: 'TARGET', value: `${lastRecordTargetGram} g`, labelColor: 'text-blue-600', valueColor: 'text-blue-600' }
                 ]
               : null
           }
-          value={lastRecord ? `${lastRecordBags} Bags (${lastRecordPerBirdGram} g/bird)` : '0 Bags'}
+          value={lastRecord ? `${lastRecordBags} Bags${lastRecordLooseKg > 0 ? ` & ${lastRecordLooseKg} kg` : ''} (${lastRecordPerBirdGram} g/bird)` : '0 Bags'}
           subtext={lastRecord ? `Day ${lastRecordFlockAgeDay} Target: ${lastRecordTargetGram} g/bird (${lastRecord.recordDate})` : 'No feed logged'}
           icon={Package}
           color="blue"
@@ -545,22 +565,53 @@ export const DailyRecordsPage = () => {
 
           <div>
             <div className="flex items-center justify-between mb-1 gap-2">
-              <label className="block text-xs font-bold text-slate-700">Feed Bags Used *</label>
+              <label className="block text-xs font-bold text-slate-700">Feed Consumption *</label>
               <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 whitespace-nowrap shrink-0">
                 Target: ~{recommendedBags} Bags ({targetGramPerBird}g/bird)
               </span>
             </div>
-            <input
-              type="number"
-              required
-              min="1"
-              step="1"
-              disabled={isReadOnly}
-              value={formData.feedConsumptionBags}
-              onChange={(e) => setFormData({ ...formData, feedConsumptionBags: e.target.value })}
-              placeholder="e.g. 2"
-              className="w-full rounded-xl border border-slate-200 py-2.5 px-3 text-sm font-bold text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
-            />
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Feed Bags Used (Whole Bags) *</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  disabled={isReadOnly}
+                  value={formData.feedConsumptionBags}
+                  onChange={(e) => setFormData({ ...formData, feedConsumptionBags: e.target.value })}
+                  placeholder="e.g. 2"
+                  className="w-full rounded-xl border border-slate-200 py-2 px-3 text-sm font-bold text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Loose Feed (Kg) (Optional)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="69"
+                  step="0.5"
+                  disabled={isReadOnly}
+                  value={formData.additionalLooseKg}
+                  onChange={(e) => setFormData({ ...formData, additionalLooseKg: e.target.value })}
+                  placeholder="e.g. 15"
+                  className="w-full rounded-xl border border-slate-200 py-2 px-3 text-sm font-bold text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
+                />
+              </div>
+            </div>
+
+            <div className="mt-2 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 border border-slate-200 text-xs">
+              <span className="text-slate-500 font-bold">Total Feed Consumed:</span>
+              <span className="font-black text-emerald-700">
+                {Number(formData.feedConsumptionBags || 0)} Bags
+                {Number(formData.additionalLooseKg || 0) > 0 ? ` & ${formData.additionalLooseKg} kg` : ''}
+                <span className="ml-1 text-[11px] font-semibold text-slate-500">
+                  ({(Number(formData.feedConsumptionBags || 0) * KG_PER_BAG) + Number(formData.additionalLooseKg || 0)} kg total)
+                </span>
+              </span>
+            </div>
           </div>
 
           <div>
@@ -635,7 +686,9 @@ export const DailyRecordsPage = () => {
 
               <div className="rounded-xl bg-blue-50/70 p-3 border border-blue-200/60 text-center">
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 block mb-0.5">Feed Consumed</span>
-                <span className="text-base sm:text-lg font-black text-blue-900 block">{viewingBags} Bags</span>
+                <span className="text-base sm:text-lg font-black text-blue-900 block">
+                  {viewingBags} Bags{viewingLooseKg > 0 ? ` & ${viewingLooseKg} kg` : ''}
+                </span>
                 <span className="text-[10px] font-medium text-blue-700 block mt-0.5">({viewingTotalKg} kg total)</span>
               </div>
 
@@ -776,8 +829,9 @@ export const DailyRecordsPage = () => {
                 </tr>
               ) : (
                 paginatedRecords.map((r) => {
-                  const bags = Math.max(1, Math.round(r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG)));
-                  const totalKg = bags * KG_PER_BAG;
+                  const bags = r.feedConsumptionBags !== undefined ? r.feedConsumptionBags : (r.feedConsumption ? Math.floor(r.feedConsumption / KG_PER_BAG) : 0);
+                  const looseKg = r.additionalLooseKg !== undefined && r.additionalLooseKg !== null ? r.additionalLooseKg : (r.feedConsumption ? parseFloat((r.feedConsumption % KG_PER_BAG).toFixed(1)) : 0);
+                  const totalKg = Number(r.feedConsumption || ((bags * KG_PER_BAG) + looseKg));
                   const chickCount = Number(r.remainingChickCount || selectedBatch?.remainingChickCount || selectedBatch?.initialChickCount || 5000);
                   const perBirdEat = chickCount > 0 ? Math.round((totalKg * 1000) / chickCount) : 0;
 
@@ -801,8 +855,8 @@ export const DailyRecordsPage = () => {
                     >
                       <td className="p-3 font-bold text-slate-900" title={r.recordDate}>{r.recordDate}</td>
                       <td className="p-3 font-bold text-rose-600" title={r.mortalityCount}>{r.mortalityCount}</td>
-                      <td className="p-3 text-slate-700 font-bold" title={`${bags} Bags (${perBirdEat} g/bird)`}>
-                        {bags} Bags <span className="text-[10px] font-normal text-slate-500">({perBirdEat}g/bird)</span>
+                      <td className="p-3 text-slate-700 font-bold" title={`${bags} Bags${looseKg > 0 ? ` & ${looseKg} kg` : ''} (${perBirdEat} g/bird)`}>
+                        {bags} Bags{looseKg > 0 ? <span className="text-slate-500 font-normal"> & {looseKg} kg</span> : null} <span className="text-[10px] font-normal text-slate-500">({perBirdEat}g/bird)</span>
                       </td>
                       <td className="p-3 font-bold text-slate-900" title={`${r.averageWeight} g (Target: ${rTargetWeight}g, Diff: ${rDiffStr})`}>
                         {r.averageWeight} g <span className={`text-[10px] font-semibold ${rWeightDiff < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>({rDiffStr})</span>

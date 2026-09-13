@@ -171,14 +171,17 @@ export const FarmerDashboard = () => {
                     </tr>
                   ) : (
                     records.map((r) => {
-                      const bagsUsed = r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG);
+                      const bagsUsed = r.feedConsumptionBags !== undefined ? r.feedConsumptionBags : (r.feedConsumption ? Math.floor(r.feedConsumption / KG_PER_BAG) : 0);
+                      const looseKg = r.additionalLooseKg !== undefined && r.additionalLooseKg !== null ? r.additionalLooseKg : (r.feedConsumption ? parseFloat((r.feedConsumption % KG_PER_BAG).toFixed(1)) : 0);
                       return (
                         <tr key={r.recordDate} className="hover:bg-slate-50">
                           <td className="py-3 px-2 font-bold text-slate-900">{r.recordDate}</td>
                           <td className="py-3 px-2 font-bold text-rose-600">{r.mortalityCount}</td>
                           <td className="py-3 px-2 text-emerald-700 font-bold">{r.remainingChickCount}</td>
                           <td className="py-3 px-2 text-slate-700">{r.feedType}</td>
-                          <td className="py-3 px-2 text-slate-700 font-bold">{bagsUsed} Bags</td>
+                          <td className="py-3 px-2 text-slate-700 font-bold">
+                            {bagsUsed} Bags{looseKg > 0 ? <span className="text-slate-500 font-normal"> & {looseKg} kg</span> : null}
+                          </td>
                           <td className="py-3 px-2 text-right font-bold text-slate-900">{r.averageWeight} g</td>
                         </tr>
                       );
