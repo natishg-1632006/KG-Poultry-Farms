@@ -246,14 +246,16 @@ export const DispatchPage = () => {
         userProfile?.name
       );
 
-      setSuccessMsg(`Vehicle ${payload.vehicleNumber} details saved successfully!`);
+      setSuccessMsg(`Vehicle ${payload.vehicleNumber} setup updated! Target box count: ${payload.totalBoxCount} boxes.`);
       setActiveDispatch(saved);
       setShowHeaderForm(false);
       await loadDispatchesForBatch(selectedBatch.id);
 
       setViewMode('detail');
-      setShowSetForm(true);
       await loadBoxSetsForDispatch(saved.id, saved);
+      
+      // Auto open Create Set Popup pre-filled for extra boxes
+      setShowSetForm(true);
     } catch (err) {
       alert('Failed saving dispatch details: ' + err.message);
     } finally {
@@ -273,9 +275,29 @@ export const DispatchPage = () => {
   };
 
   const handleOpenCreateSetForm = () => {
-    setEditingBoxSetId(null);
     const currentWeighedBoxes = boxSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
     const totalHeaderBoxes = activeDispatch?.totalBoxCount || 20;
+
+    // VALIDATION: If all target boxes are already weighed, prompt user to update Total Box Count first
+    if (currentWeighedBoxes >= totalHeaderBoxes) {
+      if (confirm(
+        `All ${totalHeaderBoxes} target boxes for Vehicle ${activeDispatch?.vehicleNumber} have already been weighed (${currentWeighedBoxes} / ${totalHeaderBoxes} boxes).\n\nTo add extra box sets, click OK to update the Vehicle Total Box Count first.`
+      )) {
+        setDispatchHeader({
+          vehicleName: activeDispatch.vehicleName || '',
+          vehicleNumber: activeDispatch.vehicleNumber || '',
+          driverName: activeDispatch.driverName || '',
+          driverMobileNumber: activeDispatch.driverMobileNumber || '',
+          dispatchDate: activeDispatch.dispatchDate || new Date().toISOString().split('T')[0],
+          totalBoxCount: totalHeaderBoxes + 5, // Auto-suggest adding +5 extra boxes!
+          chickenCountPerBox: activeDispatch.chickenCountPerBox || 12
+        });
+        setShowHeaderForm(true);
+      }
+      return;
+    }
+
+    setEditingBoxSetId(null);
     const remainingBoxes = Math.max(0, totalHeaderBoxes - currentWeighedBoxes);
     const defaultBoxesInSet = remainingBoxes > 0 ? Math.min(5, remainingBoxes) : 5;
     const perBoxCount = activeDispatch?.chickenCountPerBox || 12;
@@ -1246,7 +1268,7 @@ export const DispatchPage = () => {
         </Modal>
       )}
 
-      {/* Vehicle Header Form Modal (Create / Edit Vehicle Card) */}
+      {/* Vehicle Header Form Modal (Create / Edit Vehicle Card Setup) */}
       <Modal
         isOpen={showHeaderForm}
         onClose={() => setShowHeaderForm(false)}
@@ -1324,6 +1346,7 @@ export const DispatchPage = () => {
                 onChange={(e) => setDispatchHeader({ ...dispatchHeader, totalBoxCount: Number(e.target.value) })}
                 className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
               />
+              <span className="text-[10px] text-emerald-700 font-medium block mt-0.5">Increase count here to add extra box sets</span>
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Birds Per Box *</label>
@@ -1352,7 +1375,7 @@ export const DispatchPage = () => {
               className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
             >
               <Save className="h-4 w-4" />
-              {saving ? 'Saving Card...' : activeDispatch ? 'Update Setup' : 'Save & Open Vehicle Page'}
+              {saving ? 'Saving Setup...' : activeDispatch ? 'Update Setup & Create Extra Set' : 'Save & Open Vehicle Page'}
             </button>
           </div>
         </form>
