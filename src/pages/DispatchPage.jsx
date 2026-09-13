@@ -32,7 +32,8 @@ import {
   ArrowLeft,
   X,
   AlertCircle,
-  Filter
+  Filter,
+  ArrowUpDown
 } from 'lucide-react';
 
 export const DispatchPage = () => {
@@ -47,6 +48,11 @@ export const DispatchPage = () => {
   const [activeDispatch, setActiveDispatch] = useState(null);
   const [boxSets, setBoxSets] = useState([]);
   const [setFilter, setSetFilter] = useState('all'); // 'all' | 'pending' | 'loaded'
+  const [setSortBy, setSetSortBy] = useState('pending_first'); // 'pending_first' | 'last_updated' | 'box_asc' | 'box_desc' | 'boxes_count' | 'weight_desc'
+
+  // Vehicle Cards Grid Filters & Sort
+  const [gridFilter, setGridFilter] = useState('all'); // 'all' | 'in_progress' | 'completed'
+  const [gridSortBy, setGridSortBy] = useState('last_updated'); // 'last_updated' | 'vehicle_asc' | 'progress_desc'
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -348,7 +354,8 @@ export const DispatchPage = () => {
         chickenCount: Number(setForm.chickenCount),
         totalChickenWeight: setWeights.totalChickenWeight,
         averageChickenWeight: setWeights.averageChickenWeight,
-        isPendingLoad: setWeights.isPendingLoad
+        isPendingLoad: setWeights.isPendingLoad,
+        savedAt: new Date().toISOString()
       };
 
       await dbSaveBoxSet(activeDispatch.id, setPayload);
@@ -440,7 +447,8 @@ export const DispatchPage = () => {
         loadedWeight: grossVal,
         totalChickenWeight: setWeights.totalChickenWeight,
         averageChickenWeight: setWeights.averageChickenWeight,
-        isPendingLoad: false
+        isPendingLoad: false,
+        savedAt: new Date().toISOString()
       };
 
       await dbSaveBoxSet(activeDispatch.id, setPayload);
@@ -549,8 +557,27 @@ export const DispatchPage = () => {
   const totalNetWeight = loadedBoxSets.reduce((acc, s) => acc + (Number(s.totalChickenWeight) || 0), 0);
   const avgBirdWeight = totalDispatchedBirds > 0 ? parseFloat((totalNetWeight / totalDispatchedBirds).toFixed(3)) : 0;
 
-  // SORTING: Place Pending Sets AT THE TOP so workers can quickly find and update them!
+  // SORTING & FILTERING ENGINE FOR BOX SETS
   const sortedBoxSets = [...boxSets].sort((a, b) => {
+    if (setSortBy === 'last_updated') {
+      const timeA = new Date(a.savedAt || a.updatedAt || 0).getTime();
+      const timeB = new Date(b.savedAt || b.updatedAt || 0).getTime();
+      if (timeA !== timeB) return timeB - timeA;
+      return (b.boxSetNumber || 0) - (a.boxSetNumber || 0);
+    }
+    if (setSortBy === 'box_asc') {
+      return (a.boxSetNumber || 0) - (b.boxSetNumber || 0);
+    }
+    if (setSortBy === 'box_desc') {
+      return (b.boxSetNumber || 0) - (a.boxSetNumber || 0);
+    }
+    if (setSortBy === 'boxes_count') {
+      return (b.boxesInSet || 0) - (a.boxesInSet || 0);
+    }
+    if (setSortBy === 'weight_desc') {
+      return (b.totalChickenWeight || 0) - (a.totalChickenWeight || 0);
+    }
+    // Default: 'pending_first' (Pending sets float to top, then Box Set #)
     const aPending = !a.loadedWeight || Number(a.loadedWeight) <= 0;
     const bPending = !b.loadedWeight || Number(b.loadedWeight) <= 0;
     if (aPending && !bPending) return -1;
@@ -565,6 +592,32 @@ export const DispatchPage = () => {
     if (setFilter === 'loaded') return !isPending;
     return true;
   });
+
+  // VEHICLE CARDS GRID FILTERING & SORTING ENGINE
+  const filteredDispatches = dispatches
+    .filter(d => {
+      if (gridFilter === 'in_progress') return d.status !== 'Completed';
+      if (gridFilter === 'completed') return d.status === 'Completed';
+      return true;
+    })
+    .sort((a, b) => {
+      if (gridSortBy === 'vehicle_asc') {
+        return (a.vehicleNumber || '').localeCompare(b.vehicleNumber || '');
+      }
+      if (gridSortBy === 'progress_desc') {
+        const aSets = allBoxSetsMap[a.id] || [];
+        const bSets = allBoxSetsMap[b.id] || [];
+        const aBoxes = aSets.filter(s => Number(s.loadedWeight) > 0).reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
+        const bBoxes = bSets.filter(s => Number(s.loadedWeight) > 0).reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
+        const aPct = aBoxes / (a.totalBoxCount || 1);
+        const bPct = bBoxes / (b.totalBoxCount || 1);
+        return bPct - aPct;
+      }
+      // Default: 'last_updated'
+      const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+      const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+      return timeB - timeA;
+    });
 
   if (loading) return <div className="p-8 text-center text-slate-500 font-semibold">Loading Dispatch Management...</div>;
 
@@ -639,17 +692,67 @@ export const DispatchPage = () => {
               </button>
             </div>
           ) : (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xs sm:text-sm font-bold text-slate-700 flex items-center gap-2">
-                  <Truck className="h-4 w-4 text-emerald-600" />
-                  <span>Active Vehicle Cards ({dispatches.length})</span>
-                </h2>
-                <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">Click card to open set weighing page</span>
+            <div className="space-y-3">
+              <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <h2 className="text-xs sm:text-sm font-bold text-slate-800">
+                    Vehicle Cards ({filteredDispatches.length})
+                  </h2>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Grid Filter Bar */}
+                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0">
+                    <button
+                      onClick={() => setGridFilter('all')}
+                      className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
+                        gridFilter === 'all' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      All ({dispatches.length})
+                    </button>
+                    <button
+                      onClick={() => setGridFilter('in_progress')}
+                      className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
+                        gridFilter === 'in_progress' ? 'bg-amber-500 text-white shadow-2xs' : 'text-amber-700 hover:text-amber-900'
+                      }`}
+                    >
+                      In Progress ({dispatches.filter(d => d.status !== 'Completed').length})
+                    </button>
+                    <button
+                      onClick={() => setGridFilter('completed')}
+                      className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
+                        gridFilter === 'completed' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-emerald-700 hover:text-emerald-900'
+                      }`}
+                    >
+                      Completed ({dispatches.filter(d => d.status === 'Completed').length})
+                    </button>
+                  </div>
+
+                  {/* Grid Sort Select */}
+                  <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-xl">
+                    <ArrowUpDown className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                    <select
+                      value={gridSortBy}
+                      onChange={(e) => setGridSortBy(e.target.value)}
+                      className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
+                    >
+                      <option value="last_updated">Sort: Last Updated</option>
+                      <option value="vehicle_asc">Sort: Vehicle #</option>
+                      <option value="progress_desc">Sort: Progress %</option>
+                    </select>
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-                {dispatches.map((d) => {
+              {filteredDispatches.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400">
+                  No dispatches found matching the filter "{gridFilter}".
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                  {filteredDispatches.map((d) => {
                   const dSets = allBoxSetsMap[d.id] || [];
                   const loadedSets = dSets.filter(s => Number(s.loadedWeight) > 0);
                   const weighedBoxes = dSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
@@ -782,10 +885,11 @@ export const DispatchPage = () => {
                   );
                 })}
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
+      </div>
+    )}
 
       {/* VIEW 2: DEDICATED VEHICLE SET WEIGHING PAGE */}
       {viewMode === 'detail' && activeDispatch && (
@@ -883,36 +987,55 @@ export const DispatchPage = () => {
                   <span>Box Sets History</span>
                 </h3>
                 <p className="text-xs font-medium text-slate-500 mt-0.5">
-                  Vehicle: {activeDispatch.vehicleNumber} • Pending sets automatically appear at the top!
+                  Vehicle: {activeDispatch.vehicleNumber} • Filter & sort box set records below
                 </p>
               </div>
 
-              {/* Filter Tabs Bar */}
-              <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl shrink-0 self-start sm:self-auto">
-                <button
-                  onClick={() => setSetFilter('all')}
-                  className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
-                    setFilter === 'all' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  All ({boxSets.length})
-                </button>
-                <button
-                  onClick={() => setSetFilter('pending')}
-                  className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
-                    setFilter === 'pending' ? 'bg-amber-500 text-white shadow-2xs' : 'text-amber-700 hover:text-amber-900'
-                  }`}
-                >
-                  Pending ({pendingBoxSets.length})
-                </button>
-                <button
-                  onClick={() => setSetFilter('loaded')}
-                  className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
-                    setFilter === 'loaded' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-emerald-700 hover:text-emerald-900'
-                  }`}
-                >
-                  Loaded ({loadedBoxSets.length})
-                </button>
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Filter Tabs Bar */}
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0 self-start sm:self-auto">
+                  <button
+                    onClick={() => setSetFilter('all')}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                      setFilter === 'all' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    All ({boxSets.length})
+                  </button>
+                  <button
+                    onClick={() => setSetFilter('pending')}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                      setFilter === 'pending' ? 'bg-amber-500 text-white shadow-2xs' : 'text-amber-700 hover:text-amber-900'
+                    }`}
+                  >
+                    Pending ({pendingBoxSets.length})
+                  </button>
+                  <button
+                    onClick={() => setSetFilter('loaded')}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                      setFilter === 'loaded' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-emerald-700 hover:text-emerald-900'
+                    }`}
+                  >
+                    Loaded ({loadedBoxSets.length})
+                  </button>
+                </div>
+
+                {/* Sort Dropdown */}
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-xl">
+                  <ArrowUpDown className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                  <select
+                    value={setSortBy}
+                    onChange={(e) => setSetSortBy(e.target.value)}
+                    className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
+                  >
+                    <option value="pending_first">Sort: Pending First</option>
+                    <option value="last_updated">Sort: Last Updated</option>
+                    <option value="box_asc">Sort: Set # (1 → N)</option>
+                    <option value="box_desc">Sort: Set # (N → 1)</option>
+                    <option value="boxes_count">Sort: Box Count (High → Low)</option>
+                    <option value="weight_desc">Sort: Net Wt (High → Low)</option>
+                  </select>
+                </div>
               </div>
             </div>
 

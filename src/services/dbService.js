@@ -562,10 +562,33 @@ export async function dbSaveDispatch(dispatchData) {
   return record;
 }
 
+export async function dbDeleteInvoiceByDispatchId(dispatchId) {
+  try {
+    const snap = await withTimeout(get(ref(db, 'invoices')));
+    if (snap.exists()) {
+      const data = snap.val();
+      for (const [key, inv] of Object.entries(data)) {
+        if (inv && (inv.dispatchId === dispatchId || inv.id === dispatchId)) {
+          await withTimeout(remove(ref(db, `invoices/${key}`)));
+        }
+      }
+    }
+  } catch (_err) {
+    // fallback
+  }
+
+  const local = getLocalDB();
+  if (local.invoices && Array.isArray(local.invoices)) {
+    local.invoices = local.invoices.filter(inv => inv.dispatchId !== dispatchId && inv.id !== dispatchId);
+  }
+  saveLocalDB(local);
+}
+
 export async function dbDeleteDispatch(dispatchId) {
   try {
     await withTimeout(remove(ref(db, `dispatches/${dispatchId}`)));
     await withTimeout(remove(ref(db, `boxSets/${dispatchId}`)));
+    await dbDeleteInvoiceByDispatchId(dispatchId);
   } catch (_err) {
     // fallback
   }
@@ -573,6 +596,9 @@ export async function dbDeleteDispatch(dispatchId) {
   const local = getLocalDB();
   delete local.dispatches[dispatchId];
   delete local.boxSets[dispatchId];
+  if (local.invoices && Array.isArray(local.invoices)) {
+    local.invoices = local.invoices.filter(inv => inv.dispatchId !== dispatchId && inv.id !== dispatchId);
+  }
   saveLocalDB(local);
 }
 
