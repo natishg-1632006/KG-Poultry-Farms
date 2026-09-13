@@ -196,6 +196,7 @@ export const FeedPage = () => {
         <StatCard
           title="1. Pre-Starter Stock"
           value={`${preAvailableBags} Bags`}
+          valueLabel="Available Stock"
           availableValue={`${preAvailableBags} Bags`}
           consumedValue={`${preConsumedBags} Bags`}
           arrivedValue={`${preArrivedBags} Bags`}
@@ -206,6 +207,7 @@ export const FeedPage = () => {
         <StatCard
           title="2. Starter Stock"
           value={`${starterAvailableBags} Bags`}
+          valueLabel="Available Stock"
           availableValue={`${starterAvailableBags} Bags`}
           consumedValue={`${starterConsumedBags} Bags`}
           arrivedValue={`${starterArrivedBags} Bags`}
@@ -216,6 +218,7 @@ export const FeedPage = () => {
         <StatCard
           title="3. Finisher Stock"
           value={`${finisherAvailableBags} Bags`}
+          valueLabel="Available Stock"
           availableValue={`${finisherAvailableBags} Bags`}
           consumedValue={`${finisherConsumedBags} Bags`}
           arrivedValue={`${finisherArrivedBags} Bags`}

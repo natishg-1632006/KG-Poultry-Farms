@@ -57,7 +57,7 @@ export const StatCard = ({
       </div>
       <div className="mt-3 space-y-3">
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Available Stock</span>
+          {valueLabel && <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">{valueLabel}</span>}
           <div className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">{availableValue || value}</div>
         </div>
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { dbGetBatches, dbGetDailyRecords } from '../services/dbService';
+import { dbGetBatches, dbGetDailyRecords, dbGetFeedArrivals } from '../services/dbService';
 import { formatFeedStock, kgToBags } from '../utils/calculations';
 import { KG_PER_BAG } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
@@ -14,6 +14,7 @@ export const FarmerDashboard = () => {
   const [assignedBatches, setAssignedBatches] = useState([]);
   const [activeBatch, setActiveBatch] = useState(null);
   const [records, setRecords] = useState([]);
+  const [feedArrivals, setFeedArrivals] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,8 +36,12 @@ export const FarmerDashboard = () => {
       setActiveBatch(currentActive);
 
       if (currentActive) {
-        const rMap = await dbGetDailyRecords(currentActive.id);
+        const [rMap, fList] = await Promise.all([
+          dbGetDailyRecords(currentActive.id),
+          dbGetFeedArrivals(currentActive.id)
+        ]);
         setRecords(Object.values(rMap).sort((a, b) => b.recordDate.localeCompare(a.recordDate)));
+        setFeedArrivals(fList || []);
       }
     } catch (err) {
       console.error('Failed loading farmer dashboard data:', err);
@@ -53,10 +58,20 @@ export const FarmerDashboard = () => {
   const totalMortality = records.reduce((acc, r) => acc + Number(r.mortalityCount || 0), 0);
   const remainingChicks = Math.max(0, initialChicks - totalMortality);
 
-  const totalFeedBags = records.reduce((acc, r) => {
+  const totalFeedConsumedBags = records.reduce((acc, r) => {
     const bags = r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG);
     return acc + Number(bags || 0);
   }, 0);
+
+  const totalFeedArrivedBags = feedArrivals.reduce((acc, f) => {
+    const bags = Number(f.bagsReceived) || kgToBags(f.quantityReceived || 0, KG_PER_BAG);
+    return acc + Number(bags || 0);
+  }, 0);
+
+  const totalArrivedBagsFinal = Math.max(totalFeedArrivedBags, totalFeedConsumedBags);
+
+  const consumedStr = Number.isInteger(totalFeedConsumedBags) ? totalFeedConsumedBags : parseFloat(totalFeedConsumedBags.toFixed(1));
+  const arrivedStr = Number.isInteger(totalArrivedBagsFinal) ? totalArrivedBagsFinal : parseFloat(totalArrivedBagsFinal.toFixed(1));
 
   const latestRecord = records.length > 0 ? records[0] : null;
   const latestAvgWeight = latestRecord ? Number(latestRecord.averageWeight || 0) : 0;
@@ -107,8 +122,8 @@ export const FarmerDashboard = () => {
             />
             <StatCard
               title="Total Feed Consumed"
-              value={`${totalFeedBags.toFixed(1)} Bags`}
-              subtext="Cumulative feed used"
+              value={`${consumedStr} / ${arrivedStr} Bags`}
+              subtext="Consumed / Total Arrived Bags"
               icon={Wheat}
               color="emerald"
             />
