@@ -400,14 +400,14 @@ export const FeedPage = () => {
           Feed Arrival Log History ({selectedBatch?.batchNumber})
         </h2>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+        <div className="w-full overflow-hidden">
+          <table className="w-full text-left text-xs table-fixed">
             <thead>
-              <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold whitespace-nowrap">
-                <th className="pb-3 px-2 whitespace-nowrap">Date</th>
-                <th className="pb-3 px-2 whitespace-nowrap">Feed Type</th>
-                <th className="pb-3 px-2 whitespace-nowrap">Bags Received</th>
-                <th className="pb-3 px-2 text-right whitespace-nowrap">Actions</th>
+              <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
+                <th className="pb-3 px-1 w-[26%] truncate" title="Date">Date</th>
+                <th className="pb-3 px-1 w-[28%] truncate" title="Feed Type">Feed Type</th>
+                <th className="pb-3 px-1 w-[26%] truncate" title="Bags Received">Bags Received</th>
+                <th className="pb-3 px-1 w-[20%] text-right truncate" title="Actions">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
@@ -422,30 +422,30 @@ export const FeedPage = () => {
                     <tr
                       key={f.id}
                       onClick={() => setViewingDetail(f)}
-                      className="hover:bg-slate-50 cursor-pointer transition-colors whitespace-nowrap"
+                      className="hover:bg-slate-50 cursor-pointer transition-colors"
                     >
-                      <td className="py-3 px-2 font-bold text-slate-900 whitespace-nowrap">{f.date}</td>
-                      <td className="py-3 px-2 font-bold text-emerald-700 whitespace-nowrap">{f.feedType}</td>
-                      <td className="py-3 px-2 font-bold text-emerald-700 whitespace-nowrap">+{bags} Bags</td>
-                      <td className="py-3 px-2 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      <td className="py-3 px-1 font-bold text-slate-900 truncate" title={f.date}>{f.date}</td>
+                      <td className="py-3 px-1 font-bold text-emerald-700 truncate" title={f.feedType}>{f.feedType}</td>
+                      <td className="py-3 px-1 font-bold text-emerald-700 truncate" title={`+${bags} Bags`}>+{bags} Bags</td>
+                      <td className="py-3 px-1 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => setViewingDetail(f)}
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                            className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
                             title="View Arrival Details"
                           >
                             <Eye className="h-3.5 w-3.5" />
                           </button>
                           <button
                             onClick={() => handleEditArrival(f)}
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                            className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
                             title="Edit Arrival"
                           >
                             <Edit className="h-3.5 w-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteArrival(f.id)}
-                            className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
+                            className="rounded-lg p-1 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
                             title="Delete Arrival"
                           >
                             <Trash2 className="h-3.5 w-3.5" />

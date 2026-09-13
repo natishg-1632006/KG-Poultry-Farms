@@ -393,15 +393,15 @@ export const DailyRecordsPage = () => {
           Daily Record Log History ({selectedBatch?.batchNumber})
         </h2>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+        <div className="w-full overflow-hidden">
+          <table className="w-full text-left text-xs table-fixed">
             <thead>
-              <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold whitespace-nowrap">
-                <th className="pb-3 px-2 whitespace-nowrap">Date</th>
-                <th className="pb-3 px-2 whitespace-nowrap">Mortality</th>
-                <th className="pb-3 px-2 whitespace-nowrap">Bags Consumed</th>
-                <th className="pb-3 px-2 whitespace-nowrap">Avg Weight (g)</th>
-                <th className="pb-3 px-2 text-right whitespace-nowrap">Actions</th>
+              <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
+                <th className="pb-3 px-1 w-[24%] truncate" title="Date">Date</th>
+                <th className="pb-3 px-1 w-[16%] truncate" title="Mortality">Mortality</th>
+                <th className="pb-3 px-1 w-[24%] truncate" title="Bags Consumed">Bags Consumed</th>
+                <th className="pb-3 px-1 w-[20%] truncate" title="Avg Weight (g)">Avg Weight</th>
+                <th className="pb-3 px-1 w-[16%] text-right truncate" title="Actions">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
@@ -413,23 +413,23 @@ export const DailyRecordsPage = () => {
                 recordsList.map((r) => {
                   const bags = r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG);
                   return (
-                    <tr key={r.recordDate} className="hover:bg-slate-50 whitespace-nowrap">
-                      <td className="py-3 px-2 font-bold text-slate-900 whitespace-nowrap">{r.recordDate}</td>
-                      <td className="py-3 px-2 font-bold text-rose-600 whitespace-nowrap">{r.mortalityCount}</td>
-                      <td className="py-3 px-2 text-slate-700 font-bold whitespace-nowrap">{bags} Bags</td>
-                      <td className="py-3 px-2 font-bold text-slate-900 whitespace-nowrap">{r.averageWeight} g</td>
-                      <td className="py-3 px-2 text-right whitespace-nowrap">
+                    <tr key={r.recordDate} className="hover:bg-slate-50">
+                      <td className="py-3 px-1 font-bold text-slate-900 truncate" title={r.recordDate}>{r.recordDate}</td>
+                      <td className="py-3 px-1 font-bold text-rose-600 truncate" title={r.mortalityCount}>{r.mortalityCount}</td>
+                      <td className="py-3 px-1 text-slate-700 font-bold truncate" title={`${bags} Bags`}>{bags} Bags</td>
+                      <td className="py-3 px-1 font-bold text-slate-900 truncate" title={`${r.averageWeight} g`}>{r.averageWeight} g</td>
+                      <td className="py-3 px-1 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => handleEditRecord(r)}
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                            className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
                             title="Edit Record"
                           >
                             <Edit className="h-3.5 w-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteRecord(r.recordDate)}
-                            className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
+                            className="rounded-lg p-1 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
                             title="Delete Record"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
