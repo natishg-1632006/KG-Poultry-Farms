@@ -294,6 +294,13 @@ export const DailyRecordsPage = () => {
         title={recordsMap[formData.recordDate] ? "Update Daily Record" : "New Daily Farm Entry"}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
+          {errorMsg && (
+            <div className="flex items-center gap-3 rounded-xl bg-rose-50 p-3.5 text-xs font-semibold text-rose-700 border border-rose-200 shadow-2xs">
+              <AlertCircle className="h-5 w-5 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Record Date *</label>
             <input
@@ -386,8 +393,6 @@ export const DailyRecordsPage = () => {
               <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
                 <th className="pb-3 px-2">Date</th>
                 <th className="pb-3 px-2">Mortality</th>
-                <th className="pb-3 px-2">Remaining Chicks</th>
-                <th className="pb-3 px-2">Feed Used</th>
                 <th className="pb-3 px-2">Bags Consumed</th>
                 <th className="pb-3 px-2">Avg Weight (g)</th>
                 <th className="pb-3 px-2 text-right">Actions</th>
@@ -396,7 +401,7 @@ export const DailyRecordsPage = () => {
             <tbody className="divide-y divide-slate-100 font-medium">
               {recordsList.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="py-8 text-center text-slate-400">No daily records for this batch yet. Click any Farm button or "+ Record Daily Log" to add data.</td>
+                  <td colSpan="5" className="py-8 text-center text-slate-400">No daily records for this batch yet. Click any Farm button or "+ Record Daily Log" to add data.</td>
                 </tr>
               ) : (
                 recordsList.map((r) => {
@@ -405,8 +410,6 @@ export const DailyRecordsPage = () => {
                     <tr key={r.recordDate} className="hover:bg-slate-50">
                       <td className="py-3 px-2 font-bold text-slate-900">{r.recordDate}</td>
                       <td className="py-3 px-2 font-bold text-rose-600">{r.mortalityCount}</td>
-                      <td className="py-3 px-2 text-emerald-700 font-bold">{r.remainingChickCount}</td>
-                      <td className="py-3 px-2 text-slate-700">{r.feedType}</td>
                       <td className="py-3 px-2 text-slate-700 font-bold">{bags} Bags</td>
                       <td className="py-3 px-2 font-bold text-slate-900">{r.averageWeight} g</td>
                       <td className="py-3 px-2 text-right">
