@@ -21,9 +21,9 @@ export const DailyRecordsPage = () => {
 
   const [formData, setFormData] = useState({
     recordDate: todayStr,
-    mortalityCount: 0,
-    feedConsumptionBags: 2,
-    averageWeight: 0
+    mortalityCount: '',
+    feedConsumptionBags: '',
+    averageWeight: ''
   });
 
   useEffect(() => {
@@ -69,9 +69,16 @@ export const DailyRecordsPage = () => {
         const bags = Math.max(1, Math.round(r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG)));
         setFormData({
           recordDate: r.recordDate,
-          mortalityCount: r.mortalityCount || 0,
+          mortalityCount: r.mortalityCount !== undefined ? r.mortalityCount : '',
           feedConsumptionBags: bags,
-          averageWeight: r.averageWeight || 0
+          averageWeight: r.averageWeight !== undefined ? r.averageWeight : ''
+        });
+      } else {
+        setFormData({
+          recordDate: todayStr,
+          mortalityCount: '',
+          feedConsumptionBags: '',
+          averageWeight: ''
         });
       }
     } catch (err) {
@@ -82,14 +89,28 @@ export const DailyRecordsPage = () => {
   const selectedBatch = batches.find(b => b.id === selectedBatchId);
   const isReadOnly = isFarmer && selectedBatch?.status !== 'Active';
 
+  const handleOpenNewForm = () => {
+    setErrorMsg('');
+    setSuccessMsg('');
+    setFormData({
+      recordDate: todayStr,
+      mortalityCount: '',
+      feedConsumptionBags: '',
+      averageWeight: ''
+    });
+    setShowForm(true);
+  };
+
   const handleEditRecord = (record) => {
+    setErrorMsg('');
+    setSuccessMsg('');
     setShowForm(true);
     const bags = Math.max(1, Math.round(record.feedConsumptionBags || kgToBags(record.feedConsumption || 0, KG_PER_BAG)));
     setFormData({
       recordDate: record.recordDate,
-      mortalityCount: record.mortalityCount || 0,
+      mortalityCount: record.mortalityCount !== undefined ? record.mortalityCount : '',
       feedConsumptionBags: bags,
-      averageWeight: record.averageWeight || 0
+      averageWeight: record.averageWeight !== undefined ? record.averageWeight : ''
     });
   };
 
@@ -120,29 +141,19 @@ export const DailyRecordsPage = () => {
       const bags = Math.max(1, Math.round(existing.feedConsumptionBags || kgToBags(existing.feedConsumption || 0, KG_PER_BAG)));
       setFormData({
         recordDate: newDate,
-        mortalityCount: existing.mortalityCount || 0,
+        mortalityCount: existing.mortalityCount !== undefined ? existing.mortalityCount : '',
         feedConsumptionBags: bags,
-        averageWeight: existing.averageWeight || 0
+        averageWeight: existing.averageWeight !== undefined ? existing.averageWeight : ''
       });
     } else {
       setFormData({
         recordDate: newDate,
-        mortalityCount: 0,
-        feedConsumptionBags: 2,
-        averageWeight: 0
+        mortalityCount: '',
+        feedConsumptionBags: '',
+        averageWeight: ''
       });
     }
   };
-
-  const prevRemaining = selectedBatch ? (selectedBatch.remainingChickCount !== undefined ? Number(selectedBatch.remainingChickCount) : Number(selectedBatch.initialChickCount)) : 0;
-  let calculatedRemaining = prevRemaining;
-  let calculationError = null;
-
-  try {
-    calculatedRemaining = calculateRemainingChickens(prevRemaining, formData.mortalityCount);
-  } catch (err) {
-    calculationError = err.message;
-  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -165,23 +176,47 @@ export const DailyRecordsPage = () => {
       return;
     }
 
-    if (calculationError) {
-      setErrorMsg(calculationError);
+    // Input Validation Checks
+    if (formData.mortalityCount === '' || isNaN(formData.mortalityCount) || Number(formData.mortalityCount) < 0) {
+      setErrorMsg('Please enter a valid mortality count (0 or higher).');
+      return;
+    }
+
+    if (formData.feedConsumptionBags === '' || isNaN(formData.feedConsumptionBags) || Number(formData.feedConsumptionBags) <= 0) {
+      setErrorMsg('Please enter valid feed bags used (at least 1 whole bag).');
+      return;
+    }
+
+    const weightVal = Number(formData.averageWeight);
+    if (formData.averageWeight === '' || isNaN(formData.averageWeight) || weightVal <= 0) {
+      setErrorMsg('Please enter a valid average chicken weight greater than 0 g (e.g. 58 g).');
+      return;
+    }
+
+    const totalBags = Math.max(1, Math.round(Number(formData.feedConsumptionBags)));
+    const totalKg = bagsToKg(totalBags, KG_PER_BAG);
+
+    const currentFeedStock = selectedBatch.feedStock || { 'Pre-Starter': 0, 'Starter': 0, 'Finisher': 0 };
+    const totalAvailableKg = (Number(currentFeedStock['Pre-Starter']) || 0) + (Number(currentFeedStock['Starter']) || 0) + (Number(currentFeedStock['Finisher']) || 0);
+    const totalAvailableBags = kgToBags(totalAvailableKg, KG_PER_BAG);
+
+    // Stock availability validation
+    if (totalAvailableKg < totalKg) {
+      setErrorMsg(`Insufficient feed stock available in farm pool! Available: ${totalAvailableBags} Bags. Requested: ${totalBags} Bags. Please receive feed stock first.`);
       return;
     }
 
     setSaving(true);
     try {
-      const totalBags = Math.max(1, Math.round(Number(formData.feedConsumptionBags) || 1));
-      const totalKg = bagsToKg(totalBags, KG_PER_BAG);
-
-      const currentFeedStock = selectedBatch.feedStock || { 'Pre-Starter': 0, 'Starter': 0, 'Finisher': 0 };
       const deductionResult = deductFeedStock(currentFeedStock, null, totalKg);
 
       let autoFeedType = 'Pre-Starter';
       if (deductionResult.deductedByType['Pre-Starter'] > 0) autoFeedType = 'Pre-Starter';
       else if (deductionResult.deductedByType['Starter'] > 0) autoFeedType = 'Starter';
       else if (deductionResult.deductedByType['Finisher'] > 0) autoFeedType = 'Finisher';
+
+      const prevRemaining = selectedBatch.remainingChickCount !== undefined ? Number(selectedBatch.remainingChickCount) : Number(selectedBatch.initialChickCount || 5000);
+      const calculatedRemaining = calculateRemainingChickens(prevRemaining, Number(formData.mortalityCount));
 
       const recordObj = {
         batchId: selectedBatch.id,
@@ -190,7 +225,7 @@ export const DailyRecordsPage = () => {
         feedType: autoFeedType,
         feedConsumption: totalKg,
         feedConsumptionBags: totalBags,
-        averageWeight: Number(formData.averageWeight),
+        averageWeight: weightVal,
         remainingChickCount: calculatedRemaining,
         recordedBy: userProfile?.name || 'Farmer'
       };
@@ -200,7 +235,7 @@ export const DailyRecordsPage = () => {
 
       await dbLogAuditEvent(
         'DAILY_RECORD_SAVED',
-        `Logged daily record for ${selectedBatch.batchNumber} on ${formData.recordDate} (Mortality: ${formData.mortalityCount}, Feed: ${totalBags} Bags)`,
+        `Logged daily record for ${selectedBatch.batchNumber} on ${formData.recordDate} (Mortality: ${formData.mortalityCount}, Feed: ${totalBags} Bags, Weight: ${weightVal}g)`,
         userProfile?.name
       );
 
@@ -229,7 +264,7 @@ export const DailyRecordsPage = () => {
         </div>
         {!isReadOnly && (
           <button
-            onClick={() => setShowForm(true)}
+            onClick={handleOpenNewForm}
             className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95 shrink-0"
           >
             <Plus className="h-4 w-4" />
@@ -269,16 +304,8 @@ export const DailyRecordsPage = () => {
               disabled={isReadOnly}
               value={formData.recordDate}
               onChange={(e) => handleDateChange(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
+              className="w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
             />
-          </div>
-
-          <div className="rounded-xl bg-slate-50 border border-slate-100 p-3">
-            <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-              <span>Calculated Remaining Chicks:</span>
-              <span className="text-base font-black text-emerald-600">{calculatedRemaining}</span>
-            </div>
-            <p className="text-[10px] text-slate-400 mt-1">Formula: Prev Remaining ({prevRemaining}) - Mortality</p>
           </div>
 
           <div>
@@ -290,12 +317,13 @@ export const DailyRecordsPage = () => {
               disabled={isReadOnly}
               value={formData.mortalityCount}
               onChange={(e) => setFormData({ ...formData, mortalityCount: e.target.value })}
-              className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
+              placeholder="e.g. 0"
+              className="w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Feed Bags Used (Whole Bags: 1, 2, 3...) *</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Feed Bags Used (Whole Bags) *</label>
             <input
               type="number"
               required
@@ -303,11 +331,10 @@ export const DailyRecordsPage = () => {
               step="1"
               disabled={isReadOnly}
               value={formData.feedConsumptionBags}
-              onChange={(e) => setFormData({ ...formData, feedConsumptionBags: e.target.value ? Math.round(Number(e.target.value)) : '' })}
+              onChange={(e) => setFormData({ ...formData, feedConsumptionBags: e.target.value })}
               placeholder="e.g. 2"
               className="w-full rounded-xl border border-slate-200 py-2.5 px-3 text-sm font-bold text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
             />
-            <p className="text-[10px] font-medium text-slate-400 mt-1">Deducted in sequence: 1. Pre-Starter → 2. Starter → 3. Finisher</p>
           </div>
 
           <div>
@@ -315,13 +342,13 @@ export const DailyRecordsPage = () => {
             <input
               type="number"
               required
-              min="0"
+              min="1"
               step="1"
               disabled={isReadOnly}
               value={formData.averageWeight}
               onChange={(e) => setFormData({ ...formData, averageWeight: e.target.value })}
               placeholder="e.g. 58"
-              className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
+              className="w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
             />
           </div>
 
