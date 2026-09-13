@@ -51,7 +51,7 @@ export const DispatchPage = () => {
   const [successMsg, setSuccessMsg] = useState('');
   
   // Forms & Modals
-  const [showSetForm, setShowSetForm] = useState(false);
+  const [showSetForm, setShowSetForm] = useState(false); // Controls Create / Edit Set Popup Modal
   const [editingBoxSetId, setEditingBoxSetId] = useState(null);
   const [showHeaderForm, setShowHeaderForm] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -361,9 +361,11 @@ export const DispatchPage = () => {
       );
 
       setSuccessMsg(
-        hasLoadWeight
+        editingBoxSetId
+          ? `Box Set #${setPayload.boxSetNumber} updated successfully!`
+          : hasLoadWeight
           ? `Box Set #${setPayload.boxSetNumber} with Loaded Weight saved!`
-          : `Box Set #${setPayload.boxSetNumber} Tare Weight saved! Update Loaded Weight when birds are filled.`
+          : `Box Set #${setPayload.boxSetNumber} Tare Weight saved!`
       );
       setEditingBoxSetId(null);
       setShowSetForm(false);
@@ -736,7 +738,7 @@ export const DispatchPage = () => {
       {/* VIEW 2: DEDICATED VEHICLE SET WEIGHING PAGE */}
       {viewMode === 'detail' && activeDispatch && (
         <div className="space-y-5">
-          {/* Header Navigation Bar - Clean Responsive Layout */}
+          {/* Header Navigation Bar */}
           <div className="border-b border-slate-200 pb-4 space-y-3">
             {/* Top Row: Back Button & Status Badge */}
             <div className="flex items-center justify-between">
@@ -820,160 +822,6 @@ export const DispatchPage = () => {
             </div>
           </div>
 
-          {/* CREATE / EDIT SET FORM */}
-          {showSetForm && (
-            <div className="rounded-2xl border-2 border-emerald-500/30 bg-white p-4 sm:p-6 shadow-md space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <Scale className="h-5 w-5 text-emerald-600 shrink-0" />
-                  <h3 className="text-sm sm:text-base font-bold text-slate-900">
-                    {editingBoxSetId ? `Edit Box Set #${setForm.boxSetNumber}` : `Create Box Set #${setForm.boxSetNumber}`}
-                  </h3>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] sm:text-xs font-semibold text-emerald-700 hidden sm:flex items-center gap-1">
-                    <CheckCircle2 className="h-4 w-4" /> Saves instantly
-                  </span>
-                  <button
-                    onClick={() => setShowSetForm(false)}
-                    className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-              </div>
-
-              <form onSubmit={handleSaveBoxSet} className="space-y-4">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Set Number *</label>
-                    <input
-                      type="number"
-                      required
-                      min="1"
-                      value={setForm.boxSetNumber}
-                      onChange={(e) => setSetForm({ ...setForm, boxSetNumber: Number(e.target.value) })}
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-slate-900"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Boxes in Set (Default 5) *</label>
-                    <input
-                      type="number"
-                      required
-                      min="1"
-                      value={setForm.boxesInSet}
-                      onChange={(e) => handleBoxesInSetChange(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Chickens in Set *</label>
-                    <input
-                      type="number"
-                      required
-                      min="1"
-                      value={setForm.chickenCount}
-                      onChange={(e) => setSetForm({ ...setForm, chickenCount: Number(e.target.value) })}
-                      className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-emerald-700 focus:border-emerald-600"
-                    />
-                    <span className="text-[10px] text-slate-400 font-medium">Auto: {activeDispatch.chickenCountPerBox || 12} birds/box × {setForm.boxesInSet} boxes</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Empty Box Tare Weight (kg) *
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      step="0.1"
-                      placeholder="e.g. 25.0 kg"
-                      value={setForm.emptyBoxWeight}
-                      onChange={(e) => setSetForm({ ...setForm, emptyBoxWeight: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
-                    />
-                    <span className="text-[10px] text-slate-400 font-medium">Auto: 5kg × {setForm.boxesInSet} boxes</span>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Loaded Gross Weight (kg) <span className="text-amber-600 font-medium">(Optional)</span>
-                    </label>
-                    <input
-                      type="number"
-                      min="0.1"
-                      step="0.1"
-                      placeholder="e.g. 145.0 kg (blank for Tare only)"
-                      value={setForm.loadedWeight}
-                      onChange={(e) => setSetForm({ ...setForm, loadedWeight: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-black text-slate-900 focus:border-emerald-600"
-                    />
-                  </div>
-                </div>
-
-                {/* Live Preview Box */}
-                {(() => {
-                  const preview = calculateBoxSetWeights(setForm.loadedWeight, setForm.emptyBoxWeight, setForm.chickenCount);
-                  if (preview.isPendingLoad) {
-                    return (
-                      <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 flex items-start gap-2.5 text-xs text-amber-900">
-                        <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                        <div>
-                          <span className="font-bold block">Stage 1: Saving Tare Weight Only ({setForm.emptyBoxWeight || 25} kg)</span>
-                          <span className="text-[11px] text-amber-700">Save empty set now and update Loaded Gross Weight later when birds are loaded.</span>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div className="rounded-xl bg-emerald-50/70 border border-emerald-100 p-3 grid grid-cols-2 gap-3 text-xs">
-                      <div>
-                        <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-700 block">Net Chicken Weight</span>
-                        <span className="text-base font-black text-emerald-900">{preview.totalChickenWeight} kg</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-700 block">Average Weight / Bird</span>
-                        <span className="text-base font-black text-emerald-900">{preview.averageChickenWeight} kg</span>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowSetForm(false);
-                      setEditingBoxSetId(null);
-                    }}
-                    className="w-1/3 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
-                  >
-                    <Save className="h-4 w-4" />
-                    {saving
-                      ? 'Saving Set...'
-                      : setForm.loadedWeight
-                      ? `Save Set #${setForm.boxSetNumber} (Tare + Load)`
-                      : `Save Set #${setForm.boxSetNumber} (Tare Only)`}
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
           {/* Box Sets History - Mobile Cards & Desktop Table */}
           <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm space-y-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3">
@@ -985,14 +833,12 @@ export const DispatchPage = () => {
                 <p className="text-xs font-medium text-slate-500 mt-0.5">Vehicle: {activeDispatch.vehicleNumber} • {boxSets.length} Sets Recorded</p>
               </div>
 
-              {!showSetForm && (
-                <button
-                  onClick={handleOpenCreateSetForm}
-                  className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-50 px-3.5 py-2 text-xs font-bold text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors w-full sm:w-auto"
-                >
-                  <Plus className="h-4 w-4" /> + Create Set
-                </button>
-              )}
+              <button
+                onClick={handleOpenCreateSetForm}
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-50 px-3.5 py-2 text-xs font-bold text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors w-full sm:w-auto"
+              >
+                <Plus className="h-4 w-4" /> + Create Set
+              </button>
             </div>
 
             {/* Mobile Cards */}
@@ -1026,9 +872,9 @@ export const DispatchPage = () => {
                           <button
                             onClick={() => handleEditBoxSet(s)}
                             className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-200/60"
-                            title="Edit Box Set"
+                            title="Edit Box Set (Popup)"
                           >
-                            <Edit className="h-4 w-4" />
+                            <Edit className="h-4 w-4 text-emerald-700" />
                           </button>
                           <button
                             onClick={() => handleDeleteBoxSet(s.id)}
@@ -1136,7 +982,7 @@ export const DispatchPage = () => {
                               <button
                                 onClick={() => handleEditBoxSet(s)}
                                 className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                                title="Edit Box Set"
+                                title="Edit Box Set (Popup)"
                               >
                                 <Edit className="h-3.5 w-3.5" />
                               </button>
@@ -1159,6 +1005,148 @@ export const DispatchPage = () => {
           </div>
         </div>
       )}
+
+      {/* CREATE / EDIT BOX SET POPUP MODAL */}
+      <Modal
+        isOpen={showSetForm}
+        onClose={() => {
+          setShowSetForm(false);
+          setEditingBoxSetId(null);
+        }}
+        title={editingBoxSetId ? `Edit Box Set #${setForm.boxSetNumber}` : `Create Box Set #${setForm.boxSetNumber}`}
+        maxWidth="max-w-lg"
+      >
+        <form onSubmit={handleSaveBoxSet} className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Set Number *</label>
+              <input
+                type="number"
+                required
+                min="1"
+                value={setForm.boxSetNumber}
+                onChange={(e) => setSetForm({ ...setForm, boxSetNumber: Number(e.target.value) })}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs font-bold text-slate-900"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Boxes in Set (Default 5) *</label>
+              <input
+                type="number"
+                required
+                min="1"
+                value={setForm.boxesInSet}
+                onChange={(e) => handleBoxesInSetChange(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Chickens in Set *</label>
+              <input
+                type="number"
+                required
+                min="1"
+                value={setForm.chickenCount}
+                onChange={(e) => setSetForm({ ...setForm, chickenCount: Number(e.target.value) })}
+                className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-emerald-700 focus:border-emerald-600"
+              />
+              <span className="text-[10px] text-slate-400 font-medium block mt-0.5">Auto: {activeDispatch?.chickenCountPerBox || 12} birds/box × {setForm.boxesInSet}</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Empty Box Tare Weight (kg) *
+              </label>
+              <input
+                type="number"
+                required
+                min="0"
+                step="0.1"
+                placeholder="e.g. 25.0 kg"
+                value={setForm.emptyBoxWeight}
+                onChange={(e) => setSetForm({ ...setForm, emptyBoxWeight: e.target.value })}
+                className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
+              />
+              <span className="text-[10px] text-slate-400 font-medium block mt-0.5">Auto: 5kg × {setForm.boxesInSet} boxes</span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Loaded Gross Weight (kg) <span className="text-amber-600 font-medium">(Optional)</span>
+              </label>
+              <input
+                type="number"
+                min="0.1"
+                step="0.1"
+                placeholder="e.g. 145.0 kg (blank for Tare only)"
+                value={setForm.loadedWeight}
+                onChange={(e) => setSetForm({ ...setForm, loadedWeight: e.target.value })}
+                className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-black text-slate-900 focus:border-emerald-600"
+              />
+            </div>
+          </div>
+
+          {/* Live Preview Box */}
+          {(() => {
+            const preview = calculateBoxSetWeights(setForm.loadedWeight, setForm.emptyBoxWeight, setForm.chickenCount);
+            if (preview.isPendingLoad) {
+              return (
+                <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 flex items-start gap-2.5 text-xs text-amber-900">
+                  <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold block">Stage 1: Saving Tare Weight Only ({setForm.emptyBoxWeight || 25} kg)</span>
+                    <span className="text-[11px] text-amber-700">Save empty set now and update Loaded Gross Weight later when birds are loaded.</span>
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <div className="rounded-xl bg-emerald-50/70 border border-emerald-100 p-3 grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-700 block">Net Chicken Weight</span>
+                  <span className="text-base font-black text-emerald-900">{preview.totalChickenWeight} kg</span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-700 block">Average Weight / Bird</span>
+                  <span className="text-base font-black text-emerald-900">{preview.averageChickenWeight} kg</span>
+                </div>
+              </div>
+            );
+          })()}
+
+          <div className="flex gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setShowSetForm(false);
+                setEditingBoxSetId(null);
+              }}
+              className="w-1/3 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+            >
+              <Save className="h-4 w-4" />
+              {saving
+                ? 'Saving Set...'
+                : editingBoxSetId
+                ? 'Update Box Set (Instantly)'
+                : setForm.loadedWeight
+                ? `Save Set #${setForm.boxSetNumber} (Tare + Load)`
+                : `Save Set #${setForm.boxSetNumber} (Tare Only)`}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* QUICK LOAD WEIGHT ENTRY POPUP MODAL */}
       {loadWeightSet && (
