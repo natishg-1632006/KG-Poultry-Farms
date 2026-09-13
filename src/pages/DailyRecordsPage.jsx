@@ -544,11 +544,10 @@ export const DailyRecordsPage = () => {
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-bold text-slate-700">Feed Bags Used (Whole Bags) *</label>
-              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200 flex flex-col items-end text-right leading-tight">
-                <span>Target Day {formFlockAgeDay}: ~{recommendedBags} Bags</span>
-                <span className="text-[10px] font-medium text-emerald-600">({targetGramPerBird}g/bird)</span>
+            <div className="flex items-center justify-between mb-1 gap-2">
+              <label className="block text-xs font-bold text-slate-700">Feed Bags Used *</label>
+              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 whitespace-nowrap shrink-0">
+                Target: ~{recommendedBags} Bags ({targetGramPerBird}g/bird)
               </span>
             </div>
             <input
@@ -565,10 +564,10 @@ export const DailyRecordsPage = () => {
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center justify-between mb-1 gap-2">
               <label className="block text-xs font-bold text-slate-700">Average Chicken Weight (grams) *</label>
-              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                Target Day {formFlockAgeDay}: ~{targetWeightGram} g
+              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 whitespace-nowrap shrink-0">
+                Target: ~{targetWeightGram} g
               </span>
             </div>
             <input
