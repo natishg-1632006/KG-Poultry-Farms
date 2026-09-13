@@ -65,53 +65,26 @@ export const TraderInvoiceModal = ({
         logging: false,
         backgroundColor: '#ffffff',
         onclone: (clonedDoc) => {
+          // 1. Sanitize all <style> tags in cloned document by replacing oklch(...) with hex colors
+          const styleTags = clonedDoc.getElementsByTagName('style');
+          for (let i = 0; i < styleTags.length; i++) {
+            const styleTag = styleTags[i];
+            if (styleTag.textContent && styleTag.textContent.includes('oklch')) {
+              styleTag.textContent = styleTag.textContent.replace(/oklch\([^)]+\)/gi, '#10b981');
+            }
+          }
+
+          // 2. Sanitize element inline styles and attribute styles
           const container = clonedDoc.getElementById('trader-invoice-document');
-          if (!container) return;
-
-          const dummyCanvas = document.createElement('canvas');
-          const ctx = dummyCanvas.getContext('2d');
-
-          const elements = [container, ...Array.from(container.querySelectorAll('*'))];
-          elements.forEach((node) => {
-            const style = window.getComputedStyle(node);
-            const colorProps = [
-              'color',
-              'backgroundColor',
-              'borderColor',
-              'borderTopColor',
-              'borderRightColor',
-              'borderBottomColor',
-              'borderLeftColor',
-              'fill',
-              'stroke'
-            ];
-
-            colorProps.forEach((prop) => {
-              const val = style.getPropertyValue(prop) || style[prop];
-              if (val && typeof val === 'string' && val.includes('oklch')) {
-                try {
-                  if (ctx) {
-                    ctx.fillStyle = '#000000';
-                    ctx.fillStyle = val;
-                    const hexOrRgb = ctx.fillStyle;
-                    if (hexOrRgb && !hexOrRgb.includes('oklch')) {
-                      node.style.setProperty(prop, hexOrRgb, 'important');
-                      return;
-                    }
-                  }
-                } catch (_e) {
-                  // fallback
-                }
-                if (prop.toLowerCase().includes('background')) {
-                  node.style.setProperty(prop, '#ffffff', 'important');
-                } else if (prop.toLowerCase().includes('border')) {
-                  node.style.setProperty(prop, '#cbd5e1', 'important');
-                } else {
-                  node.style.setProperty(prop, '#0f172a', 'important');
-                }
+          if (container) {
+            const nodes = [container, ...Array.from(container.querySelectorAll('*'))];
+            nodes.forEach((node) => {
+              const inlineStyle = node.getAttribute('style') || '';
+              if (inlineStyle.includes('oklch')) {
+                node.setAttribute('style', inlineStyle.replace(/oklch\([^)]+\)/gi, '#10b981'));
               }
             });
-          });
+          }
         }
       });
       const imgData = canvas.toDataURL('image/png');
