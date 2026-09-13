@@ -346,12 +346,11 @@ Thank you for your business!`;
             </div>
           </div>
 
-          {/* Settlement Calculation & Official Seal Box */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center pt-2">
-            {/* Payment Summary Box */}
+          {/* Financial Settlement Box */}
+          <div className="flex justify-end pt-2">
             <div
               style={{ backgroundColor: '#f0fdf4', borderColor: '#a7f3d0' }}
-              className="rounded-2xl border-2 p-4 space-y-2"
+              className="w-full sm:w-80 md:w-96 rounded-2xl border-2 p-4 sm:p-5 space-y-2.5 shadow-2xs"
             >
               <div
                 style={{ color: '#064e3b', borderColor: '#a7f3d0' }}
@@ -361,14 +360,14 @@ Thank you for your business!`;
                 <span style={{ color: '#047857' }} className="text-[10px] font-bold">Rate & Total Breakdown</span>
               </div>
 
-              <div className="space-y-1.5 text-xs text-slate-700">
-                <div className="flex justify-between">
-                  <span>Total Net Weight:</span>
+              <div className="space-y-2 text-xs sm:text-sm text-slate-700">
+                <div className="flex justify-between items-center">
+                  <span className="font-medium text-slate-600">Total Net Weight:</span>
                   <span className="font-bold text-slate-900">{totalNetWeight.toFixed(2)} kg</span>
                 </div>
 
                 <div className="flex justify-between items-center">
-                  <span>Broiler Rate per kg:</span>
+                  <span className="font-medium text-slate-600">Broiler Rate per kg:</span>
                   <div className="flex items-center gap-1">
                     <span className="font-bold text-slate-900">₹</span>
                     {onRateChange ? (
@@ -376,7 +375,7 @@ Thank you for your business!`;
                         type="number"
                         value={ratePerKg}
                         onChange={(e) => onRateChange(Number(e.target.value))}
-                        className="w-20 rounded-lg border border-slate-300 bg-white px-2 py-0.5 text-xs font-bold text-slate-900 focus:border-emerald-600"
+                        className="w-20 rounded-lg border border-slate-300 bg-white px-2 py-0.5 text-xs font-bold text-slate-900 focus:border-emerald-600 shadow-2xs"
                       />
                     ) : (
                       <span className="font-bold text-slate-900">{currentRate}</span>
@@ -386,30 +385,12 @@ Thank you for your business!`;
 
                 <div
                   style={{ borderColor: '#a7f3d0' }}
-                  className="flex justify-between border-t pt-2 text-sm sm:text-base font-black text-slate-900"
+                  className="flex justify-between items-center border-t pt-2.5 text-sm sm:text-base font-black text-slate-900"
                 >
-                  <span>TOTAL AMOUNT:</span>
+                  <span className="tracking-tight">TOTAL AMOUNT:</span>
                   <span style={{ color: '#047857' }}>₹ {Math.round(grandTotal).toLocaleString('en-IN')}</span>
                 </div>
               </div>
-            </div>
-
-            {/* Official Verified Farm Seal & Stamp */}
-            <div className="flex flex-col items-center justify-center p-3 text-center space-y-2">
-              <div
-                style={{ borderColor: '#059669', backgroundColor: '#f0fdf4' }}
-                className="relative flex items-center justify-center h-28 w-28 rounded-full border-4 border-dashed shadow-xs p-2 transform rotate-[-3deg]"
-              >
-                <div style={{ borderColor: '#10b981' }} className="absolute inset-1 rounded-full border"></div>
-                <div style={{ color: '#065f46' }} className="flex flex-col items-center justify-center space-y-0.5 text-center">
-                  <ShieldCheck className="h-6 w-6 text-emerald-600" />
-                  <span className="text-[8px] font-black uppercase tracking-widest leading-none">KG POULTRY</span>
-                  <span style={{ color: '#064e3b' }} className="text-[9px] font-extrabold uppercase tracking-tighter">VERIFIED</span>
-                  <span style={{ color: '#047857' }} className="text-[7px] font-bold uppercase">OFFICIAL SEAL</span>
-                </div>
-              </div>
-              <div className="text-[11px] font-bold text-slate-700">KG Poultry Farms Verified Dispatch</div>
-              <div className="text-[10px] text-slate-400 font-medium">Authorized Quality & Weight Certificate</div>
             </div>
           </div>
 
