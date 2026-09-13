@@ -22,8 +22,7 @@ export const DailyRecordsPage = () => {
   const [formData, setFormData] = useState({
     recordDate: todayStr,
     mortalityCount: 0,
-    feedType: 'Pre-Starter',
-    feedConsumptionBags: 1.5,
+    feedConsumptionBags: 2,
     averageWeight: 0
   });
 
@@ -67,11 +66,10 @@ export const DailyRecordsPage = () => {
       setRecordsMap(map || {});
       if (map && map[todayStr]) {
         const r = map[todayStr];
-        const bags = r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG);
+        const bags = Math.max(1, Math.round(r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG)));
         setFormData({
           recordDate: r.recordDate,
           mortalityCount: r.mortalityCount || 0,
-          feedType: r.feedType || 'Pre-Starter',
           feedConsumptionBags: bags,
           averageWeight: r.averageWeight || 0
         });
@@ -86,11 +84,10 @@ export const DailyRecordsPage = () => {
 
   const handleEditRecord = (record) => {
     setShowForm(true);
-    const bags = record.feedConsumptionBags || kgToBags(record.feedConsumption || 0, KG_PER_BAG);
+    const bags = Math.max(1, Math.round(record.feedConsumptionBags || kgToBags(record.feedConsumption || 0, KG_PER_BAG)));
     setFormData({
       recordDate: record.recordDate,
       mortalityCount: record.mortalityCount || 0,
-      feedType: record.feedType || 'Pre-Starter',
       feedConsumptionBags: bags,
       averageWeight: record.averageWeight || 0
     });
@@ -120,11 +117,10 @@ export const DailyRecordsPage = () => {
 
     if (recordsMap && recordsMap[newDate]) {
       const existing = recordsMap[newDate];
-      const bags = existing.feedConsumptionBags || kgToBags(existing.feedConsumption || 0, KG_PER_BAG);
+      const bags = Math.max(1, Math.round(existing.feedConsumptionBags || kgToBags(existing.feedConsumption || 0, KG_PER_BAG)));
       setFormData({
         recordDate: newDate,
         mortalityCount: existing.mortalityCount || 0,
-        feedType: existing.feedType || 'Pre-Starter',
         feedConsumptionBags: bags,
         averageWeight: existing.averageWeight || 0
       });
@@ -132,8 +128,7 @@ export const DailyRecordsPage = () => {
       setFormData({
         recordDate: newDate,
         mortalityCount: 0,
-        feedType: 'Pre-Starter',
-        feedConsumptionBags: 1.5,
+        feedConsumptionBags: 2,
         averageWeight: 0
       });
     }
@@ -177,17 +172,22 @@ export const DailyRecordsPage = () => {
 
     setSaving(true);
     try {
-      const totalBags = Number(formData.feedConsumptionBags) || 0;
+      const totalBags = Math.max(1, Math.round(Number(formData.feedConsumptionBags) || 1));
       const totalKg = bagsToKg(totalBags, KG_PER_BAG);
 
       const currentFeedStock = selectedBatch.feedStock || { 'Pre-Starter': 0, 'Starter': 0, 'Finisher': 0 };
-      const deductionResult = deductFeedStock(currentFeedStock, formData.feedType, totalKg);
+      const deductionResult = deductFeedStock(currentFeedStock, null, totalKg);
+
+      let autoFeedType = 'Pre-Starter';
+      if (deductionResult.deductedByType['Pre-Starter'] > 0) autoFeedType = 'Pre-Starter';
+      else if (deductionResult.deductedByType['Starter'] > 0) autoFeedType = 'Starter';
+      else if (deductionResult.deductedByType['Finisher'] > 0) autoFeedType = 'Finisher';
 
       const recordObj = {
         batchId: selectedBatch.id,
         recordDate: formData.recordDate,
         mortalityCount: Number(formData.mortalityCount),
-        feedType: formData.feedType,
+        feedType: autoFeedType,
         feedConsumption: totalKg,
         feedConsumptionBags: totalBags,
         averageWeight: Number(formData.averageWeight),
@@ -294,35 +294,20 @@ export const DailyRecordsPage = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Feed Type *</label>
-              <select
-                disabled={isReadOnly}
-                value={formData.feedType}
-                onChange={(e) => setFormData({ ...formData, feedType: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
-              >
-                <option value="Pre-Starter">Pre-Starter</option>
-                <option value="Starter">Starter</option>
-                <option value="Finisher">Finisher</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Feed Bags Used *</label>
-              <input
-                type="number"
-                required
-                min="0.1"
-                step="0.1"
-                disabled={isReadOnly}
-                value={formData.feedConsumptionBags}
-                onChange={(e) => setFormData({ ...formData, feedConsumptionBags: e.target.value })}
-                placeholder="e.g. 1.5"
-                className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
-              />
-            </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Feed Bags Used (Whole Bags: 1, 2, 3...) *</label>
+            <input
+              type="number"
+              required
+              min="1"
+              step="1"
+              disabled={isReadOnly}
+              value={formData.feedConsumptionBags}
+              onChange={(e) => setFormData({ ...formData, feedConsumptionBags: e.target.value ? Math.round(Number(e.target.value)) : '' })}
+              placeholder="e.g. 2"
+              className="w-full rounded-xl border border-slate-200 py-2.5 px-3 text-sm font-bold text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
+            />
+            <p className="text-[10px] font-medium text-slate-400 mt-1">Deducted in sequence: 1. Pre-Starter → 2. Starter → 3. Finisher</p>
           </div>
 
           <div>

@@ -227,14 +227,14 @@ export const FeedPage = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Feed Bags Received *</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Feed Bags Received (Whole Bags: 1, 2, 3...) *</label>
             <input
               type="number"
               required
-              min="0.5"
-              step="0.5"
+              min="1"
+              step="1"
               value={formData.bagsReceived}
-              onChange={(e) => setFormData({ ...formData, bagsReceived: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, bagsReceived: e.target.value ? Math.round(Number(e.target.value)) : '' })}
               placeholder="e.g. 5"
               className="w-full rounded-xl border border-slate-200 py-2.5 px-3 text-sm font-bold text-slate-900 focus:border-emerald-600"
             />
