@@ -6,7 +6,7 @@ import { formatFeedStock, kgToBags } from '../utils/calculations';
 import { KG_PER_BAG } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
 import { Badge } from '../components/common/Badge';
-import { ClipboardList, Wheat, Syringe, Truck, Activity, ArrowRight } from 'lucide-react';
+import { ClipboardList, Wheat, Syringe, Truck, Activity, ArrowRight, Layers, AlertCircle, Scale, Calendar } from 'lucide-react';
 
 export const FarmerDashboard = () => {
   const { userProfile } = useAuth();
@@ -48,8 +48,26 @@ export const FarmerDashboard = () => {
     return <div className="p-8 text-center text-slate-500">Loading Farmer Portal...</div>;
   }
 
+  const initialChicks = activeBatch ? Number(activeBatch.initialChickCount || 0) : 0;
   const remainingChicks = activeBatch ? (activeBatch.remainingChickCount ?? activeBatch.initialChickCount) : 0;
-  const feedStock = activeBatch?.feedStock || { 'Pre-Starter': 0, 'Starter': 0, 'Finisher': 0 };
+
+  const totalFeedBags = records.reduce((acc, r) => {
+    const bags = r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG);
+    return acc + Number(bags || 0);
+  }, 0);
+
+  const totalMortality = records.reduce((acc, r) => acc + Number(r.mortalityCount || 0), 0);
+
+  const latestRecord = records.length > 0 ? records[0] : null;
+  const latestAvgWeight = latestRecord ? Number(latestRecord.averageWeight || 0) : 0;
+
+  let flockAgeDays = 1;
+  if (activeBatch?.chickArrivalDate) {
+    const arrivalDate = new Date(activeBatch.chickArrivalDate);
+    const today = new Date();
+    const diffMs = Math.max(0, today.getTime() - arrivalDate.getTime());
+    flockAgeDays = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1;
+  }
 
   return (
     <div className="space-y-6">
@@ -75,34 +93,48 @@ export const FarmerDashboard = () => {
         </div>
       ) : (
         <>
-          {/* Metrics Overview showing Bags */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Metrics Overview showing exact requested KPI Cards */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             <StatCard
-              title="Remaining Chickens"
-              value={remainingChicks.toLocaleString()}
-              subtext={`Initial: ${activeBatch.initialChickCount}`}
+              title="Total Chicks"
+              value={initialChicks.toLocaleString()}
+              subtext="Initial batch count"
+              icon={Layers}
+              color="emerald"
+            />
+            <StatCard
+              title="Current Chicks"
+              value={Number(remainingChicks).toLocaleString()}
+              subtext="Current live count"
               icon={Activity}
               color="emerald"
             />
             <StatCard
-              title="Pre-Starter Stock"
-              value={formatFeedStock(feedStock['Pre-Starter'] || 0)}
-              subtext="First phase feed"
+              title="Total Feed Consumed"
+              value={`${totalFeedBags.toFixed(1)} Bags`}
+              subtext="Cumulative feed used"
               icon={Wheat}
               color="emerald"
             />
             <StatCard
-              title="Starter Stock"
-              value={formatFeedStock(feedStock['Starter'] || 0)}
-              subtext="Growth phase feed"
-              icon={Wheat}
+              title="Total Mortality"
+              value={totalMortality.toLocaleString()}
+              subtext="Cumulative mortality count"
+              icon={AlertCircle}
+              color="amber"
+            />
+            <StatCard
+              title="Latest Avg Weight"
+              value={`${latestAvgWeight} g`}
+              subtext={latestRecord ? `Latest entry: ${latestRecord.recordDate}` : 'No daily records yet'}
+              icon={Scale}
               color="emerald"
             />
             <StatCard
-              title="Finisher Stock"
-              value={formatFeedStock(feedStock['Finisher'] || 0)}
-              subtext="Final phase feed"
-              icon={Wheat}
+              title="Current Day"
+              value={`Day ${flockAgeDays}`}
+              subtext={`Arrival: ${activeBatch?.chickArrivalDate || 'N/A'}`}
+              icon={Calendar}
               color="blue"
             />
           </div>
