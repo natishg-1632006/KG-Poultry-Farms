@@ -26,7 +26,7 @@ const INITIAL_LOCAL_STATE = {
       farmName: 'KG North Shed',
       role: 'Farmer',
       active: true,
-      assignedBatches: ['KG001'],
+      assignedBatches: ['KG001', 'KG002'],
       createdAt: new Date().toISOString()
     }
   },
@@ -84,6 +84,8 @@ const INITIAL_LOCAL_STATE = {
         driverName: 'Murugan',
         vehicleNumber: 'TN-38-B-9988',
         quantityReceived: 500,
+        quantityReceivedKg: 500,
+        bagsReceived: 7.1,
         date: '2026-09-01',
         notes: 'Initial pre-starter batch arrival',
         createdAt: new Date().toISOString()
@@ -95,92 +97,23 @@ const INITIAL_LOCAL_STATE = {
         driverName: 'Murugan',
         vehicleNumber: 'TN-38-B-9988',
         quantityReceived: 1000,
+        quantityReceivedKg: 1000,
+        bagsReceived: 14.3,
         date: '2026-09-05',
         notes: 'Starter feed arrival',
         createdAt: new Date().toISOString()
       }
     ]
   },
-  medicineRecords: {
-    'KG001': [
-      {
-        id: 'med-1',
-        batchId: 'KG001',
-        recordType: 'Vaccine',
-        vaccines: [
-          { name: 'Ranikhet (LaSota)', quantity: 5000, unit: 'ml' },
-          { name: 'IBD (Gumboro)', quantity: 5000, unit: 'ml' }
-        ],
-        vaccinatorNames: ['Dr. Ramesh', 'Assistant Selvam'],
-        date: '2026-09-07',
-        reason: 'Day 7 Booster Vaccination',
-        createdAt: new Date().toISOString()
-      }
-    ]
-  },
-  dispatches: {
-    'disp-1': {
-      id: 'disp-1',
-      batchId: 'KG001',
-      vehicleName: 'Eicher Pro 2049',
-      vehicleNumber: 'TN-38-C-5544',
-      driverName: 'Karthik',
-      driverMobileNumber: '9842101234',
-      dispatchDate: '2026-09-12',
-      totalBoxCount: 10,
-      chickenCountPerBox: 12,
-      totalChickenCount: 120,
-      totalWeight: 240,
-      averageWeight: 2.0,
-      status: 'In Progress',
-      createdAt: new Date().toISOString()
-    }
-  },
-  boxSets: {
-    'disp-1': [
-      {
-        id: 'set-1',
-        dispatchId: 'disp-1',
-        boxSetNumber: 1,
-        emptyBoxWeight: 5,
-        loadedWeight: 29,
-        chickenCount: 12,
-        totalChickenWeight: 24,
-        averageChickenWeight: 2.0,
-        savedAt: new Date().toISOString()
-      }
-    ]
-  },
+  medicineRecords: {},
+  dispatches: {},
+  boxSets: {},
   targets: {
     feedConsumption: FEED_CONSUMPTION_TARGETS,
     averageWeight: AVERAGE_WEIGHT_TARGETS
   },
-  invoices: [
-    {
-      id: 'INV-2026-001',
-      dispatchId: 'disp-1',
-      batchId: 'KG001',
-      invoiceDate: '2026-09-12',
-      customerName: 'Kg Poultry Meat Traders',
-      customerPhone: '9443312345',
-      vehicleNumber: 'TN-38-C-5544',
-      driverName: 'Karthik',
-      totalChickens: 120,
-      totalWeightKg: 240,
-      ratePerKg: 135,
-      totalAmount: 32400,
-      createdAt: new Date().toISOString()
-    }
-  ],
-  auditLogs: [
-    {
-      id: 'log-1',
-      action: 'BATCH_CREATED',
-      actorName: 'System Admin',
-      details: 'Created batch KG001 with 5000 initial chicks',
-      timestamp: new Date().toISOString()
-    }
-  ]
+  invoices: [],
+  auditLogs: []
 };
 
 // Helper: Wrap promises with a timeout to prevent hanging UI
@@ -214,6 +147,35 @@ function saveLocalDB(data) {
   }
 }
 
+/**
+ * Dynamically computes live feed stock pool for a batch from all feed arrivals minus daily consumption
+ */
+function computeBatchFeedStock(batchId, local) {
+  const stock = { 'Pre-Starter': 0, 'Starter': 0, 'Finisher': 0 };
+
+  // 1. Sum up all feed arrivals
+  const arrivals = local.feedStocks[batchId] || [];
+  arrivals.forEach(a => {
+    const type = a.feedType || 'Pre-Starter';
+    const kg = Number(a.quantityReceivedKg || a.quantityReceived || 0);
+    stock[type] = (stock[type] || 0) + kg;
+  });
+
+  // 2. Subtract daily record consumption
+  const dailyMap = local.dailyRecords[batchId] || {};
+  Object.values(dailyMap).forEach(r => {
+    const type = r.feedType || 'Pre-Starter';
+    const kg = Number(r.feedConsumption || 0);
+    stock[type] = Math.max(0, (stock[type] || 0) - kg);
+  });
+
+  return {
+    'Pre-Starter': parseFloat(stock['Pre-Starter'].toFixed(2)),
+    'Starter': parseFloat(stock['Starter'].toFixed(2)),
+    'Finisher': parseFloat(stock['Finisher'].toFixed(2))
+  };
+}
+
 // USER MANAGEMENT
 export async function dbGetUsers() {
   try {
@@ -244,22 +206,35 @@ export async function dbSaveUser(userData) {
 
 // BATCH MANAGEMENT
 export async function dbGetBatches() {
+  const local = getLocalDB();
   try {
     const snap = await withTimeout(get(ref(db, 'batches')));
-    if (snap.exists()) return Object.values(snap.val());
+    if (snap.exists()) {
+      const fbBatches = Object.values(snap.val());
+      return fbBatches.map(b => ({
+        ...b,
+        feedStock: computeBatchFeedStock(b.id, local)
+      }));
+    }
   } catch (_err) {
     // fallback
   }
-  const local = getLocalDB();
-  return Object.values(local.batches || {});
+
+  return Object.values(local.batches || {}).map(b => ({
+    ...b,
+    feedStock: computeBatchFeedStock(b.id, local)
+  }));
 }
 
 export async function dbSaveBatch(batchData) {
   const batchId = batchData.id || batchData.batchNumber;
+  const local = getLocalDB();
+  const calculatedStock = computeBatchFeedStock(batchId, local);
+
   const record = {
     ...batchData,
     id: batchId,
-    feedStock: batchData.feedStock || { 'Pre-Starter': 0, 'Starter': 0, 'Finisher': 0 },
+    feedStock: calculatedStock,
     updatedAt: new Date().toISOString()
   };
 
@@ -269,7 +244,6 @@ export async function dbSaveBatch(batchData) {
     // fallback
   }
 
-  const local = getLocalDB();
   local.batches[batchId] = record;
   saveLocalDB(local);
   return record;
@@ -324,6 +298,7 @@ export async function dbSaveDailyRecord(batchId, recordDate, recordData) {
 
   if (local.batches[batchId]) {
     local.batches[batchId].remainingChickCount = record.remainingChickCount;
+    local.batches[batchId].feedStock = computeBatchFeedStock(batchId, local);
   }
   saveLocalDB(local);
   return record;
@@ -362,10 +337,25 @@ export async function dbAddFeedArrival(batchId, feedData) {
   }
   local.feedStocks[batchId].push(record);
 
-  if (local.batches[batchId]) {
-    const type = feedData.feedType;
-    const current = local.batches[batchId].feedStock[type] || 0;
-    local.batches[batchId].feedStock[type] = current + Number(feedData.quantityReceived || 0);
+  // Compute live feedStock pool for batch
+  if (!local.batches[batchId]) {
+    local.batches[batchId] = {
+      id: batchId,
+      batchNumber: batchId,
+      batchName: `KgPoultryBatch-${batchId.replace('KG', '')}`,
+      chickArrivalDate: new Date().toISOString().split('T')[0],
+      initialChickCount: 5000,
+      remainingChickCount: 5000,
+      status: 'Active'
+    };
+  }
+
+  local.batches[batchId].feedStock = computeBatchFeedStock(batchId, local);
+
+  try {
+    await withTimeout(set(ref(db, `batches/${batchId}/feedStock`), local.batches[batchId].feedStock));
+  } catch (_e) {
+    // fallback
   }
 
   saveLocalDB(local);

@@ -62,6 +62,8 @@ export const FeedPage = () => {
     try {
       const list = await dbGetFeedArrivals(bId);
       setFeedArrivals(list);
+      const allBatches = await dbGetBatches();
+      setBatches(allBatches);
     } catch (err) {
       console.error('Failed loading feed arrivals:', err);
     }
