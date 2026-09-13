@@ -89,6 +89,20 @@ describe('Calculations Utility Tests', () => {
       expect(res.updatedStock['Starter']).toBe(75);
       expect(res.updatedStock['Finisher']).toBe(150);
     });
+
+    it('spills over deduction from Pre-Starter into Starter when Pre-Starter is exhausted', () => {
+      const stock = {
+        'Pre-Starter': 70, // 1 Bag
+        'Starter': 350,   // 5 Bags
+        'Finisher': 0
+      };
+
+      // Deduct 3 Bags = 210kg
+      const res = deductFeedStock(stock, null, 210);
+      expect(res.updatedStock['Pre-Starter']).toBe(0);   // 0 Bags
+      expect(res.updatedStock['Starter']).toBe(210);      // 3 Bags (210kg / 70kg per bag)
+      expect(res.updatedStock['Finisher']).toBe(0);
+    });
   });
 
   describe('Batch ID and Name generators', () => {

@@ -1,6 +1,7 @@
 import { ref, get, set, update, remove, push, child } from 'firebase/database';
 import { db } from './firebase';
 import { FEED_CONSUMPTION_TARGETS, AVERAGE_WEIGHT_TARGETS } from '../constants/companyTargets';
+import { deductFeedStock } from '../utils/calculations';
 
 const MOCK_STORAGE_KEY = 'kg_poultry_local_db_v1';
 
@@ -161,10 +162,16 @@ export function computeBatchFeedStock(batchId, local = getLocalDB()) {
   });
 
   const dailyMap = local.dailyRecords[batchId] || {};
-  Object.values(dailyMap).forEach(r => {
-    const type = r.feedType || 'Pre-Starter';
+  const recordsSorted = Object.values(dailyMap).sort((a, b) => (a.recordDate || '').localeCompare(b.recordDate || ''));
+
+  recordsSorted.forEach(r => {
     const kg = Number(r.feedConsumption || 0);
-    stock[type] = Math.max(0, (stock[type] || 0) - kg);
+    if (kg > 0) {
+      const deductionResult = deductFeedStock(stock, null, kg);
+      stock['Pre-Starter'] = deductionResult.updatedStock['Pre-Starter'];
+      stock['Starter'] = deductionResult.updatedStock['Starter'];
+      stock['Finisher'] = deductionResult.updatedStock['Finisher'];
+    }
   });
 
   return {
