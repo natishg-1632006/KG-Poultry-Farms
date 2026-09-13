@@ -5,8 +5,7 @@ import { formatFeedStock, bagsToKg, kgToBags } from '../utils/calculations';
 import { KG_PER_BAG } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
 import { Modal } from '../components/common/Modal';
-import { FeedBagIcon } from '../components/common/FeedBagIcon';
-import { Wheat, Truck, Save, CheckCircle2, Edit, Trash2, Layers, Plus, Eye, User, Calendar, FileText } from 'lucide-react';
+import { Package, Wheat, Truck, Save, CheckCircle2, Edit, Trash2, Layers, Plus, Eye, User, Calendar, FileText } from 'lucide-react';
 
 export const FeedPage = () => {
   const { userProfile, isFarmer } = useAuth();
@@ -179,21 +178,21 @@ export const FeedPage = () => {
           title="1. Pre-Starter Stock"
           value={formatFeedStock(feedStock['Pre-Starter'] || 0)}
           subtext="First deduction priority (Blue Bag)"
-          icon={FeedBagIcon}
+          icon={Package}
           color="blue"
         />
         <StatCard
           title="2. Starter Stock"
           value={formatFeedStock(feedStock['Starter'] || 0)}
           subtext="Second deduction priority (Green Bag)"
-          icon={FeedBagIcon}
+          icon={Package}
           color="emerald"
         />
         <StatCard
           title="3. Finisher Stock"
           value={formatFeedStock(feedStock['Finisher'] || 0)}
           subtext="Third deduction priority (Orange Bag)"
-          icon={FeedBagIcon}
+          icon={Package}
           color="orange"
         />
       </div>
@@ -224,7 +223,7 @@ export const FeedPage = () => {
 
               <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                 <span className="font-medium text-slate-500 flex items-center gap-1.5">
-                  <FeedBagIcon className={`h-4 w-4 ${
+                  <Package className={`h-4 w-4 ${
                     viewingDetail.feedType === 'Pre-Starter' ? 'text-blue-600' :
                     viewingDetail.feedType === 'Starter' ? 'text-emerald-600' :
                     viewingDetail.feedType === 'Finisher' ? 'text-orange-600' : 'text-slate-400'
@@ -441,7 +440,7 @@ export const FeedPage = () => {
                         f.feedType === 'Starter' ? 'text-emerald-600' :
                         f.feedType === 'Finisher' ? 'text-orange-600' : 'text-slate-700'
                       }`} title={f.feedType}>
-                        <FeedBagIcon className="h-3.5 w-3.5 shrink-0" />
+                        <Package className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate">{f.feedType}</span>
                       </td>
                       <td className="py-3 px-1 font-bold text-slate-800 truncate" title={`+${bags} Bags`}>+{bags} Bags</td>
