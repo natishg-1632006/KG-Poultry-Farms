@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { dbGetAuditLogs } from '../services/dbService';
 import { ShieldCheck, Search, Clock } from 'lucide-react';
+import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
 export const AuditLogsPage = () => {
   const [logs, setLogs] = useState([]);
@@ -28,14 +29,13 @@ export const AuditLogsPage = () => {
     (l.actorName && l.actorName.toLowerCase().includes(search.toLowerCase()))
   );
 
-  if (loading) return <div className="p-8 text-center text-slate-500">Loading System Audit Logs...</div>;
+  if (loading) return <LoadingSpinner message="Loading System Audit Logs..." />;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900">Security Audit Logs</h1>
-          <p className="text-sm font-medium text-slate-500">Immutable trace of user actions, status changes, and critical operations.</p>
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900 truncate">Security Audit Logs</h1>
         </div>
       </div>
 

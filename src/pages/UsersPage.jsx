@@ -4,6 +4,8 @@ import { Modal } from '../components/common/Modal';
 import { Badge } from '../components/common/Badge';
 import { useAuth } from '../context/AuthContext';
 import { UserPlus, Search, Edit, ToggleLeft, ToggleRight } from 'lucide-react';
+import CustomSelect from '../components/common/CustomSelect';
+import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
 export const UsersPage = () => {
   const { userProfile: currentUserProfile } = useAuth();
@@ -142,21 +144,20 @@ export const UsersPage = () => {
     return matchesSearch && matchesRole;
   });
 
-  if (loading) return <div className="p-8 text-center text-slate-500">Loading User Management...</div>;
+  if (loading) return <LoadingSpinner message="Loading User Management..." />;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900">User Management</h1>
-          <p className="text-sm font-medium text-slate-500">Manage farm administrators, farmers, profiles, and batch assignments.</p>
-        </div>
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-lg sm:text-2xl font-black tracking-tight text-slate-900 shrink-0">
+          User Management
+        </h1>
         <button
           onClick={handleOpenCreateModal}
-          className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs font-bold text-white shadow-sm transition-all active:scale-95 shrink-0 whitespace-nowrap cursor-pointer"
         >
-          <UserPlus className="h-4 w-4" />
-          Add New User
+          <UserPlus className="h-4 w-4 shrink-0" />
+          <span>Add New User</span>
         </button>
       </div>
 
@@ -175,15 +176,15 @@ export const UsersPage = () => {
 
         <div className="flex items-center gap-2">
           <label className="text-xs font-bold text-slate-500">Role:</label>
-          <select
+          <CustomSelect
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
-            className="rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-700 focus:border-emerald-600 focus:outline-hidden"
-          >
-            <option value="ALL">All Roles</option>
-            <option value="Admin">Admin Only</option>
-            <option value="Farmer">Farmer Only</option>
-          </select>
+            options={[
+              { value: 'ALL', label: 'All Roles' },
+              { value: 'Admin', label: 'Admin Only' },
+              { value: 'Farmer', label: 'Farmer Only' },
+            ]}
+          />
         </div>
       </div>
 

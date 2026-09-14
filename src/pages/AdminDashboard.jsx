@@ -5,6 +5,7 @@ import { StatCard } from '../components/common/StatCard';
 import { Badge } from '../components/common/Badge';
 import { WeatherWidget } from '../components/common/WeatherWidget';
 import { Layers, Users, Truck, AlertCircle, PlusCircle, ArrowRight, ShieldCheck, Activity } from 'lucide-react';
+import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
 export const AdminDashboard = () => {
   const [batches, setBatches] = useState([]);
@@ -41,30 +42,29 @@ export const AdminDashboard = () => {
   const totalDispatchedKg = dispatches.reduce((acc, d) => acc + (Number(d.totalWeight) || 0), 0);
 
   if (loading) {
-    return <div className="p-8 text-center text-slate-500">Loading Admin Dashboard...</div>;
+    return <LoadingSpinner message="Loading Admin Dashboard..." />;
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900">Admin Command Center</h1>
-          <p className="text-sm font-medium text-slate-500">Overview of broiler farm operations, batches, and company metrics.</p>
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900 truncate">Admin Dashboard</h1>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 shrink-0">
           <Link
             to="/admin/batches"
-            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-3 py-2 sm:px-4 sm:py-2.5 text-xs font-black text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95 shrink-0 whitespace-nowrap cursor-pointer"
           >
-            <PlusCircle className="h-4 w-4" />
-            New Batch
+            <PlusCircle className="h-4 w-4 shrink-0" />
+            <span>New Batch</span>
           </Link>
           <Link
             to="/admin/users"
-            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+            className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 sm:px-4 sm:py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors shrink-0"
           >
-            <Users className="h-4 w-4" />
-            Manage Users
+            <Users className="h-4 w-4 shrink-0" />
+            <span>Manage Users</span>
           </Link>
         </div>
       </div>

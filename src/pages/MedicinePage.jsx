@@ -3,7 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { dbGetBatches, dbGetMedicineRecords, dbAddMedicineRecord, dbDeleteMedicineRecord, dbLogAuditEvent } from '../services/dbService';
 import { MEDICINE_UNITS } from '../constants/companyTargets';
 import { Modal } from '../components/common/Modal';
-import { Syringe, Plus, Trash2, Edit, Save, CheckCircle2, Layers, Pill } from 'lucide-react';
+import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import { Syringe, Plus, Trash2, Edit, Save, CheckCircle2, Layers, Pill, User, Calendar, Eye, AlertCircle } from 'lucide-react';
 
 const formatMedicineUnit = (unit) => {
   if (!unit) return '';
@@ -22,8 +23,8 @@ export const MedicinePage = () => {
   const [editingRecordId, setEditingRecordId] = useState(null);
   const [showForm, setShowForm] = useState(false);
 
-  const [recordType, setRecordType] = useState('Vaccine');
   const [activeHistoryTab, setActiveHistoryTab] = useState('Vaccine');
+  const [recordType, setRecordType] = useState('Vaccine');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [reason, setReason] = useState('');
 
@@ -37,6 +38,7 @@ export const MedicinePage = () => {
     { name: '', quantity: '', unit: 'ml' }
   ]);
   const [vaccinatorsList, setVaccinatorsList] = useState(['']);
+  const [viewingRecordDetail, setViewingRecordDetail] = useState(null);
 
   useEffect(() => {
     loadBatches();
@@ -50,24 +52,22 @@ export const MedicinePage = () => {
 
   async function loadBatches() {
     try {
+      setLoading(true);
       const all = await dbGetBatches();
       let accessible = all;
-      if (isFarmer) {
-        accessible = all.filter(
-          b => b.assignedFarmerId === userProfile?.uid ||
-               b.assignedFarmerName === userProfile?.name ||
-               userProfile?.assignedBatches?.includes(b.batchNumber) ||
-               userProfile?.assignedBatches?.includes(b.id)
-        );
-      }
       setBatches(accessible);
       if (accessible.length > 0) {
-        const active = accessible.find(b => b.status === 'Active') || accessible[0];
-        setSelectedBatchId(active.id);
+        const activeBatches = accessible.filter(b => (b.status || '').toLowerCase() === 'active');
+        const defaultBatch = activeBatches.length > 0 
+          ? activeBatches[activeBatches.length - 1] 
+          : accessible[accessible.length - 1];
+        setSelectedBatchId(defaultBatch.id);
+        await loadRecords(defaultBatch.id);
+      } else {
+        setLoading(false);
       }
     } catch (err) {
       console.error('Failed loading batches for medicine:', err);
-    } finally {
       setLoading(false);
     }
   }
@@ -78,12 +78,16 @@ export const MedicinePage = () => {
       setRecords(list);
     } catch (err) {
       console.error('Failed loading medicine records:', err);
+    } finally {
+      setLoading(false);
     }
   }
 
   const selectedBatch = batches.find(b => b.id === selectedBatchId);
+  const isReadOnly = selectedBatch ? (selectedBatch.status || '').toLowerCase() === 'completed' : false;
 
   const handleOpenNewForm = (type = 'Vaccine') => {
+    if (isReadOnly) return;
     setEditingRecordId(null);
     setRecordType(type);
     setDate(new Date().toISOString().split('T')[0]);
@@ -97,6 +101,7 @@ export const MedicinePage = () => {
   };
 
   const handleEditRecord = (record) => {
+    if (isReadOnly) return;
     setEditingRecordId(record.id);
     setShowForm(true);
     setRecordType(record.recordType || 'Vaccine');
@@ -114,6 +119,7 @@ export const MedicinePage = () => {
   };
 
   const handleDeleteRecord = async (recordId) => {
+    if (isReadOnly) return;
     if (!confirm('Are you sure you want to delete this medication/vaccine log entry?')) return;
     try {
       await dbDeleteMedicineRecord(selectedBatchId, recordId);
@@ -215,24 +221,40 @@ export const MedicinePage = () => {
   const vaccineRecords = records.filter(r => (r.recordType || 'Vaccine') === 'Vaccine');
   const medicineRecords = records.filter(r => r.recordType === 'Medicine');
 
-  if (loading) return <div className="p-8 text-center text-slate-500">Loading Medicine & Vaccine Module...</div>;
+  if (loading) return <LoadingSpinner message="Loading Medicine & Vaccine Module..." />;
 
   return (
     <div className="space-y-6">
       {/* Page Header with Action Button */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900">Medicine & Vaccination Log</h1>
-          <p className="text-sm font-medium text-slate-500">Record scheduled vaccinations, dual vaccines, and flock medications.</p>
-        </div>
-        <button
-          onClick={() => handleOpenNewForm('Vaccine')}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95 shrink-0"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Log Medicine / Vaccine</span>
-        </button>
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-lg sm:text-2xl font-black tracking-tight text-slate-900 shrink-0">
+          Medicine & Vaccination Log
+        </h1>
+        {!isReadOnly && (
+          <button
+            onClick={() => handleOpenNewForm('Vaccine')}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs font-bold text-white shadow-sm transition-all active:scale-95 shrink-0 whitespace-nowrap cursor-pointer"
+          >
+            <Plus className="h-4 w-4 shrink-0" />
+            <span>Log Medicine</span>
+          </button>
+        )}
       </div>
+
+      {isReadOnly && (
+        <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-amber-800 flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
+            <div>
+              <p className="text-xs font-bold">Batch Marked as Completed ({selectedBatch?.batchName || selectedBatch?.batchNumber})</p>
+              <p className="text-[11px] text-amber-700">This batch is completed. Medicine and vaccine logging is in read-only mode.</p>
+            </div>
+          </div>
+          <span className="rounded-md bg-amber-200/80 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-900">
+            Read-Only Mode
+          </span>
+        </div>
+      )}
 
       {successMsg && (
         <div className="flex items-center gap-3 rounded-xl bg-emerald-50 p-4 text-xs font-semibold text-emerald-700 border border-emerald-200">
@@ -455,34 +477,33 @@ export const MedicinePage = () => {
             <h2 className="text-base font-bold text-slate-900">
               Medicine & Vaccination History ({selectedBatch?.batchNumber})
             </h2>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">Click tabs to toggle between Vaccination and Medication history tables.</p>
           </div>
 
           {/* Interactive Table Tabs */}
-          <div className="flex items-center rounded-xl bg-slate-100 p-1 self-start sm:self-auto shrink-0">
+          <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100/90 p-1 w-full sm:w-auto shrink-0">
             <button
               type="button"
               onClick={() => setActiveHistoryTab('Vaccine')}
-              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+              className={`flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-extrabold whitespace-nowrap transition-all ${
                 activeHistoryTab === 'Vaccine'
-                  ? 'bg-white text-emerald-700 shadow-sm'
+                  ? 'bg-white text-emerald-700 shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Syringe className="h-3.5 w-3.5" />
-              <span>Vaccination Records ({vaccineRecords.length})</span>
+              <Syringe className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+              <span>Vaccines ({vaccineRecords.length})</span>
             </button>
             <button
               type="button"
               onClick={() => setActiveHistoryTab('Medicine')}
-              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+              className={`flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-extrabold whitespace-nowrap transition-all ${
                 activeHistoryTab === 'Medicine'
-                  ? 'bg-white text-emerald-700 shadow-sm'
+                  ? 'bg-white text-emerald-700 shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Pill className="h-3.5 w-3.5" />
-              <span>Medicine Records ({medicineRecords.length})</span>
+              <Pill className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+              <span>Medicines ({medicineRecords.length})</span>
             </button>
           </div>
         </div>
@@ -498,25 +519,37 @@ export const MedicinePage = () => {
                 </div>
               ) : (
                 vaccineRecords.map((r) => (
-                  <div key={r.id} className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-3 shadow-2xs">
+                  <div
+                    key={r.id}
+                    onClick={() => setViewingRecordDetail(r)}
+                    className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-3 shadow-2xs hover:border-emerald-300 hover:shadow-md transition-all cursor-pointer"
+                  >
                     <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
                       <span className="text-xs font-bold text-slate-900">{r.date}</span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleEditRecord(r)}
-                          className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-200/60"
-                          title="Edit Record"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteRecord(r.id)}
-                          className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-100/60"
-                          title="Delete Record"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+                      {!isReadOnly && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditRecord(r);
+                            }}
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-200/60"
+                            title="Edit Record"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteRecord(r.id);
+                            }}
+                            className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-100/60"
+                            title="Delete Record"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <div>
@@ -583,7 +616,11 @@ export const MedicinePage = () => {
                     </tr>
                   ) : (
                     vaccineRecords.map((r) => (
-                      <tr key={r.id} className="hover:bg-slate-50">
+                      <tr
+                        key={r.id}
+                        onClick={() => setViewingRecordDetail(r)}
+                        className="hover:bg-emerald-50/60 cursor-pointer transition-colors"
+                      >
                         <td className="py-3 px-2 font-bold text-slate-900">{r.date}</td>
                         <td className="py-3 px-2">
                           <div className="space-y-1">
@@ -611,22 +648,32 @@ export const MedicinePage = () => {
                         </td>
                         <td className="py-3 px-2 text-slate-600">{r.reason}</td>
                         <td className="py-3 px-2 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={() => handleEditRecord(r)}
-                              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                              title="Edit Record"
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteRecord(r.id)}
-                              className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
-                              title="Delete Record"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
+                          {!isReadOnly ? (
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditRecord(r);
+                                }}
+                                className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                                title="Edit Record"
+                              >
+                                <Edit className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteRecord(r.id);
+                                }}
+                                className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
+                                title="Delete Record"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 font-semibold italic">Locked</span>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -646,25 +693,37 @@ export const MedicinePage = () => {
                 </div>
               ) : (
                 medicineRecords.map((r) => (
-                  <div key={r.id} className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-3 shadow-2xs">
+                  <div
+                    key={r.id}
+                    onClick={() => setViewingRecordDetail(r)}
+                    className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-3 shadow-2xs hover:border-teal-300 hover:shadow-md transition-all cursor-pointer"
+                  >
                     <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
                       <span className="text-xs font-bold text-slate-900">{r.date}</span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleEditRecord(r)}
-                          className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-200/60"
-                          title="Edit Record"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteRecord(r.id)}
-                          className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-100/60"
-                          title="Delete Record"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+                      {!isReadOnly && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditRecord(r);
+                            }}
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-200/60"
+                            title="Edit Record"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteRecord(r.id);
+                            }}
+                            className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-100/60"
+                            title="Delete Record"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center justify-between bg-white rounded-lg p-2.5 border border-slate-200">
@@ -712,7 +771,11 @@ export const MedicinePage = () => {
                     </tr>
                   ) : (
                     medicineRecords.map((r) => (
-                      <tr key={r.id} className="hover:bg-slate-50">
+                      <tr
+                        key={r.id}
+                        onClick={() => setViewingRecordDetail(r)}
+                        className="hover:bg-teal-50/60 cursor-pointer transition-colors"
+                      >
                         <td className="py-3 px-2 font-bold text-slate-900">{r.date}</td>
                         <td className="py-3 px-2 font-bold text-teal-800">{r.medicineName}</td>
                         <td className="py-3 px-2 font-bold text-slate-700">
@@ -720,22 +783,32 @@ export const MedicinePage = () => {
                         </td>
                         <td className="py-3 px-2 text-slate-600">{r.reason}</td>
                         <td className="py-3 px-2 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={() => handleEditRecord(r)}
-                              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                              title="Edit Record"
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteRecord(r.id)}
-                              className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
-                              title="Delete Record"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
+                          {!isReadOnly ? (
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditRecord(r);
+                                }}
+                                className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                                title="Edit Record"
+                              >
+                                <Edit className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteRecord(r.id);
+                                }}
+                                className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
+                                title="Delete Record"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 font-semibold italic">Locked</span>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -746,6 +819,171 @@ export const MedicinePage = () => {
           </div>
         )}
       </div>
+
+      {/* Record Details Popup Modal */}
+      {viewingRecordDetail && (
+        <Modal
+          isOpen={!!viewingRecordDetail}
+          onClose={() => setViewingRecordDetail(null)}
+          title={
+            viewingRecordDetail.recordType === 'Vaccine'
+              ? 'Vaccination Log Details'
+              : 'Medication Log Details'
+          }
+          maxWidth="max-w-md"
+        >
+          <div className="space-y-4">
+            {/* Header Badge & Date */}
+            <div className="flex items-center justify-between bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
+              <div>
+                <span className="text-[10px] uppercase font-extrabold text-slate-400 tracking-wider block">
+                  Batch & Date
+                </span>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-xs font-black text-slate-900">
+                    {selectedBatch ? `Batch #${selectedBatch.batchNumber}` : 'Batch Record'}
+                  </span>
+                  <span className="text-slate-300">•</span>
+                  <span className="text-xs font-bold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-md">
+                    {viewingRecordDetail.date}
+                  </span>
+                </div>
+              </div>
+              <span
+                className={`px-3 py-1 text-xs font-extrabold rounded-full ${
+                  viewingRecordDetail.recordType === 'Vaccine'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-teal-600 text-white shadow-xs'
+                }`}
+              >
+                {viewingRecordDetail.recordType || 'Vaccine'}
+              </span>
+            </div>
+
+            {/* Vaccine Details */}
+            {viewingRecordDetail.recordType !== 'Medicine' ? (
+              <div className="space-y-3">
+                <div>
+                  <span className="text-xs font-bold text-slate-500 block mb-1.5">
+                    Vaccine(s) Administered & Dosage:
+                  </span>
+                  <div className="space-y-2">
+                    {viewingRecordDetail.vaccines && viewingRecordDetail.vaccines.length > 0 ? (
+                      viewingRecordDetail.vaccines.map((v, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between bg-emerald-50/70 border border-emerald-200/80 p-3 rounded-xl"
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="h-2 w-2 rounded-full bg-emerald-600"></div>
+                            <span className="text-xs font-bold text-emerald-950">{v.name}</span>
+                          </div>
+                          {v.quantity ? (
+                            <span className="text-xs font-black text-emerald-800 bg-white px-2.5 py-1 rounded-lg border border-emerald-200">
+                              {v.quantity} {formatMedicineUnit(v.unit)}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-400 font-medium">No dosage specified</span>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-xs text-slate-400 italic">No vaccine details logged</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Vaccinator Names */}
+                <div>
+                  <span className="text-xs font-bold text-slate-500 block mb-1.5">
+                    Vaccinator Name(s):
+                  </span>
+                  {viewingRecordDetail.vaccinatorNames && viewingRecordDetail.vaccinatorNames.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {viewingRecordDetail.vaccinatorNames.map((vn, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg text-xs font-bold text-slate-800"
+                        >
+                          <User className="h-3 w-3 text-slate-500" />
+                          {vn}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-slate-400 italic">None specified</span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* Medicine Details */
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-teal-50/70 border border-teal-200/80 p-3 rounded-xl">
+                    <span className="text-[10px] uppercase font-extrabold text-teal-600 tracking-wider block mb-0.5">
+                      Medicine Name
+                    </span>
+                    <span className="text-sm font-black text-teal-950">
+                      {viewingRecordDetail.medicineName || '—'}
+                    </span>
+                  </div>
+                  <div className="bg-emerald-50/70 border border-emerald-200/80 p-3 rounded-xl">
+                    <span className="text-[10px] uppercase font-extrabold text-emerald-600 tracking-wider block mb-0.5">
+                      Dosage / Quantity
+                    </span>
+                    <span className="text-sm font-black text-emerald-950">
+                      {viewingRecordDetail.quantity} {formatMedicineUnit(viewingRecordDetail.unit)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Reason / Notes */}
+            <div>
+              <span className="text-xs font-bold text-slate-500 block mb-1.5">
+                Reason / Clinical Notes:
+              </span>
+              <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl text-xs text-slate-700 font-medium min-h-[60px] whitespace-pre-wrap">
+                {viewingRecordDetail.reason || 'No clinical notes or reason provided for this entry.'}
+              </div>
+            </div>
+
+            {/* Action Footer */}
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  const rec = viewingRecordDetail;
+                  setViewingRecordDetail(null);
+                  handleEditRecord(rec);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer"
+              >
+                <Edit className="h-3.5 w-3.5" /> Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const recId = viewingRecordDetail.id;
+                  setViewingRecordDetail(null);
+                  handleDeleteRecord(recId);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all cursor-pointer"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> Delete
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewingRecordDetail(null)}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };

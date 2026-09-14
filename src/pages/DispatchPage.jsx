@@ -15,6 +15,9 @@ import { calculateBoxSetWeights } from '../utils/calculations';
 import { Badge } from '../components/common/Badge';
 import { Modal } from '../components/common/Modal';
 import { TraderInvoiceModal } from '../components/invoice/TraderInvoiceModal';
+import CustomSelect from '../components/common/CustomSelect';
+import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import { scrollToTop } from '../utils/scroll';
 import {
   Truck,
   Save,
@@ -75,12 +78,12 @@ export const DispatchPage = () => {
   const [showExtraSetPromptModal, setShowExtraSetPromptModal] = useState(false);
 
   const [dispatchHeader, setDispatchHeader] = useState({
-    vehicleName: 'Eicher Pro 2049',
-    vehicleNumber: 'TN-38-C-5544',
-    driverName: 'Karthik',
-    driverMobileNumber: '9842101234',
+    vehicleName: '',
+    vehicleNumber: '',
+    driverName: '',
+    driverMobileNumber: '',
     dispatchDate: new Date().toISOString().split('T')[0],
-    totalBoxCount: 20,
+    totalBoxCount: 5,
     chickenCountPerBox: 12
   });
 
@@ -104,24 +107,22 @@ export const DispatchPage = () => {
 
   async function loadBatches() {
     try {
+      setLoading(true);
       const all = await dbGetBatches();
       let accessible = all;
-      if (isFarmer) {
-        accessible = all.filter(
-          b => b.assignedFarmerId === userProfile?.uid ||
-               b.assignedFarmerName === userProfile?.name ||
-               userProfile?.assignedBatches?.includes(b.batchNumber) ||
-               userProfile?.assignedBatches?.includes(b.id)
-        );
-      }
       setBatches(accessible);
       if (accessible.length > 0) {
-        const active = accessible.find(b => b.status === 'Active') || accessible[0];
-        setSelectedBatchId(active.id);
+        const activeBatches = accessible.filter(b => (b.status || '').toLowerCase() === 'active');
+        const defaultBatch = activeBatches.length > 0 
+          ? activeBatches[activeBatches.length - 1] 
+          : accessible[accessible.length - 1];
+        setSelectedBatchId(defaultBatch.id);
+        await loadDispatchesForBatch(defaultBatch.id);
+      } else {
+        setLoading(false);
       }
     } catch (err) {
       console.error('Failed loading batches for dispatch:', err);
-    } finally {
       setLoading(false);
     }
   }
@@ -148,6 +149,8 @@ export const DispatchPage = () => {
       }
     } catch (err) {
       console.error('Failed loading dispatches:', err);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -179,8 +182,10 @@ export const DispatchPage = () => {
   }
 
   const selectedBatch = batches.find(b => b.id === selectedBatchId);
+  const isReadOnly = selectedBatch ? (selectedBatch.status || '').toLowerCase() === 'completed' : false;
 
   const handleOpenNewDispatch = () => {
+    if (isReadOnly) return;
     setActiveDispatch(null);
     setDispatchHeader({
       vehicleName: '',
@@ -188,11 +193,15 @@ export const DispatchPage = () => {
       driverName: '',
       driverMobileNumber: '',
       dispatchDate: new Date().toISOString().split('T')[0],
-      totalBoxCount: 20,
+      totalBoxCount: 5,
       chickenCountPerBox: 12
     });
     setShowHeaderForm(true);
   };
+
+  useEffect(() => {
+    scrollToTop();
+  }, [activeDispatch, viewMode, selectedBatchId]);
 
   const handleOpenVehicleDetailPage = async (dispatch) => {
     setActiveDispatch(dispatch);
@@ -200,6 +209,7 @@ export const DispatchPage = () => {
     setShowSetForm(false);
     setEditingBoxSetId(null);
     setSetFilter('all');
+    scrollToTop();
     await loadBoxSetsForDispatch(dispatch.id, dispatch);
   };
 
@@ -209,10 +219,12 @@ export const DispatchPage = () => {
     setShowSetForm(false);
     setEditingBoxSetId(null);
     setSetFilter('all');
+    scrollToTop();
   };
 
   const handleDeleteDispatch = async (dId, e) => {
     if (e) e.stopPropagation();
+    if (isReadOnly) return;
     if (!confirm('Are you sure you want to delete this vehicle dispatch card and all its box sets?')) return;
     try {
       await dbDeleteDispatch(dId);
@@ -237,7 +249,7 @@ export const DispatchPage = () => {
   const handleSaveDispatchHeader = async (e) => {
     e.preventDefault();
     setSuccessMsg('');
-    if (!selectedBatch) return;
+    if (!selectedBatch || isReadOnly) return;
 
     setSaving(true);
     try {
@@ -371,6 +383,11 @@ export const DispatchPage = () => {
       const updatedDispatch = {
         ...activeDispatch,
         totalWeight: parseFloat(combinedWeight.toFixed(2)),
+        birdsCount: combinedChicks,
+        totalBirds: combinedChicks,
+        totalChickens: combinedChicks,
+        cratesCount: combinedLoadedBoxes,
+        totalCrates: combinedLoadedBoxes,
         averageWeight: combinedAvg,
         status: combinedLoadedBoxes >= activeDispatch.totalBoxCount ? 'Completed' : 'In Progress'
       };
@@ -549,11 +566,11 @@ export const DispatchPage = () => {
   };
 
   // Box Sets Calculation & Filtering Engine
-  const totalWeighedBoxes = boxSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
   const loadedBoxSets = boxSets.filter(s => Number(s.loadedWeight) > 0);
   const pendingBoxSets = boxSets.filter(s => !s.loadedWeight || Number(s.loadedWeight) <= 0);
   
-  const loadedBoxesCount = loadedBoxSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
+  const totalWeighedBoxes = loadedBoxSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
+  const loadedBoxesCount = totalWeighedBoxes;
   const totalDispatchedBirds = loadedBoxSets.reduce((acc, s) => acc + (Number(s.chickenCount) || 0), 0);
   const totalNetWeight = loadedBoxSets.reduce((acc, s) => acc + (Number(s.totalChickenWeight) || 0), 0);
   const avgBirdWeight = totalDispatchedBirds > 0 ? parseFloat((totalNetWeight / totalDispatchedBirds).toFixed(3)) : 0;
@@ -594,11 +611,26 @@ export const DispatchPage = () => {
     return true;
   });
 
+  // VEHICLE CARDS STATUS CALCULATION HELPER
+  const checkIsDispatchCompleted = (d) => {
+    if (!d) return false;
+    const dSets = allBoxSetsMap[d.id] || (activeDispatch?.id === d.id ? boxSets : []);
+    const loadedSets = dSets.filter(s => Number(s.loadedWeight) > 0);
+    const weighedBoxes = loadedSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
+
+    if (d.status === 'Completed') return true;
+    if (d.totalBoxCount > 0 && weighedBoxes >= d.totalBoxCount && loadedSets.length > 0) {
+      return true;
+    }
+    return false;
+  };
+
   // VEHICLE CARDS GRID FILTERING & SORTING ENGINE
   const filteredDispatches = dispatches
     .filter(d => {
-      if (gridFilter === 'in_progress') return d.status !== 'Completed';
-      if (gridFilter === 'completed') return d.status === 'Completed';
+      const isCompleted = checkIsDispatchCompleted(d);
+      if (gridFilter === 'in_progress') return !isCompleted;
+      if (gridFilter === 'completed') return isCompleted;
       return true;
     })
     .sort((a, b) => {
@@ -620,7 +652,7 @@ export const DispatchPage = () => {
       return timeB - timeA;
     });
 
-  if (loading) return <div className="p-8 text-center text-slate-500 font-semibold">Loading Dispatch Management...</div>;
+  if (loading) return <LoadingSpinner message="Loading Vehicle & Dispatch Data..." />;
 
   return (
     <div className="space-y-5">
@@ -641,36 +673,38 @@ export const DispatchPage = () => {
       {viewMode === 'grid' && (
         <div className="space-y-5">
           {/* Page Header */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">Chicken Dispatch & Weighing</h1>
-              <p className="text-xs sm:text-sm font-medium text-slate-500">Manage vehicle dispatches. Click any card to weigh boxes.</p>
-            </div>
+          <div className="flex items-center justify-between gap-2">
+            <h1 className="text-lg sm:text-2xl font-black tracking-tight text-slate-900 shrink-0">
+              Dispatch & Weighing
+            </h1>
             
-            <div className="flex items-center gap-2.5">
-              {batches.length > 1 && (
-                <select
-                  value={selectedBatchId}
-                  onChange={(e) => setSelectedBatchId(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-700 shadow-2xs focus:border-emerald-600 shrink-0"
+            <div className="flex items-center gap-2 shrink-0">
+              {!isReadOnly && (
+                <button
+                  onClick={handleOpenNewDispatch}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-all active:scale-95 shrink-0 whitespace-nowrap cursor-pointer"
                 >
-                  {batches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      Batch #{b.batchNumber}
-                    </option>
-                  ))}
-                </select>
+                  <Plus className="h-4 w-4 shrink-0" />
+                  <span>Add Vehicle</span>
+                </button>
               )}
-
-              <button
-                onClick={handleOpenNewDispatch}
-                className="flex flex-1 sm:flex-initial items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95 shrink-0"
-              >
-                <Plus className="h-4 w-4" />
-                <span>+ Add Vehicle Dispatch</span>
-              </button>
             </div>
           </div>
+
+          {isReadOnly && (
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-amber-800 flex items-center justify-between shadow-xs">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
+                <div>
+                  <p className="text-xs font-bold">Batch Marked as Completed ({selectedBatch?.batchName || selectedBatch?.batchNumber})</p>
+                  <p className="text-[11px] text-amber-700">This batch is completed. Vehicle dispatches and box set weighing are in read-only mode.</p>
+                </div>
+              </div>
+              <span className="rounded-md bg-amber-200/80 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-900">
+                Read-Only Mode
+              </span>
+            </div>
+          )}
 
           {/* Cards Grid */}
           {dispatches.length === 0 ? (
@@ -694,56 +728,63 @@ export const DispatchPage = () => {
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-2xs">
-                <div className="flex items-center gap-2">
-                  <Truck className="h-4 w-4 text-emerald-600 shrink-0" />
-                  <h2 className="text-xs sm:text-sm font-bold text-slate-800">
-                    Vehicle Cards ({filteredDispatches.length})
-                  </h2>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  {/* Grid Filter Bar */}
-                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0">
-                    <button
-                      onClick={() => setGridFilter('all')}
-                      className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
-                        gridFilter === 'all' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
-                      }`}
-                    >
-                      All ({dispatches.length})
-                    </button>
-                    <button
-                      onClick={() => setGridFilter('in_progress')}
-                      className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
-                        gridFilter === 'in_progress' ? 'bg-amber-500 text-white shadow-2xs' : 'text-amber-700 hover:text-amber-900'
-                      }`}
-                    >
-                      In Progress ({dispatches.filter(d => d.status !== 'Completed').length})
-                    </button>
-                    <button
-                      onClick={() => setGridFilter('completed')}
-                      className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
-                        gridFilter === 'completed' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-emerald-700 hover:text-emerald-900'
-                      }`}
-                    >
-                      Completed ({dispatches.filter(d => d.status === 'Completed').length})
-                    </button>
+              <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+                {/* Top Row: Title on Left, Sort Dropdown on Right */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Truck className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <h2 className="text-xs sm:text-sm font-extrabold text-slate-800">
+                      Vehicle Cards ({dispatches.length})
+                    </h2>
                   </div>
 
-                  {/* Grid Sort Select */}
-                  <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-xl">
-                    <ArrowUpDown className="h-3.5 w-3.5 text-slate-500 shrink-0" />
-                    <select
+                  {/* Sort Dropdown */}
+                  <div className="shrink-0">
+                    <CustomSelect
                       value={gridSortBy}
                       onChange={(e) => setGridSortBy(e.target.value)}
-                      className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
-                    >
-                      <option value="last_updated">Sort: Last Updated</option>
-                      <option value="vehicle_asc">Sort: Vehicle #</option>
-                      <option value="progress_desc">Sort: Progress %</option>
-                    </select>
+                      icon={ArrowUpDown}
+                      options={[
+                        { value: 'last_updated', label: 'Sort: Last Updated' },
+                        { value: 'vehicle_asc', label: 'Sort: Vehicle #' },
+                        { value: 'progress_desc', label: 'Sort: Progress %' },
+                      ]}
+                    />
                   </div>
+                </div>
+
+                {/* Bottom Row: Full Width Segmented Filter Tabs */}
+                <div className="grid grid-cols-3 gap-1 bg-slate-100/80 p-1 rounded-2xl w-full">
+                  <button
+                    onClick={() => setGridFilter('all')}
+                    className={`py-1.5 px-3 text-xs font-extrabold rounded-xl transition-all text-center whitespace-nowrap ${
+                      gridFilter === 'all'
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    All ({dispatches.length})
+                  </button>
+                  <button
+                    onClick={() => setGridFilter('in_progress')}
+                    className={`py-1.5 px-3 text-xs font-extrabold rounded-xl transition-all text-center whitespace-nowrap ${
+                      gridFilter === 'in_progress'
+                        ? 'bg-white text-amber-800 shadow-2xs'
+                        : 'text-amber-800 hover:text-amber-900'
+                    }`}
+                  >
+                    In Progress ({dispatches.filter(d => !checkIsDispatchCompleted(d)).length})
+                  </button>
+                  <button
+                    onClick={() => setGridFilter('completed')}
+                    className={`py-1.5 px-3 text-xs font-extrabold rounded-xl transition-all text-center whitespace-nowrap ${
+                      gridFilter === 'completed'
+                        ? 'bg-white text-emerald-800 shadow-2xs'
+                        : 'text-emerald-800 hover:text-emerald-900'
+                    }`}
+                  >
+                    Completed ({dispatches.filter(d => checkIsDispatchCompleted(d)).length})
+                  </button>
                 </div>
               </div>
 
@@ -755,13 +796,19 @@ export const DispatchPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
                   {filteredDispatches.map((d) => {
                   const dSets = allBoxSetsMap[d.id] || [];
+                  const emptySets = dSets.filter(s => Number(s.emptyBoxWeight) > 0);
                   const loadedSets = dSets.filter(s => Number(s.loadedWeight) > 0);
-                  const weighedBoxes = dSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
+
+                  const emptyBoxes = emptySets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
+                  const loadedBoxes = loadedSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
+
                   const totalWeight = loadedSets.reduce((acc, s) => acc + (Number(s.totalChickenWeight) || 0), 0);
                   const totalBirds = loadedSets.reduce((acc, s) => acc + (Number(s.chickenCount) || 0), 0);
                   const avgWeight = totalBirds > 0 ? (totalWeight / totalBirds).toFixed(3) : '0.000';
-                  const progressPct = Math.min(100, Math.round((weighedBoxes / (d.totalBoxCount || 1)) * 100));
-                  const isCompleted = d.status === 'Completed' || weighedBoxes >= d.totalBoxCount;
+
+                  const emptyPct = Math.min(100, Math.round((emptyBoxes / (d.totalBoxCount || 1)) * 100));
+                  const loadedPct = Math.min(100, Math.round((loadedBoxes / (d.totalBoxCount || 1)) * 100));
+                  const isCompleted = checkIsDispatchCompleted(d);
 
                   return (
                     <div
@@ -771,49 +818,55 @@ export const DispatchPage = () => {
                     >
                       {/* Top Bar */}
                       <div>
-                        <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-3">
-                          <div className="flex items-center gap-2.5">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-colors shrink-0">
-                              <Truck className="h-5 w-5" />
+                        <div className="border-b border-slate-100 pb-3 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-colors shrink-0">
+                                <Truck className="h-4 w-4" />
+                              </div>
+                              <Badge variant={isCompleted ? 'Completed' : 'In Progress'}>
+                                {isCompleted ? 'Completed' : 'In Progress'}
+                              </Badge>
                             </div>
-                            <div>
-                              <h3 className="font-extrabold text-sm text-slate-900 group-hover:text-emerald-700 transition-colors break-all">
-                                {d.vehicleNumber}
-                              </h3>
-                              <p className="text-xs font-semibold text-slate-500">{d.vehicleName || 'Vehicle'}</p>
-                            </div>
+
+                            {!isReadOnly && (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveDispatch(d);
+                                    setDispatchHeader({
+                                      vehicleName: d.vehicleName || '',
+                                      vehicleNumber: d.vehicleNumber || '',
+                                      driverName: d.driverName || '',
+                                      driverMobileNumber: d.driverMobileNumber || '',
+                                      dispatchDate: d.dispatchDate || new Date().toISOString().split('T')[0],
+                                      totalBoxCount: d.totalBoxCount || 20,
+                                      chickenCountPerBox: d.chickenCountPerBox || 12
+                                    });
+                                    setShowHeaderForm(true);
+                                  }}
+                                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                  title="Edit Vehicle Setup"
+                                >
+                                  <Edit className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={(e) => handleDeleteDispatch(d.id, e)}
+                                  className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                                  title="Delete Dispatch Card"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            )}
                           </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <Badge variant={isCompleted ? 'Completed' : 'In Progress'}>
-                              {isCompleted ? 'Completed' : 'In Progress'}
-                            </Badge>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveDispatch(d);
-                                setDispatchHeader({
-                                  vehicleName: d.vehicleName || '',
-                                  vehicleNumber: d.vehicleNumber || '',
-                                  driverName: d.driverName || '',
-                                  driverMobileNumber: d.driverMobileNumber || '',
-                                  dispatchDate: d.dispatchDate || new Date().toISOString().split('T')[0],
-                                  totalBoxCount: d.totalBoxCount || 20,
-                                  chickenCountPerBox: d.chickenCountPerBox || 12
-                                });
-                                setShowHeaderForm(true);
-                              }}
-                              className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                              title="Edit Vehicle Setup"
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              onClick={(e) => handleDeleteDispatch(d.id, e)}
-                              className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                              title="Delete Dispatch Card"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+
+                          <div>
+                            <h3 className="font-black text-base text-slate-900 group-hover:text-emerald-700 transition-colors break-words leading-tight" title={d.vehicleName || d.vehicleNumber || 'Trader'}>
+                              {d.vehicleName || d.vehicleNumber || 'Trader'}
+                            </h3>
+                            <p className="text-xs font-semibold text-slate-500 mt-0.5">Vehicle: <span className="text-slate-700 font-bold">{d.vehicleNumber}</span></p>
                           </div>
                         </div>
 
@@ -839,17 +892,40 @@ export const DispatchPage = () => {
                           </div>
                         </div>
 
-                        {/* Progress Bar */}
-                        <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100 space-y-1 my-1">
-                          <div className="flex justify-between text-xs font-bold">
-                            <span className="text-slate-600">Boxes Weighed</span>
-                            <span className="text-emerald-700">{weighedBoxes} / {d.totalBoxCount} Boxes ({progressPct}%)</span>
+                        {/* Dual Progress Bars: Empty Weight & Loaded Weight */}
+                        <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100 space-y-2 my-1">
+                          {/* 1. Empty Weight Progress */}
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-xs font-bold">
+                              <span className="text-slate-600 flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+                                <span>Empty Weight</span>
+                              </span>
+                              <span className="text-amber-700">{emptyBoxes} / {d.totalBoxCount} Boxes ({emptyPct}%)</span>
+                            </div>
+                            <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-amber-500 transition-all duration-300"
+                                style={{ width: `${emptyPct}%` }}
+                              ></div>
+                            </div>
                           </div>
-                          <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-emerald-600 transition-all duration-300"
-                              style={{ width: `${progressPct}%` }}
-                            ></div>
+
+                          {/* 2. Loaded Weight Progress */}
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-xs font-bold">
+                              <span className="text-slate-600 flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                                <span>Loaded Weight</span>
+                              </span>
+                              <span className="text-emerald-700">{loadedBoxes} / {d.totalBoxCount} Boxes ({loadedPct}%)</span>
+                            </div>
+                            <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-emerald-600 transition-all duration-300"
+                                style={{ width: `${loadedPct}%` }}
+                              ></div>
+                            </div>
                           </div>
                         </div>
 
@@ -876,7 +952,7 @@ export const DispatchPage = () => {
                           e.stopPropagation();
                           handleOpenVehicleDetailPage(d);
                         }}
-                        className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 py-2.5 text-xs font-bold text-white shadow-xs hover:from-emerald-700 hover:to-teal-700 transition-all"
+                        className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-all cursor-pointer"
                       >
                         <Scale className="h-4 w-4" />
                         <span>Open Set Weighing ({dSets.length} Sets)</span>
@@ -906,55 +982,64 @@ export const DispatchPage = () => {
                 <ArrowLeft className="h-4 w-4 text-slate-500" />
                 <span>Back to Vehicles</span>
               </button>
-              <Badge variant={activeDispatch.status}>{activeDispatch.status}</Badge>
+              {(() => {
+                const isDetailCompleted = checkIsDispatchCompleted(activeDispatch);
+                return (
+                  <Badge variant={isDetailCompleted ? 'Completed' : 'In Progress'}>
+                    {isDetailCompleted ? 'Completed' : 'In Progress'}
+                  </Badge>
+                );
+              })()}
             </div>
 
-            {/* Vehicle Title & Details */}
-            <div>
-              <h1 className="text-lg sm:text-2xl font-black tracking-tight text-slate-900 break-words">
-                Vehicle {activeDispatch.vehicleNumber}
-              </h1>
-              <p className="text-xs font-medium text-slate-500 mt-0.5">
-                {activeDispatch.vehicleName || 'Vehicle'} • Driver: {activeDispatch.driverName} ({activeDispatch.driverMobileNumber || 'No mobile'})
-              </p>
-            </div>
+            {/* Vehicle Details Sub-Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
+              <div>
+                <h1 className="text-base sm:text-xl font-black tracking-tight text-slate-900 break-words hidden sm:block">
+                  {activeDispatch.vehicleName || `Trader (${activeDispatch.vehicleNumber})`}
+                </h1>
+                <p className="text-xs font-semibold text-slate-600">
+                  Vehicle #: <strong className="text-slate-900">{activeDispatch.vehicleNumber}</strong> • Driver: <strong className="text-slate-900">{activeDispatch.driverName}</strong> {activeDispatch.driverMobileNumber ? `(${activeDispatch.driverMobileNumber})` : ''}
+                </p>
+              </div>
 
-            {/* Action Buttons Row */}
-            <div className="grid grid-cols-3 gap-2 pt-1 sm:flex sm:items-center sm:justify-end sm:gap-2">
-              <button
-                onClick={() => {
-                  setDispatchHeader({
-                    vehicleName: activeDispatch.vehicleName || '',
-                    vehicleNumber: activeDispatch.vehicleNumber || '',
-                    driverName: activeDispatch.driverName || '',
-                    driverMobileNumber: activeDispatch.driverMobileNumber || '',
-                    dispatchDate: activeDispatch.dispatchDate || new Date().toISOString().split('T')[0],
-                    totalBoxCount: activeDispatch.totalBoxCount || 20,
-                    chickenCountPerBox: activeDispatch.chickenCountPerBox || 12
-                  });
-                  setShowHeaderForm(true);
-                }}
-                className="flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white py-2 px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                <Edit className="h-3.5 w-3.5 text-slate-500" />
-                <span>Edit Setup</span>
-              </button>
+              {/* Action Buttons Row */}
+              <div className="grid grid-cols-3 gap-2 pt-1 sm:pt-0 sm:flex sm:items-center sm:gap-2">
+                <button
+                  onClick={() => {
+                    setDispatchHeader({
+                      vehicleName: activeDispatch.vehicleName || '',
+                      vehicleNumber: activeDispatch.vehicleNumber || '',
+                      driverName: activeDispatch.driverName || '',
+                      driverMobileNumber: activeDispatch.driverMobileNumber || '',
+                      dispatchDate: activeDispatch.dispatchDate || new Date().toISOString().split('T')[0],
+                      totalBoxCount: activeDispatch.totalBoxCount || 5,
+                      chickenCountPerBox: activeDispatch.chickenCountPerBox || 12
+                    });
+                    setShowHeaderForm(true);
+                  }}
+                  className="flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white py-2 px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
+                >
+                  <Edit className="h-3.5 w-3.5 text-slate-500" />
+                  <span>Edit Setup</span>
+                </button>
 
-              <button
-                onClick={() => setShowInvoiceModal(true)}
-                className="flex items-center justify-center gap-1 rounded-xl bg-slate-900 py-2 px-2.5 text-xs font-bold text-white shadow-sm hover:bg-slate-800 transition-colors"
-              >
-                <FileText className="h-3.5 w-3.5 text-emerald-400" />
-                <span>Invoice</span>
-              </button>
+                <button
+                  onClick={() => setShowInvoiceModal(true)}
+                  className="flex items-center justify-center gap-1 rounded-xl bg-slate-900 py-2 px-2.5 text-xs font-bold text-white shadow-sm hover:bg-slate-800 transition-colors"
+                >
+                  <FileText className="h-3.5 w-3.5 text-emerald-400" />
+                  <span>Invoice</span>
+                </button>
 
-              <button
-                onClick={handleOpenCreateSetForm}
-                className="flex items-center justify-center gap-1 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 py-2 px-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95"
-              >
-                <Plus className="h-4 w-4" />
-                <span>+ Create Set</span>
-              </button>
+                <button
+                  onClick={handleOpenCreateSetForm}
+                  className="flex items-center justify-center gap-1 rounded-xl bg-emerald-600 py-2 px-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-all active:scale-95"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Create Set</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -981,69 +1066,73 @@ export const DispatchPage = () => {
 
           {/* Box Sets History Header with Filters & Status Sort */}
           <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm space-y-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Layers className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 shrink-0" />
-                  <span>Box Sets History</span>
-                </h3>
-                <p className="text-xs font-medium text-slate-500 mt-0.5">
-                  Vehicle: {activeDispatch.vehicleNumber} • Filter & sort box set records below
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                {/* Filter Tabs Bar */}
-                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0 self-start sm:self-auto">
-                  <button
-                    onClick={() => setSetFilter('all')}
-                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
-                      setFilter === 'all' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    All ({boxSets.length})
-                  </button>
-                  <button
-                    onClick={() => setSetFilter('pending')}
-                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
-                      setFilter === 'pending' ? 'bg-amber-500 text-white shadow-2xs' : 'text-amber-700 hover:text-amber-900'
-                    }`}
-                  >
-                    Pending ({pendingBoxSets.length})
-                  </button>
-                  <button
-                    onClick={() => setSetFilter('loaded')}
-                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
-                      setFilter === 'loaded' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-emerald-700 hover:text-emerald-900'
-                    }`}
-                  >
-                    Loaded ({loadedBoxSets.length})
-                  </button>
+            <div className="space-y-3 border-b border-slate-100 pb-3">
+              {/* Top Row: Title & Subtitle on Left, Sort Dropdown on Right */}
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                    <Layers className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 shrink-0" />
+                    <span>Box Sets History</span>
+                  </h3>
                 </div>
 
                 {/* Sort Dropdown */}
-                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-xl">
-                  <ArrowUpDown className="h-3.5 w-3.5 text-slate-500 shrink-0" />
-                  <select
+                <div className="shrink-0">
+                  <CustomSelect
                     value={setSortBy}
                     onChange={(e) => setSetSortBy(e.target.value)}
-                    className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
-                  >
-                    <option value="pending_first">Sort: Pending First</option>
-                    <option value="last_updated">Sort: Last Updated</option>
-                    <option value="box_asc">Sort: Set # (1 → N)</option>
-                    <option value="box_desc">Sort: Set # (N → 1)</option>
-                    <option value="boxes_count">Sort: Box Count (High → Low)</option>
-                    <option value="weight_desc">Sort: Net Wt (High → Low)</option>
-                  </select>
+                    icon={ArrowUpDown}
+                    options={[
+                      { value: 'pending_first', label: 'Sort: Pending First' },
+                      { value: 'last_updated', label: 'Sort: Last Updated' },
+                      { value: 'box_asc', label: 'Sort: Set # (1 → N)' },
+                      { value: 'box_desc', label: 'Sort: Set # (N → 1)' },
+                      { value: 'boxes_count', label: 'Sort: Box Count (High → Low)' },
+                      { value: 'weight_desc', label: 'Sort: Net Wt (High → Low)' },
+                    ]}
+                  />
                 </div>
+              </div>
+
+              {/* Bottom Row: Full Width Segmented Filter Tabs Bar */}
+              <div className="grid grid-cols-3 gap-1 bg-slate-100/80 p-1 rounded-2xl w-full">
+                <button
+                  onClick={() => setSetFilter('all')}
+                  className={`py-1.5 px-3 text-xs font-extrabold rounded-xl transition-all text-center whitespace-nowrap ${
+                    setFilter === 'all'
+                      ? 'bg-white text-slate-900 shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  All ({boxSets.length})
+                </button>
+                <button
+                  onClick={() => setSetFilter('pending')}
+                  className={`py-1.5 px-3 text-xs font-extrabold rounded-xl transition-all text-center whitespace-nowrap ${
+                    setFilter === 'pending'
+                      ? 'bg-white text-amber-800 shadow-2xs'
+                      : 'text-amber-800 hover:text-amber-900'
+                  }`}
+                >
+                  Pending ({pendingBoxSets.length})
+                </button>
+                <button
+                  onClick={() => setSetFilter('loaded')}
+                  className={`py-1.5 px-3 text-xs font-extrabold rounded-xl transition-all text-center whitespace-nowrap ${
+                    setFilter === 'loaded'
+                      ? 'bg-white text-emerald-800 shadow-2xs'
+                      : 'text-emerald-800 hover:text-emerald-900'
+                  }`}
+                >
+                  Loaded ({loadedBoxSets.length})
+                </button>
               </div>
             </div>
 
             {/* Mobile Cards View */}
             <div className="sm:hidden space-y-3">
               {filteredBoxSets.length === 0 ? (
-                <div className="py-8 text-center text-xs text-slate-400 space-y-2">
+                <div className="py-8 text-center text-xs text-slate-400 space-y-2 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
                   <p>
                     {setFilter === 'pending'
                       ? 'No pending sets! All recorded box sets have loaded weight entered.'
@@ -1053,7 +1142,7 @@ export const DispatchPage = () => {
                   </p>
                   <button
                     onClick={handleOpenCreateSetForm}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-all"
                   >
                     <Plus className="h-4 w-4" /> Create First Set (Tare Wt)
                   </button>
@@ -1063,46 +1152,51 @@ export const DispatchPage = () => {
                   const isPending = !s.loadedWeight || Number(s.loadedWeight) <= 0;
 
                   return (
-                    <div key={s.id} className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-2.5 shadow-2xs">
-                      <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+                    <div key={s.id} className="rounded-2xl border border-slate-200/90 bg-white p-4 space-y-3 shadow-2xs hover:shadow-xs transition-all">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs font-black text-slate-900">Box Set #{s.boxSetNumber} ({s.boxesInSet || 5} Boxes)</span>
-                          <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${
-                            isPending ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-100 text-emerald-800'
+                          <span className="text-sm font-black text-slate-900">Box Set #{s.boxSetNumber}</span>
+                          <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg">
+                            {s.boxesInSet || 5} Boxes
+                          </span>
+                          <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                            isPending ? 'bg-amber-50 text-amber-800 border-amber-200/80' : 'bg-emerald-50 text-emerald-800 border-emerald-200/80'
                           }`}>
                             {isPending ? 'Pending Load Wt' : 'Loaded ✓'}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            onClick={() => handleEditBoxSet(s)}
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-200/60"
-                            title="Edit Box Set (Popup)"
-                          >
-                            <Edit className="h-4 w-4 text-emerald-700" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteBoxSet(s.id)}
-                            className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-100/60"
-                            title="Delete Box Set"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
+                        {!isReadOnly && (
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              onClick={() => handleEditBoxSet(s)}
+                              className="rounded-xl p-1.5 bg-slate-100/80 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                              title="Edit Box Set (Popup)"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteBoxSet(s.id)}
+                              className="rounded-xl p-1.5 bg-slate-100/80 text-rose-500 hover:bg-rose-100 transition-colors"
+                              title="Delete Box Set"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="bg-white p-2.5 rounded-lg border border-slate-100">
-                          <span className="text-[10px] text-slate-400 font-bold block uppercase">Tare / Loaded Wt</span>
-                          <span className="font-bold text-slate-700">
-                            {s.emptyBoxWeight} kg / {isPending ? <em className="text-amber-600 font-normal">Pending</em> : `${s.loadedWeight} kg`}
+                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-100/90">
+                          <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider mb-0.5">Tare / Loaded Wt</span>
+                          <span className="font-extrabold text-slate-900 text-xs block">
+                            {s.emptyBoxWeight} kg / {isPending ? <em className="text-amber-600 font-normal italic">Pending</em> : `${s.loadedWeight} kg`}
                           </span>
                         </div>
-                        <div className={`p-2.5 rounded-lg border ${isPending ? 'bg-amber-50 border-amber-100' : 'bg-emerald-50 border-emerald-100'}`}>
-                          <span className={`text-[10px] font-bold block uppercase ${isPending ? 'text-amber-700' : 'text-emerald-700'}`}>
+                        <div className={`p-3 rounded-xl border ${isPending ? 'bg-amber-50/80 border-amber-200/60' : 'bg-emerald-50/80 border-emerald-200/60'}`}>
+                          <span className={`text-[10px] font-bold block uppercase tracking-wider mb-0.5 ${isPending ? 'text-amber-700' : 'text-emerald-700'}`}>
                             Net Chicken Wt
                           </span>
-                          <span className={`font-black ${isPending ? 'text-amber-900 text-xs' : 'text-emerald-900 text-sm'}`}>
+                          <span className={`font-black block ${isPending ? 'text-amber-900 text-xs' : 'text-emerald-900 text-sm'}`}>
                             {isPending ? 'Click button below' : `${s.totalChickenWeight} kg`}
                           </span>
                         </div>
@@ -1111,15 +1205,15 @@ export const DispatchPage = () => {
                       {isPending ? (
                         <button
                           onClick={() => handleEnterLoadWeight(s)}
-                          className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 py-2 text-xs font-bold text-white shadow-2xs hover:from-amber-700 hover:to-orange-700 transition-all active:scale-95"
+                          className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 py-2.5 text-xs font-bold text-white shadow-2xs hover:from-amber-700 hover:to-orange-700 transition-all active:scale-98 cursor-pointer"
                         >
                           <Scale className="h-3.5 w-3.5" />
                           <span>+ Enter Loaded Weight (Popup)</span>
                         </button>
                       ) : (
-                        <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-200/60 text-slate-600 font-medium">
-                          <span>Birds: <strong className="text-slate-900">{s.chickenCount}</strong></span>
-                          <span>Avg: <strong className="text-slate-900">{s.averageChickenWeight} kg/bird</strong></span>
+                        <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-100 text-slate-600 font-semibold">
+                          <span>Birds: <strong className="text-slate-900 font-bold">{s.chickenCount}</strong></span>
+                          <span>Avg: <strong className="text-slate-900 font-bold">{s.averageChickenWeight} kg/bird</strong></span>
                         </div>
                       )}
                     </div>
@@ -1129,22 +1223,22 @@ export const DispatchPage = () => {
             </div>
 
             {/* Desktop Table View */}
-            <div className="hidden sm:block overflow-x-auto">
+            <div className="hidden sm:block overflow-hidden rounded-2xl border border-slate-200/90 shadow-2xs">
               <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
-                    <th className="pb-3 px-2">Set #</th>
-                    <th className="pb-3 px-2">Status</th>
-                    <th className="pb-3 px-2">Boxes in Set</th>
-                    <th className="pb-3 px-2">Empty Box Wt</th>
-                    <th className="pb-3 px-2">Loaded Wt</th>
-                    <th className="pb-3 px-2">Birds Count</th>
-                    <th className="pb-3 px-2">Total Net Wt</th>
-                    <th className="pb-3 px-2">Avg Weight</th>
-                    <th className="pb-3 px-2 text-right">Actions</th>
+                <thead className="bg-slate-50/90 text-slate-600 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200/80">
+                  <tr>
+                    <th className="py-3.5 px-4">Set #</th>
+                    <th className="py-3.5 px-4">Status</th>
+                    <th className="py-3.5 px-4">Boxes in Set</th>
+                    <th className="py-3.5 px-4">Empty Box Wt</th>
+                    <th className="py-3.5 px-4">Loaded Wt</th>
+                    <th className="py-3.5 px-4">Birds Count</th>
+                    <th className="py-3.5 px-4">Total Net Wt</th>
+                    <th className="py-3.5 px-4">Avg Weight</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 font-medium">
+                <tbody className="divide-y divide-slate-100 font-medium bg-white">
                   {filteredBoxSets.length === 0 ? (
                     <tr>
                       <td colSpan="9" className="py-8 text-center text-slate-400">
@@ -1160,22 +1254,22 @@ export const DispatchPage = () => {
                       const isPending = !s.loadedWeight || Number(s.loadedWeight) <= 0;
 
                       return (
-                        <tr key={s.id} className="hover:bg-slate-50">
-                          <td className="py-3 px-2 font-bold text-slate-900">Box Set #{s.boxSetNumber}</td>
-                          <td className="py-3 px-2">
-                            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${
-                              isPending ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-100 text-emerald-800'
+                        <tr key={s.id} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="py-3.5 px-4 font-bold text-slate-900">Box Set #{s.boxSetNumber}</td>
+                          <td className="py-3.5 px-4">
+                            <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                              isPending ? 'bg-amber-50 text-amber-800 border-amber-200/80' : 'bg-emerald-50 text-emerald-800 border-emerald-200/80'
                             }`}>
                               {isPending ? 'Pending Load Wt' : 'Loaded ✓'}
                             </span>
                           </td>
-                          <td className="py-3 px-2 text-slate-700 font-bold">{s.boxesInSet || 5} Boxes</td>
-                          <td className="py-3 px-2 text-slate-600">{s.emptyBoxWeight} kg</td>
-                          <td className="py-3 px-2">
+                          <td className="py-3.5 px-4 text-slate-700 font-bold">{s.boxesInSet || 5} Boxes</td>
+                          <td className="py-3.5 px-4 text-slate-600">{s.emptyBoxWeight} kg</td>
+                          <td className="py-3.5 px-4">
                             {isPending ? (
                               <button
                                 onClick={() => handleEnterLoadWeight(s)}
-                                className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors"
+                                className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer"
                               >
                                 <Plus className="h-3 w-3" /> Add Load Wt (Popup)
                               </button>
@@ -1183,34 +1277,38 @@ export const DispatchPage = () => {
                               <span className="font-bold text-slate-900">{s.loadedWeight} kg</span>
                             )}
                           </td>
-                          <td className="py-3 px-2 text-emerald-700 font-bold">{s.chickenCount}</td>
-                          <td className="py-3 px-2">
+                          <td className="py-3.5 px-4 text-emerald-700 font-bold">{s.chickenCount}</td>
+                          <td className="py-3.5 px-4">
                             {isPending ? (
                               <span className="text-amber-600 font-semibold italic text-[11px]">Pending Load</span>
                             ) : (
                               <span className="text-emerald-600 font-black">{s.totalChickenWeight} kg</span>
                             )}
                           </td>
-                          <td className="py-3 px-2 font-bold text-slate-900">
+                          <td className="py-3.5 px-4 font-bold text-slate-900">
                             {isPending ? '—' : `${s.averageChickenWeight} kg`}
                           </td>
-                          <td className="py-3 px-2 text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                onClick={() => handleEditBoxSet(s)}
-                                className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                                title="Edit Box Set (Popup)"
-                              >
-                                <Edit className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteBoxSet(s.id)}
-                                className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
-                                title="Delete Box Set"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
+                          <td className="py-3.5 px-4 text-right">
+                            {!isReadOnly ? (
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  onClick={() => handleEditBoxSet(s)}
+                                  className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                                  title="Edit Box Set (Popup)"
+                                >
+                                  <Edit className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteBoxSet(s.id)}
+                                  className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors"
+                                  title="Delete Box Set"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 font-semibold italic">Locked</span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -1468,7 +1566,7 @@ export const DispatchPage = () => {
         <Modal
           isOpen={showExtraSetPromptModal}
           onClose={() => setShowExtraSetPromptModal(false)}
-          title={`Target Box Count Reached (${totalWeighedBoxes} / ${activeDispatch.totalBoxCount} Boxes)`}
+          title={`Target Box Count Reached (${activeDispatch.totalBoxCount} / ${activeDispatch.totalBoxCount} Boxes)`}
           maxWidth="max-w-md"
         >
           <div className="space-y-4 text-center">
@@ -1514,18 +1612,18 @@ export const DispatchPage = () => {
       <Modal
         isOpen={showHeaderForm}
         onClose={() => setShowHeaderForm(false)}
-        title={activeDispatch ? `Edit Vehicle Card: ${activeDispatch.vehicleNumber}` : "Setup New Vehicle Dispatch Card"}
+        title={activeDispatch ? `Edit Dispatch: ${activeDispatch.vehicleName || activeDispatch.vehicleNumber}` : "Setup New Dispatch Card"}
       >
         <form onSubmit={handleSaveDispatchHeader} className="space-y-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Trader / Vehicle Name *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Trader Name *</label>
               <input
                 type="text"
                 required
                 value={dispatchHeader.vehicleName}
                 onChange={(e) => setDispatchHeader({ ...dispatchHeader, vehicleName: e.target.value })}
-                placeholder="e.g. Sri Amman Poultry / Eicher"
+                placeholder="e.g. Sri Amman Poultry Traders"
                 className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
               />
             </div>

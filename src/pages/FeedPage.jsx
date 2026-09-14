@@ -5,7 +5,9 @@ import { formatFeedStock, bagsToKg, kgToBags } from '../utils/calculations';
 import { KG_PER_BAG } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
 import { Modal } from '../components/common/Modal';
-import { Package, Wheat, Truck, Save, CheckCircle2, Edit, Trash2, Layers, Plus, Eye, User, Calendar, FileText, RotateCcw } from 'lucide-react';
+import { Package, Wheat, Truck, Save, CheckCircle2, Edit, Trash2, Layers, Plus, Eye, User, Calendar, FileText, RotateCcw, AlertCircle } from 'lucide-react';
+import CustomSelect from '../components/common/CustomSelect';
+import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
 export const FeedPage = () => {
   const { userProfile, isFarmer } = useAuth();
@@ -43,24 +45,22 @@ export const FeedPage = () => {
 
   async function loadBatches() {
     try {
+      setLoading(true);
       const all = await dbGetBatches();
       let accessible = all;
-      if (isFarmer) {
-        accessible = all.filter(
-          b => b.assignedFarmerId === userProfile?.uid ||
-               b.assignedFarmerName === userProfile?.name ||
-               userProfile?.assignedBatches?.includes(b.batchNumber) ||
-               userProfile?.assignedBatches?.includes(b.id)
-        );
-      }
       setBatches(accessible);
       if (accessible.length > 0) {
-        const active = accessible.find(b => b.status === 'Active') || accessible[0];
-        setSelectedBatchId(active.id);
+        const activeBatches = accessible.filter(b => (b.status || '').toLowerCase() === 'active');
+        const defaultBatch = activeBatches.length > 0 
+          ? activeBatches[activeBatches.length - 1] 
+          : accessible[accessible.length - 1];
+        setSelectedBatchId(defaultBatch.id);
+        await loadFeedArrivals(defaultBatch.id);
+      } else {
+        setLoading(false);
       }
     } catch (err) {
       console.error('Failed loading batches for feed:', err);
-    } finally {
       setLoading(false);
     }
   }
@@ -73,10 +73,13 @@ export const FeedPage = () => {
       setBatches(allBatches);
     } catch (err) {
       console.error('Failed loading feed arrivals:', err);
+    } finally {
+      setLoading(false);
     }
   }
 
   const selectedBatch = batches.find(b => b.id === selectedBatchId);
+  const isReadOnly = selectedBatch ? (selectedBatch.status || '').toLowerCase() === 'completed' : false;
   const feedStock = selectedBatch?.feedStock || { 'Pre-Starter': 0, 'Starter': 0, 'Finisher': 0 };
 
   const feedStats = feedArrivals.reduce((acc, f) => {
@@ -121,6 +124,7 @@ export const FeedPage = () => {
   const finisherConsumedBags = Math.max(0, parseFloat((finisherArrivedBags - finisherAvailableBags).toFixed(1)));
 
   const handleEditArrival = (arrival) => {
+    if (isReadOnly) return;
     setEditingFeedId(arrival.id);
     setShowForm(true);
     const bags = arrival.bagsReceived !== undefined ? arrival.bagsReceived : kgToBags(arrival.quantityReceived || 0, KG_PER_BAG);
@@ -137,6 +141,7 @@ export const FeedPage = () => {
   };
 
   const handleDeleteArrival = async (feedId) => {
+    if (isReadOnly) return;
     if (!confirm('Are you sure you want to delete this feed entry? Stock KPI cards will recalculate.')) return;
     try {
       await dbDeleteFeedArrival(selectedBatchId, feedId);
@@ -151,7 +156,7 @@ export const FeedPage = () => {
   const handleAddArrival = async (e) => {
     e.preventDefault();
     setSuccessMsg('');
-    if (!selectedBatch) return;
+    if (!selectedBatch || isReadOnly) return;
 
     setSaving(true);
     try {
@@ -224,37 +229,55 @@ export const FeedPage = () => {
     return type === transactionFilter;
   });
 
-  if (loading) return <div className="p-8 text-center text-slate-500">Loading Feed Management...</div>;
+  if (loading) return <LoadingSpinner message="Loading Feed Management..." />;
 
   return (
     <div className="space-y-6">
       {/* Page Header with Single Action Button */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900">Feed Stock & Return Management</h1>
-          <p className="text-sm font-medium text-slate-500">Log incoming feed stock, record returned feed, and monitor available inventory.</p>
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900 truncate">
+            Feed Stock & Return Management
+          </h1>
         </div>
-        <button
-          onClick={() => {
-            setEditingFeedId(null);
-            setFormData({
-              transactionType: 'Receive',
-              feedType: 'Pre-Starter',
-              driverName: '',
-              vehicleNumber: '',
-              bagsReceived: 5,
-              additionalKg: 0,
-              date: new Date().toISOString().split('T')[0],
-              notes: ''
-            });
-            setShowForm(true);
-          }}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95 shrink-0"
-        >
-          <Plus className="h-4 w-4" />
-          <span>+ Log Feed Stock</span>
-        </button>
+        {!isReadOnly && (
+          <button
+            onClick={() => {
+              setEditingFeedId(null);
+              setFormData({
+                transactionType: 'Receive',
+                feedType: 'Pre-Starter',
+                driverName: '',
+                vehicleNumber: '',
+                bagsReceived: 5,
+                additionalKg: 0,
+                date: new Date().toISOString().split('T')[0],
+                notes: ''
+              });
+              setShowForm(true);
+            }}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-3 py-2 sm:px-4 sm:py-2.5 text-xs font-black text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95 shrink-0 whitespace-nowrap cursor-pointer"
+          >
+            <Plus className="h-4 w-4 shrink-0" />
+            <span>Log Feed Stock</span>
+          </button>
+        )}
       </div>
+
+      {isReadOnly && (
+        <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-amber-800 flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
+            <div>
+              <p className="text-xs font-bold">Batch Marked as Completed ({selectedBatch?.batchName || selectedBatch?.batchNumber})</p>
+              <p className="text-[11px] text-amber-700">This batch is completed. Feed transactions are in read-only mode.</p>
+            </div>
+          </div>
+          <span className="rounded-md bg-amber-200/80 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-900">
+            Read-Only Mode
+          </span>
+        </div>
+      )}
 
       {/* KPI Stock Cards in Bags */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -565,38 +588,39 @@ export const FeedPage = () => {
         </form>
       </Modal>
 
-      {/* Feed Transaction Log History Table */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 mb-4">
-          <h2 className="text-base font-bold text-slate-900">
+      {/* Feed Transaction Log History */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm min-w-0">
+        <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3 mb-4 min-w-0">
+          <h2 className="text-xs sm:text-base font-black text-slate-900 truncate">
             Feed Transaction Log History ({selectedBatch?.batchNumber})
           </h2>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-500">Filter:</span>
-            <select
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-bold shrink-0 whitespace-nowrap">
+            <span>Filter:</span>
+            <CustomSelect
               value={transactionFilter}
               onChange={(e) => setTransactionFilter(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-800 focus:border-emerald-600 cursor-pointer"
-            >
-              <option value="ALL">All Transactions ({feedArrivals.length})</option>
-              <option value="Receive">Received Feed Only</option>
-              <option value="Return">Returned Feed Only</option>
-            </select>
+              options={[
+                { value: 'ALL', label: `All (${feedArrivals.length})` },
+                { value: 'Receive', label: 'Received Only' },
+                { value: 'Return', label: 'Returned Only' },
+              ]}
+            />
           </div>
         </div>
 
-        <div className="w-full overflow-hidden">
-          <table className="w-full text-left text-xs table-fixed">
-            <thead>
-              <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
-                <th className="pb-3 px-1 w-[22%] truncate" title="Date">Date</th>
-                <th className="pb-3 px-1 w-[24%] truncate" title="Type">Transaction</th>
-                <th className="pb-3 px-1 w-[24%] truncate" title="Feed Category">Feed Category</th>
-                <th className="pb-3 px-1 w-[16%] truncate" title="Quantity">Quantity</th>
-                <th className="pb-3 px-1 w-[14%] text-right truncate" title="Actions">Actions</th>
+        {/* DESKTOP VIEW TABLE */}
+        <div className="hidden sm:block w-full overflow-x-auto rounded-xl border border-slate-100">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50 sticky top-0 border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold whitespace-nowrap">
+              <tr>
+                <th className="py-3 px-3">Date</th>
+                <th className="py-3 px-3">Transaction</th>
+                <th className="py-3 px-3">Feed Category</th>
+                <th className="py-3 px-3">Quantity</th>
+                <th className="py-3 px-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 font-medium">
+            <tbody className="divide-y divide-slate-100 font-medium whitespace-nowrap">
               {filteredFeedArrivals.length === 0 ? (
                 <tr>
                   <td colSpan="5" className="py-8 text-center text-slate-400">No feed transactions recorded matching criteria.</td>
@@ -611,8 +635,8 @@ export const FeedPage = () => {
                       onClick={() => setViewingDetail(f)}
                       className="hover:bg-slate-50 cursor-pointer transition-colors"
                     >
-                      <td className="py-3 px-1 font-bold text-slate-900 truncate" title={f.date}>{f.date}</td>
-                      <td className="py-3 px-1 font-bold truncate">
+                      <td className="py-3 px-3 font-bold text-slate-900">{f.date}</td>
+                      <td className="py-3 px-3 font-bold">
                         <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
                           isReturn ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                         }`}>
@@ -620,40 +644,46 @@ export const FeedPage = () => {
                           <span>{isReturn ? 'Return Feed' : 'Receive Feed'}</span>
                         </span>
                       </td>
-                      <td className={`py-3 px-1 font-bold truncate flex items-center gap-1.5 ${
-                        f.feedType === 'Pre-Starter' ? 'text-blue-600' :
-                        f.feedType === 'Starter' ? 'text-emerald-600' :
-                        f.feedType === 'Finisher' ? 'text-orange-600' : 'text-slate-700'
-                      }`} title={f.feedType}>
-                        <Package className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">{f.feedType}</span>
+                      <td className="py-3 px-3 font-bold">
+                        <div className={`inline-flex items-center gap-1.5 ${
+                          f.feedType === 'Pre-Starter' ? 'text-blue-600' :
+                          f.feedType === 'Starter' ? 'text-emerald-600' :
+                          f.feedType === 'Finisher' ? 'text-orange-600' : 'text-slate-700'
+                        }`}>
+                          <Package className="h-3.5 w-3.5 shrink-0" />
+                          <span>{f.feedType}</span>
+                        </div>
                       </td>
-                      <td className={`py-3 px-1 font-bold truncate ${isReturn ? 'text-amber-700' : 'text-emerald-700'}`} title={`${isReturn ? '-' : '+'}${bags} Bags ${f.additionalKg ? `& ${f.additionalKg} kg` : ''}`}>
+                      <td className={`py-3 px-3 font-bold ${isReturn ? 'text-amber-700' : 'text-emerald-700'}`}>
                         {isReturn ? '-' : '+'}{bags} Bags{f.additionalKg ? ` & ${f.additionalKg} kg` : ''}
                       </td>
-                      <td className="py-3 px-1 text-right" onClick={(e) => e.stopPropagation()}>
+                      <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => setViewingDetail(f)}
-                            className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
                             title="View Details"
                           >
                             <Eye className="h-3.5 w-3.5" />
                           </button>
-                          <button
-                            onClick={() => handleEditArrival(f)}
-                            className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                            title="Edit Entry"
-                          >
-                            <Edit className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteArrival(f.id)}
-                            className="rounded-lg p-1 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
-                            title="Delete Entry"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          {!isReadOnly && (
+                            <>
+                              <button
+                                onClick={() => handleEditArrival(f)}
+                                className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                                title="Edit Entry"
+                              >
+                                <Edit className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteArrival(f.id)}
+                                className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
+                                title="Delete Entry"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -662,6 +692,95 @@ export const FeedPage = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* MOBILE CARDS VIEW */}
+        <div className="block sm:hidden space-y-3.5">
+          {filteredFeedArrivals.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-400">
+              No feed transactions recorded matching criteria.
+            </div>
+          ) : (
+            filteredFeedArrivals.map((f) => {
+              const bags = f.bagsReceived !== undefined ? f.bagsReceived : kgToBags(f.quantityReceived || 0, KG_PER_BAG);
+              const isReturn = f.transactionType === 'Return';
+
+              return (
+                <div
+                  key={f.id}
+                  onClick={() => setViewingDetail(f)}
+                  className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs hover:shadow-md hover:border-emerald-300 transition-all cursor-pointer space-y-3"
+                >
+                  {/* Card Header Row */}
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <span className="text-sm font-black text-slate-900">{f.date}</span>
+                    </div>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
+                      isReturn ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    }`}>
+                      {isReturn ? <RotateCcw className="h-3 w-3 shrink-0" /> : <Plus className="h-3 w-3 shrink-0" />}
+                      <span>{isReturn ? 'Return Feed' : 'Receive Feed'}</span>
+                    </span>
+                  </div>
+
+                  {/* Feed Category & Quantity Details */}
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100 space-y-0.5 min-w-0">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Feed Type</span>
+                      <div className={`font-black flex items-center gap-1 truncate ${
+                        f.feedType === 'Pre-Starter' ? 'text-blue-600' :
+                        f.feedType === 'Starter' ? 'text-emerald-600' :
+                        f.feedType === 'Finisher' ? 'text-orange-600' : 'text-slate-700'
+                      }`}>
+                        <Package className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{f.feedType}</span>
+                      </div>
+                    </div>
+
+                    <div className={`rounded-xl p-2.5 border space-y-0.5 min-w-0 ${
+                      isReturn ? 'bg-amber-50/80 border-amber-100 text-amber-900' : 'bg-emerald-50/80 border-emerald-100 text-emerald-950'
+                    }`}>
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Quantity</span>
+                      <span className="font-black text-xs block truncate">
+                        {isReturn ? '-' : '+'}{bags} Bags{f.additionalKg ? ` & ${f.additionalKg}kg` : ''}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card Footer Actions */}
+                  <div className="flex items-center justify-between border-t border-slate-100 pt-2.5 text-xs">
+                    <span className="font-extrabold text-emerald-700 flex items-center gap-1.5 hover:text-emerald-800">
+                      <Eye className="h-3.5 w-3.5 text-emerald-600" />
+                      <span>View Details</span>
+                    </span>
+
+                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                      {!isReadOnly && (
+                        <>
+                          <button
+                            onClick={() => handleEditArrival(f)}
+                            className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                            title="Edit Entry"
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteArrival(f.id)}
+                            className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors"
+                            title="Delete Entry"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </div>

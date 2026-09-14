@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { dbGetInvoices, dbGetBoxSets } from '../services/dbService';
 import { TraderInvoiceModal } from '../components/invoice/TraderInvoiceModal';
 import { Search } from 'lucide-react';
+import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
 export const InvoicesPage = () => {
   const [invoices, setInvoices] = useState([]);
@@ -41,14 +42,13 @@ export const InvoicesPage = () => {
     (inv.vehicleNumber && inv.vehicleNumber.toLowerCase().includes(search.toLowerCase()))
   );
 
-  if (loading) return <div className="p-8 text-center text-slate-500">Loading Invoice History...</div>;
+  if (loading) return <LoadingSpinner message="Loading Invoice History..." />;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900">Dispatch Invoice History</h1>
-          <p className="text-sm font-medium text-slate-500">View, print, and export official verified trader sales invoices.</p>
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900 truncate">Dispatch Invoice History</h1>
         </div>
       </div>
 

@@ -1,14 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { dbGetBatches, dbGetDailyRecords, dbSaveDailyRecord, dbDeleteDailyRecord, dbUpdateBatchFeedStockPool, dbLogAuditEvent } from '../services/dbService';
 import { calculateRemainingChickens, validateRecordDate, deductFeedStock, bagsToKg, kgToBags } from '../utils/calculations';
 import { KG_PER_BAG, FEED_CONSUMPTION_TARGETS, AVERAGE_WEIGHT_TARGETS } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
 import { Modal } from '../components/common/Modal';
-import { ClipboardList, AlertCircle, Save, CheckCircle2, Edit, Trash2, Layers, Plus, X, Calendar, Package, Scale, Target, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ClipboardList, AlertCircle, Save, CheckCircle2, Edit, Trash2, Layers, Plus, X, Calendar, Package, Scale, Target, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
+import CustomSelect from '../components/common/CustomSelect';
+import CustomDatePicker from '../components/common/CustomDatePicker';
+import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
 export const DailyRecordsPage = () => {
   const { userProfile, isFarmer } = useAuth();
+  const historySectionRef = useRef(null);
   const [batches, setBatches] = useState([]);
   const [selectedBatchId, setSelectedBatchId] = useState('');
   const [recordsMap, setRecordsMap] = useState({});
@@ -21,6 +25,12 @@ export const DailyRecordsPage = () => {
   const [viewingRecord, setViewingRecord] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  const scrollToHistoryTop = () => {
+    if (historySectionRef.current) {
+      historySectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -44,24 +54,22 @@ export const DailyRecordsPage = () => {
 
   async function loadBatches() {
     try {
+      setLoading(true);
       const all = await dbGetBatches();
       let accessible = all;
-      if (isFarmer) {
-        accessible = all.filter(
-          b => b.assignedFarmerId === userProfile?.uid ||
-               b.assignedFarmerName === userProfile?.name ||
-               userProfile?.assignedBatches?.includes(b.batchNumber) ||
-               userProfile?.assignedBatches?.includes(b.id)
-        );
-      }
       setBatches(accessible);
       if (accessible.length > 0) {
-        const active = accessible.find(b => b.status === 'Active') || accessible[0];
-        setSelectedBatchId(active.id);
+        const activeBatches = accessible.filter(b => (b.status || '').toLowerCase() === 'active');
+        const defaultBatch = activeBatches.length > 0 
+          ? activeBatches[activeBatches.length - 1] 
+          : accessible[accessible.length - 1];
+        setSelectedBatchId(defaultBatch.id);
+        await loadRecordsForBatch(defaultBatch.id);
+      } else {
+        setLoading(false);
       }
     } catch (err) {
       console.error('Failed loading batches for daily records:', err);
-    } finally {
       setLoading(false);
     }
   }
@@ -92,11 +100,13 @@ export const DailyRecordsPage = () => {
       }
     } catch (err) {
       console.error('Failed loading daily records:', err);
+    } finally {
+      setLoading(false);
     }
   }
 
   const selectedBatch = batches.find(b => b.id === selectedBatchId);
-  const isReadOnly = selectedBatch?.status === 'Completed';
+  const isReadOnly = selectedBatch ? (selectedBatch.status || '').toLowerCase() === 'completed' : false;
 
   const handleOpenNewForm = () => {
     setErrorMsg('');
@@ -369,29 +379,28 @@ export const DailyRecordsPage = () => {
     viewingWeightDiff = Number(viewingRecord.averageWeight || 0) - viewingTargetWeight;
   }
 
-  if (loading) return <div className="p-8 text-center text-slate-500">Loading Daily Farm Records...</div>;
+  if (loading) return <LoadingSpinner message="Loading Daily Farm Records..." />;
 
   return (
     <div className="space-y-6">
       {/* Page Header with Action Button */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">Daily Farm Records</h1>
-          <p className="text-xs sm:text-sm font-medium text-slate-500">Record daily mortality, feed consumption in Bags, and chicken growth weights.</p>
-        </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900 shrink-0">
+          Daily Farm Records
+        </h1>
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setShowTargetsTable(!showTargetsTable)}
-            className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-xs w-full sm:w-auto"
+            className="hidden sm:inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-2xs cursor-pointer"
           >
             <Target className="h-4 w-4 text-emerald-600 shrink-0" />
-            <span>{showTargetsTable ? 'Hide Target Reference' : 'Target Feed & Weight Standards (Day 1-45)'}</span>
+            <span>{showTargetsTable ? 'Hide Targets' : 'Target Standards'}</span>
           </button>
 
           {!isReadOnly && (
             <button
               onClick={handleOpenNewForm}
-              className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-3.5 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95 w-full sm:w-auto"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs font-bold text-white shadow-sm transition-all active:scale-95 shrink-0 whitespace-nowrap cursor-pointer"
             >
               <Plus className="h-4 w-4 shrink-0" />
               <span>Record Daily Log</span>
@@ -400,13 +409,27 @@ export const DailyRecordsPage = () => {
         </div>
       </div>
 
+      {isReadOnly && (
+        <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-amber-800 flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
+            <div>
+              <p className="text-xs font-bold">Batch Marked as Completed ({selectedBatch?.batchName || selectedBatch?.batchNumber})</p>
+              <p className="text-[11px] text-amber-700">This batch is completed. Data entry, edits, and deletions are disabled.</p>
+            </div>
+          </div>
+          <span className="rounded-md bg-amber-200/80 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-900">
+            Read-Only Mode
+          </span>
+        </div>
+      )}
+
       {/* Target Feed & Weight Standards Reference Panel */}
       {showTargetsTable && (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm space-y-4 min-w-0">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-sm sm:text-base font-bold text-slate-900">Standard Daily Feed & Growth Weight Targets (Day 1 - 45)</h2>
-              <p className="text-xs text-slate-500 mt-0.5">Recommended daily feed intake per bird (g), target body weight (g), and estimated total batch daily feed.</p>
             </div>
             <button
               onClick={() => setShowTargetsTable(false)}
@@ -538,15 +561,13 @@ export const DailyRecordsPage = () => {
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Record Date *</label>
-            <input
-              type="date"
-              required
+            <CustomDatePicker
+              value={formData.recordDate}
               min={selectedBatch?.chickArrivalDate}
               max={todayStr}
               disabled={isReadOnly}
-              value={formData.recordDate}
-              onChange={(e) => handleDateChange(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
+              loggedDates={Object.keys(recordsMap || {})}
+              onChange={(newDate) => handleDateChange(newDate)}
             />
           </div>
 
@@ -779,40 +800,34 @@ export const DailyRecordsPage = () => {
       </Modal>
 
       {/* History Table with Edit and Delete Actions - Fixed Header & Paginated */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm min-w-0">
-        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 mb-4">
-          <div className="flex items-center justify-between sm:justify-start gap-2">
-            <h2 className="text-sm sm:text-base font-bold text-slate-900">
+      <div ref={historySectionRef} className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm min-w-0">
+        <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3 mb-4 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h2 className="text-xs sm:text-base font-black text-slate-900 truncate">
               Daily Record Log History ({selectedBatch?.batchNumber})
             </h2>
-            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600">
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] sm:text-xs font-bold text-slate-600 shrink-0 whitespace-nowrap">
               {totalRecords} Entries
             </span>
           </div>
 
-          <div className="flex items-center justify-between sm:justify-end gap-3">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
-              <span>View:</span>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-bold text-slate-800 focus:border-emerald-600 focus:bg-white transition-colors cursor-pointer"
-              >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={30}>30</option>
-                <option value={40}>40</option>
-                <option value={50}>50</option>
-              </select>
-              <span>records</span>
-            </div>
+          <div className="flex items-center gap-1 text-[11px] sm:text-xs text-slate-500 font-bold shrink-0 whitespace-nowrap">
+            <span>View:</span>
+            <CustomSelect
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setCurrentPage(1);
+                scrollToHistoryTop();
+              }}
+              options={[10, 20, 30, 40, 50].map((num) => ({ value: num, label: String(num) }))}
+            />
+            <span className="hidden sm:inline">records</span>
           </div>
         </div>
 
-        <div className="w-full overflow-auto max-h-[440px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden rounded-xl border border-slate-100">
+        {/* DESKTOP VIEW TABLE */}
+        <div className="hidden sm:block w-full overflow-auto max-h-[440px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden rounded-xl border border-slate-100">
           <table className="w-full min-w-[500px] text-left text-xs">
             <thead className="bg-slate-50 sticky top-0 border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold whitespace-nowrap z-10 shadow-2xs">
               <tr>
@@ -863,28 +878,32 @@ export const DailyRecordsPage = () => {
                         {r.averageWeight} g <span className={`text-[10px] font-semibold ${rWeightDiff < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>({rDiffStr})</span>
                       </td>
                       <td className="p-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditRecord(r);
-                            }}
-                            className="rounded-lg p-1 text-slate-500 hover:bg-slate-200/60 hover:text-slate-900"
-                            title="Edit Record"
-                          >
-                            <Edit className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteRecord(r.recordDate);
-                            }}
-                            className="rounded-lg p-1 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
-                            title="Delete Record"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+                        {!isReadOnly ? (
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditRecord(r);
+                              }}
+                              className="rounded-lg p-1 text-slate-500 hover:bg-slate-200/60 hover:text-slate-900"
+                              title="Edit Record"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteRecord(r.recordDate);
+                              }}
+                              className="rounded-lg p-1 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
+                              title="Delete Record"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 font-semibold italic">Locked</span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -892,6 +911,107 @@ export const DailyRecordsPage = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* MOBILE VIEW CARDS DESIGN MATCHING USER SCREENSHOT */}
+        <div className="block sm:hidden space-y-3.5">
+          {totalRecords === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-400">
+              No daily records for this batch yet. Click "+ Record Daily Log" to add data.
+            </div>
+          ) : (
+            paginatedRecords.map((r) => {
+              const bags = r.feedConsumptionBags !== undefined ? r.feedConsumptionBags : (r.feedConsumption ? Math.floor(r.feedConsumption / KG_PER_BAG) : 0);
+              const looseKg = r.additionalLooseKg !== undefined && r.additionalLooseKg !== null ? r.additionalLooseKg : (r.feedConsumption ? parseFloat((r.feedConsumption % KG_PER_BAG).toFixed(1)) : 0);
+              const totalKg = Number(r.feedConsumption || ((bags * KG_PER_BAG) + looseKg));
+              const chickCount = Number(r.remainingChickCount || selectedBatch?.remainingChickCount || selectedBatch?.initialChickCount || 5000);
+
+              return (
+                <div
+                  key={r.recordDate}
+                  onClick={() => setViewingRecord(r)}
+                  className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs hover:shadow-md hover:border-emerald-300 transition-all cursor-pointer space-y-3.5"
+                >
+                  {/* Card Header Row */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <span className="text-sm font-black text-slate-900">{r.recordDate}</span>
+                    </div>
+                    <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
+                      Live: {chickCount.toLocaleString()}
+                    </span>
+                  </div>
+
+                  {/* 3 Color-Coded Stat Blocks */}
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    {/* Mortality */}
+                    <div className="rounded-xl bg-rose-50/80 p-2 border border-rose-100/90 min-w-0">
+                      <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-tight text-rose-500 block mb-0.5 whitespace-nowrap truncate">
+                        MORTALITY
+                      </span>
+                      <span className="text-base font-black text-rose-700 block">
+                        {r.mortalityCount || 0}
+                      </span>
+                    </div>
+
+                    {/* Feed (Kg) */}
+                    <div className="rounded-xl bg-amber-50/80 p-2 border border-amber-100/90 min-w-0">
+                      <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-tight text-amber-600 block mb-0.5 whitespace-nowrap truncate">
+                        FEED (KG)
+                      </span>
+                      <span className="text-base font-black text-amber-800 block">
+                        {totalKg} kg
+                      </span>
+                    </div>
+
+                    {/* Avg Weight */}
+                    <div className="rounded-xl bg-purple-50/80 p-2 border border-purple-100/90 min-w-0">
+                      <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-tight text-purple-600 block mb-0.5 whitespace-nowrap truncate">
+                        AVG WEIGHT
+                      </span>
+                      <span className="text-base font-black text-purple-800 block">
+                        {r.averageWeight || 0} g
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card Footer Actions */}
+                  <div className="flex items-center justify-between border-t border-slate-100 pt-2.5 text-xs">
+                    <span className="font-extrabold text-emerald-700 flex items-center gap-1.5 hover:text-emerald-800">
+                      <Eye className="h-3.5 w-3.5 text-emerald-600" />
+                      <span>View Details</span>
+                    </span>
+
+                    {!isReadOnly && (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditRecord(r);
+                          }}
+                          className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                          title="Edit Record"
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteRecord(r.recordDate);
+                          }}
+                          className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors"
+                          title="Delete Record"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
 
         {/* Pagination Controls */}
@@ -905,7 +1025,10 @@ export const DailyRecordsPage = () => {
 
             <div className="flex items-center justify-center gap-1.5">
               <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                onClick={() => {
+                  setCurrentPage(prev => Math.max(1, prev - 1));
+                  scrollToHistoryTop();
+                }}
                 disabled={currentPage === 1}
                 className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent transition-all shadow-2xs cursor-pointer"
               >
@@ -918,7 +1041,10 @@ export const DailyRecordsPage = () => {
               </div>
 
               <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                onClick={() => {
+                  setCurrentPage(prev => Math.min(totalPages, prev + 1));
+                  scrollToHistoryTop();
+                }}
                 disabled={currentPage === totalPages}
                 className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent transition-all shadow-2xs cursor-pointer"
               >

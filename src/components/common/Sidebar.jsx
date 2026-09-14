@@ -13,36 +13,27 @@ import {
   BarChart3,
   FileText,
   ShieldCheck,
+  History,
   X
 } from 'lucide-react';
 
 export const Sidebar = ({ isOpen, onClose }) => {
   const { isAdmin, isFarmer } = useAuth();
 
-  const adminNav = [
-    { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
-    { name: 'User Management', path: '/admin/users', icon: Users },
-    { name: 'Batch Management', path: '/admin/batches', icon: Layers },
+  const farmNav = [
+    { name: 'Dashboard', path: isAdmin ? '/admin/dashboard' : '/farmer/dashboard', icon: LayoutDashboard },
     { name: 'Daily Farm Records', path: '/daily-records', icon: ClipboardList },
     { name: 'Feed Management', path: '/feed', icon: Wheat },
     { name: 'Medicine & Vaccines', path: '/medicine', icon: Syringe },
     { name: 'Dispatch & Box Sets', path: '/dispatch', icon: Truck },
-    { name: 'Company Targets', path: '/admin/targets', icon: Target },
     { name: 'Reports & Analytics', path: '/reports', icon: BarChart3 },
-    { name: 'Invoice History', path: '/invoices', icon: FileText },
-    { name: 'Audit Logs', path: '/admin/audit-logs', icon: ShieldCheck }
+    ...(isAdmin ? [{ name: 'User Management', path: '/admin/users', icon: Users }] : []),
+    ...(isAdmin ? [{ name: 'Audit Logs', path: '/admin/audit-logs', icon: ShieldCheck }] : []),
+    { name: 'Batch Management', path: '/admin/batches', icon: Layers },
+    { name: 'Batch History', path: '/batch-history', icon: History }
   ];
 
-  const farmerNav = [
-    { name: 'My Dashboard', path: '/farmer/dashboard', icon: LayoutDashboard },
-    { name: 'Daily Entry', path: '/daily-records', icon: ClipboardList },
-    { name: 'Feed Stock', path: '/feed', icon: Wheat },
-    { name: 'Medicine Entry', path: '/medicine', icon: Syringe },
-    { name: 'Dispatch & Box Sets', path: '/dispatch', icon: Truck },
-    { name: 'My Batch Reports', path: '/reports', icon: BarChart3 }
-  ];
-
-  const navItems = isAdmin ? adminNav : farmerNav;
+  const navItems = farmNav;
 
   return (
     <>
@@ -68,7 +59,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
 
         <div className="flex-1 overflow-y-auto px-4 py-6">
           <div className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
-            {isAdmin ? 'Admin Console' : 'Farmer Operations'}
+            Farm Management
           </div>
           <nav className="space-y-1">
             {navItems.map((item) => {

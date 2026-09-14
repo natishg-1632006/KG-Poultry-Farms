@@ -17,7 +17,10 @@ import { CompanyTargetsPage } from './pages/CompanyTargetsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { InvoicesPage } from './pages/InvoicesPage';
 import { AuditLogsPage } from './pages/AuditLogsPage';
+import { BatchHistoryPage } from './pages/BatchHistoryPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+
+import { ScrollToTop } from './components/common/ScrollToTop';
 
 // Root redirect handler
 const IndexRedirect = () => {
@@ -30,6 +33,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <ScrollToTop />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
 
@@ -60,33 +64,11 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="admin/batches"
-              element={
-                <ProtectedRoute requireAdmin>
-                  <BatchesPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="admin/targets"
-              element={
-                <ProtectedRoute requireAdmin>
-                  <CompanyTargetsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="admin/audit-logs"
-              element={
-                <ProtectedRoute requireAdmin>
-                  <AuditLogsPage />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Shared Farmer & Admin Routes */}
+            {/* Shared Farm Operations Routes */}
             <Route path="farmer/dashboard" element={<FarmerDashboard />} />
+            <Route path="admin/batches" element={<BatchesPage />} />
+            <Route path="admin/targets" element={<CompanyTargetsPage />} />
+            <Route path="batch-history" element={<BatchHistoryPage />} />
             <Route path="daily-records" element={<DailyRecordsPage />} />
             <Route path="feed" element={<FeedPage />} />
             <Route path="medicine" element={<MedicinePage />} />

@@ -8,6 +8,7 @@ import { StatCard } from '../components/common/StatCard';
 import { Badge } from '../components/common/Badge';
 import { WeatherWidget } from '../components/common/WeatherWidget';
 import { ClipboardList, Wheat, Syringe, Truck, Activity, ArrowRight, Layers, AlertCircle, Scale, Calendar } from 'lucide-react';
+import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
 export const FarmerDashboard = () => {
   const { userProfile } = useAuth();
@@ -24,15 +25,12 @@ export const FarmerDashboard = () => {
   async function loadFarmerData() {
     try {
       const allBatches = await dbGetBatches();
-      const farmerBatches = allBatches.filter(
-        b => b.assignedFarmerId === userProfile?.uid || 
-             b.assignedFarmerName === userProfile?.name ||
-             userProfile?.assignedBatches?.includes(b.batchNumber) ||
-             userProfile?.assignedBatches?.includes(b.id)
-      );
-      
+      const farmerBatches = allBatches;
       setAssignedBatches(farmerBatches);
-      const currentActive = farmerBatches.find(b => b.status === 'Active') || farmerBatches[0];
+      const activeBatchesList = farmerBatches.filter(b => (b.status || '').toLowerCase() === 'active');
+      const currentActive = activeBatchesList.length > 0
+        ? activeBatchesList[activeBatchesList.length - 1]
+        : (farmerBatches.length > 0 ? farmerBatches[farmerBatches.length - 1] : null);
       setActiveBatch(currentActive);
 
       if (currentActive) {
@@ -51,12 +49,14 @@ export const FarmerDashboard = () => {
   }
 
   if (loading) {
-    return <div className="p-8 text-center text-slate-500">Loading Farmer Portal...</div>;
+    return <LoadingSpinner message="Loading Farmer Portal..." />;
   }
 
   const initialChicks = activeBatch ? Number(activeBatch.initialChickCount || 0) : 0;
   const totalMortality = records.reduce((acc, r) => acc + Number(r.mortalityCount || 0), 0);
-  const remainingChicks = Math.max(0, initialChicks - totalMortality);
+  const remainingChicks = activeBatch && activeBatch.remainingChickCount !== undefined
+    ? Number(activeBatch.remainingChickCount)
+    : Math.max(0, initialChicks - totalMortality);
 
   const totalFeedConsumedBags = records.reduce((acc, r) => {
     const bags = r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG);
@@ -92,16 +92,13 @@ export const FarmerDashboard = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900">Farmer Operations Portal</h1>
-          <p className="text-sm font-medium text-slate-500">
-            Welcome back, {userProfile?.name}! Farm: {userProfile?.farmName || 'Assigned Shed'}
-          </p>
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900 truncate">Farmer Portal</h1>
         </div>
         {activeBatch && (
-          <div className="flex items-center gap-2.5 rounded-xl bg-emerald-50 border border-emerald-200/80 px-4 py-2 text-xs font-bold text-emerald-900 shadow-xs">
-            <span>Current Batch: {activeBatch.batchNumber} ({activeBatch.batchName}) • <strong className="text-emerald-700">Day {flockAgeDays}</strong></span>
+          <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200/80 px-3 py-1.5 sm:px-4 sm:py-2 text-xs font-bold text-emerald-900 shadow-xs shrink-0">
+            <span className="truncate">Batch: {activeBatch.batchNumber} • <strong className="text-emerald-700">Day {flockAgeDays}</strong></span>
             <Badge variant={activeBatch.status}>{activeBatch.status}</Badge>
           </div>
         )}
@@ -147,49 +144,6 @@ export const FarmerDashboard = () => {
               icon={Scale}
               color="emerald"
             />
-          </div>
-
-          {/* Recent Daily Records Table */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-base font-bold text-slate-900 mb-4">Recent Daily Operational Records</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
-                    <th className="pb-3 px-2">Date</th>
-                    <th className="pb-3 px-2">Mortality</th>
-                    <th className="pb-3 px-2">Remaining Chicks</th>
-                    <th className="pb-3 px-2">Feed Type Used</th>
-                    <th className="pb-3 px-2">Bags Consumed</th>
-                    <th className="pb-3 px-2 text-right">Avg Weight (g)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium">
-                  {records.length === 0 ? (
-                    <tr>
-                      <td colSpan="6" className="py-6 text-center text-slate-400">No daily records logged for this batch yet.</td>
-                    </tr>
-                  ) : (
-                    records.map((r) => {
-                      const bagsUsed = r.feedConsumptionBags !== undefined ? r.feedConsumptionBags : (r.feedConsumption ? Math.floor(r.feedConsumption / KG_PER_BAG) : 0);
-                      const looseKg = r.additionalLooseKg !== undefined && r.additionalLooseKg !== null ? r.additionalLooseKg : (r.feedConsumption ? parseFloat((r.feedConsumption % KG_PER_BAG).toFixed(1)) : 0);
-                      return (
-                        <tr key={r.recordDate} className="hover:bg-slate-50">
-                          <td className="py-3 px-2 font-bold text-slate-900">{r.recordDate}</td>
-                          <td className="py-3 px-2 font-bold text-rose-600">{r.mortalityCount}</td>
-                          <td className="py-3 px-2 text-emerald-700 font-bold">{r.remainingChickCount}</td>
-                          <td className="py-3 px-2 text-slate-700">{r.feedType}</td>
-                          <td className="py-3 px-2 text-slate-700 font-bold">
-                            {bagsUsed} Bags{looseKg > 0 ? <span className="text-slate-500 font-normal"> & {looseKg} kg</span> : null}
-                          </td>
-                          <td className="py-3 px-2 text-right font-bold text-slate-900">{r.averageWeight} g</td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
           </div>
         </>
       )}

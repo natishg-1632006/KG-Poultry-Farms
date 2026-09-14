@@ -15,6 +15,8 @@ import {
   Legend
 } from 'recharts';
 import { BarChart3, TrendingUp, Wheat, Activity } from 'lucide-react';
+import CustomSelect from '../components/common/CustomSelect';
+import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
 export const ReportsPage = () => {
   const { userProfile, isFarmer } = useAuth();
@@ -37,32 +39,31 @@ export const ReportsPage = () => {
 
   async function loadData() {
     try {
+      setLoading(true);
       const [bList, tObj, dList] = await Promise.all([
         dbGetBatches(),
         dbGetCompanyTargets(),
         dbGetDispatches()
       ]);
 
-      let accessible = bList;
-      if (isFarmer) {
-        accessible = bList.filter(
-          b => b.assignedFarmerId === userProfile?.uid ||
-               b.assignedFarmerName === userProfile?.name ||
-               userProfile?.assignedBatches?.includes(b.batchNumber) ||
-               userProfile?.assignedBatches?.includes(b.id)
-        );
-      }
+      const accessible = bList;
 
       setBatches(accessible);
       setTargets(tObj);
       setDispatches(dList);
 
       if (accessible.length > 0) {
-        setSelectedBatchId(accessible[0].id);
+        const activeBatches = accessible.filter(b => (b.status || '').toLowerCase() === 'active');
+        const defaultBatch = activeBatches.length > 0 
+          ? activeBatches[activeBatches.length - 1] 
+          : accessible[accessible.length - 1];
+        setSelectedBatchId(defaultBatch.id);
+        await loadBatchRecords(defaultBatch.id);
+      } else {
+        setLoading(false);
       }
     } catch (err) {
       console.error('Failed loading report data:', err);
-    } finally {
       setLoading(false);
     }
   }
@@ -73,12 +74,14 @@ export const ReportsPage = () => {
       setDailyRecords(Object.values(map || {}).sort((a, b) => a.recordDate.localeCompare(b.recordDate)));
     } catch (err) {
       console.error('Failed loading daily records for reports:', err);
+    } finally {
+      setLoading(false);
     }
   }
 
   const selectedBatch = batches.find(b => b.id === selectedBatchId);
 
-  if (loading) return <div className="p-8 text-center text-slate-500">Loading Analytics & Reports...</div>;
+  if (loading) return <LoadingSpinner message="Loading Analytics & Reports..." />;
 
   // Prepare chart dataset for selected batch
   const chartData = dailyRecords.map((r) => {
@@ -103,23 +106,21 @@ export const ReportsPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900">Reports & Operational Analytics</h1>
-          <p className="text-sm font-medium text-slate-500">Visual performance metrics for mortality, feed consumption, and growth weight curves.</p>
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900 truncate">Reports & Analytics</h1>
         </div>
         {selectedBatch && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-500">Select Batch:</span>
-            <select
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="hidden sm:inline text-xs font-bold text-slate-500">Select Batch:</span>
+            <CustomSelect
               value={selectedBatchId}
               onChange={(e) => setSelectedBatchId(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600"
-            >
-              {batches.map(b => (
-                <option key={b.id} value={b.id}>{b.batchNumber} - {b.batchName}</option>
-              ))}
-            </select>
+              options={batches.map((b) => ({
+                value: b.id,
+                label: `${b.batchNumber} - ${b.batchName}`,
+              }))}
+            />
           </div>
         )}
       </div>

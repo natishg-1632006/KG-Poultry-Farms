@@ -4,6 +4,8 @@ import { dbGetCompanyTargets, dbSaveCompanyTargets, dbGetBatches, dbGetDailyReco
 import { calculateDayOfBatch } from '../utils/calculations';
 import { Badge } from '../components/common/Badge';
 import { Edit2, Save, CheckCircle2, TrendingUp, Wheat } from 'lucide-react';
+import CustomSelect from '../components/common/CustomSelect';
+import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
 export const CompanyTargetsPage = () => {
   const { userProfile, isAdmin } = useAuth();
@@ -32,6 +34,7 @@ export const CompanyTargetsPage = () => {
 
   async function loadTargetData() {
     try {
+      setLoading(true);
       const [tObj, bList] = await Promise.all([dbGetCompanyTargets(), dbGetBatches()]);
       setTargets(tObj);
       setEditableFeed(tObj.feedConsumption || {});
@@ -39,10 +42,12 @@ export const CompanyTargetsPage = () => {
       setBatches(bList);
       if (bList.length > 0) {
         setSelectedBatchId(bList[0].id);
+        await loadBatchRecords(bList[0].id);
+      } else {
+        setLoading(false);
       }
     } catch (err) {
       console.error('Failed loading target data:', err);
-    } finally {
       setLoading(false);
     }
   }
@@ -53,6 +58,8 @@ export const CompanyTargetsPage = () => {
       setDailyRecords(Object.values(map || {}));
     } catch (err) {
       console.error('Failed loading daily records for target comparison:', err);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -74,7 +81,7 @@ export const CompanyTargetsPage = () => {
     }
   };
 
-  if (loading || !targets) return <div className="p-8 text-center text-slate-500">Loading Company Targets...</div>;
+  if (loading || !targets) return <LoadingSpinner message="Loading Company Target Benchmarks..." />;
 
   // Build comparison rows for selected batch
   const maxDays = activeTab === 'feed' ? 45 : 42;
@@ -93,19 +100,19 @@ export const CompanyTargetsPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900">Company Target Benchmarks</h1>
-          <p className="text-sm font-medium text-slate-500">Feed Consumption (Day 1–45) and Average Weight (Day 1–42) target vs actual comparisons.</p>
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900 truncate">Target Benchmarks</h1>
         </div>
         {isAdmin && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {!editingMode ? (
               <button
                 onClick={() => setEditingMode(true)}
-                className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-3 py-2 sm:px-4 sm:py-2.5 text-xs font-black text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95 shrink-0 whitespace-nowrap cursor-pointer"
               >
-                <Edit2 className="h-4 w-4" /> Edit Target Benchmarks
+                <Edit2 className="h-4 w-4 shrink-0" />
+                <span>Edit Targets</span>
               </button>
             ) : (
               <div className="flex items-center gap-2">
@@ -117,9 +124,10 @@ export const CompanyTargetsPage = () => {
                 </button>
                 <button
                   onClick={handleSaveTargets}
-                  className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-3 py-2 text-xs font-black text-white shadow-md cursor-pointer"
                 >
-                  <Save className="h-4 w-4" /> Save Targets
+                  <Save className="h-4 w-4 shrink-0" />
+                  <span>Save Targets</span>
                 </button>
               </div>
             )}
@@ -158,15 +166,14 @@ export const CompanyTargetsPage = () => {
         {selectedBatch && (
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-slate-500">Compare Batch:</span>
-            <select
+            <CustomSelect
               value={selectedBatchId}
               onChange={(e) => setSelectedBatchId(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600"
-            >
-              {batches.map(b => (
-                <option key={b.id} value={b.id}>{b.batchNumber} - {b.batchName}</option>
-              ))}
-            </select>
+              options={batches.map((b) => ({
+                value: b.id,
+                label: `${b.batchNumber} - ${b.batchName}`,
+              }))}
+            />
           </div>
         )}
       </div>

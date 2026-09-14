@@ -32,12 +32,60 @@
     background-size: 1.1rem;
     padding-right: 2.5rem !important;
     cursor: pointer;
+    border-color: #a7f3d0 !important;
+    background-color: #f0fdf4 !important;
+    color: #064e3b !important;
+    font-weight: 700 !important;
     transition: all 0.2s ease-in-out;
+  }
+
+  select:hover {
+    background-color: #d1fae5 !important;
+    border-color: #059669 !important;
   }
 
   select:focus {
     outline: none;
     border-color: #059669 !important;
-    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15) !important;
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.2) !important;
+    background-color: #ffffff !important;
+  }
+
+  select option {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    font-weight: 600 !important;
+    padding: 8px !important;
+  }
+
+  /* Theme Styled Date Inputs across entire application */
+  input[type="date"] {
+    accent-color: #059669 !important;
+    color-scheme: light !important;
+    cursor: pointer;
+    border-color: #cbd5e1;
+    transition: all 0.2s ease-in-out;
+  }
+
+  input[type="date"]:hover {
+    border-color: #34d399 !important;
+  }
+
+  input[type="date"]:focus {
+    outline: none;
+    border-color: #059669 !important;
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.2) !important;
+  }
+
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    filter: invert(35%) sepia(85%) saturate(450%) hue-rotate(110deg) brightness(95%) contrast(90%);
+    border-radius: 6px;
+    padding: 2px;
+    transition: all 0.2s ease;
+  }
+
+  input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    background-color: #d1fae5;
   }
 }

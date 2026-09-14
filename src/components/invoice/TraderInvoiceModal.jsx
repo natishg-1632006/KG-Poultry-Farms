@@ -30,7 +30,7 @@ export const TraderInvoiceModal = ({
   // Normalize data between direct dispatch object or saved invoiceData
   const invNumber = invoiceData?.id || `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`;
   const invDate = invoiceData?.invoiceDate || dispatch?.dispatchDate || new Date().toISOString().split('T')[0];
-  const customerName = invoiceData?.customerName || dispatch?.vehicleName || 'KG Wholesale Poultry Traders';
+  const customerName = invoiceData?.customerName || dispatch?.vehicleName || dispatch?.traderName || 'KG Wholesale Poultry Traders';
   const customerPhone = invoiceData?.customerPhone || dispatch?.driverMobileNumber || '';
   const vehicleNo = invoiceData?.vehicleNumber || dispatch?.vehicleNumber || 'TN-38-C-5544';
   const driverName = invoiceData?.driverName || dispatch?.driverName || 'Karthik';
@@ -38,7 +38,7 @@ export const TraderInvoiceModal = ({
   // Calculate totals from boxSets or invoiceData
   const loadedSets = boxSets.filter(s => Number(s.loadedWeight) > 0);
   const totalBoxes = boxSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
-  const totalTareWeight = boxSets.reduce((acc, s) => acc + ((Number(s.emptyBoxWeight) || 0) * (Number(s.boxesInSet) || 1)), 0);
+  const totalTareWeight = boxSets.reduce((acc, s) => acc + (Number(s.emptyBoxWeight) || 0), 0);
   const totalGrossWeight = boxSets.reduce((acc, s) => acc + (Number(s.loadedWeight) || 0), 0);
   
   const totalNetWeight = loadedSets.length > 0
@@ -47,13 +47,12 @@ export const TraderInvoiceModal = ({
 
   const totalBirds = loadedSets.length > 0
     ? loadedSets.reduce((acc, s) => acc + (Number(s.chickenCount) || 0), 0)
-    : (invoiceData?.totalChickens || 0);
+    : (invoiceData?.totalChickens || dispatch?.totalBirds || dispatch?.birdsCount || 0);
 
   const currentRate = invoiceData?.ratePerKg || ratePerKg || 135;
-  const grandTotal = totalNetWeight * currentRate;
   const avgWeight = totalBirds > 0 ? (totalNetWeight / totalBirds).toFixed(3) : (dispatch?.averageWeight || 0);
 
-  // PDF Generation Function - with oklch color parser fix
+  // PDF Generation Function - with oklch/oklab color parser fix
   const handleDownloadPDF = async () => {
     const el = document.getElementById('trader-invoice-document');
     if (!el) return;
@@ -65,59 +64,102 @@ export const TraderInvoiceModal = ({
         logging: false,
         backgroundColor: '#ffffff',
         onclone: (clonedDoc) => {
-          const mapOklchToHex = (text) => {
-            if (!text || !text.includes('oklch')) return text;
+          const sanitizeColors = (text) => {
+            if (!text) return text;
+            if (!text.includes('oklch') && !text.includes('oklab')) return text;
             return text
-              .replace(/--color-slate-950:\s*oklch\([^)]+\)/gi, '--color-slate-950: #020617')
-              .replace(/--color-slate-900:\s*oklch\([^)]+\)/gi, '--color-slate-900: #0f172a')
-              .replace(/--color-slate-800:\s*oklch\([^)]+\)/gi, '--color-slate-800: #1e293b')
-              .replace(/--color-slate-700:\s*oklch\([^)]+\)/gi, '--color-slate-700: #334155')
-              .replace(/--color-slate-600:\s*oklch\([^)]+\)/gi, '--color-slate-600: #475569')
-              .replace(/--color-slate-500:\s*oklch\([^)]+\)/gi, '--color-slate-500: #64748b')
-              .replace(/--color-slate-400:\s*oklch\([^)]+\)/gi, '--color-slate-400: #94a3b8')
-              .replace(/--color-slate-300:\s*oklch\([^)]+\)/gi, '--color-slate-300: #cbd5e1')
-              .replace(/--color-slate-200:\s*oklch\([^)]+\)/gi, '--color-slate-200: #e2e8f0')
-              .replace(/--color-slate-100:\s*oklch\([^)]+\)/gi, '--color-slate-100: #f1f5f9')
-              .replace(/--color-slate-50:\s*oklch\([^)]+\)/gi, '--color-slate-50: #f8fafc')
-              .replace(/--color-emerald-900:\s*oklch\([^)]+\)/gi, '--color-emerald-900: #064e3b')
-              .replace(/--color-emerald-800:\s*oklch\([^)]+\)/gi, '--color-emerald-800: #065f46')
-              .replace(/--color-emerald-700:\s*oklch\([^)]+\)/gi, '--color-emerald-700: #047857')
-              .replace(/--color-emerald-600:\s*oklch\([^)]+\)/gi, '--color-emerald-600: #059669')
-              .replace(/--color-emerald-500:\s*oklch\([^)]+\)/gi, '--color-emerald-500: #10b981')
-              .replace(/--color-emerald-100:\s*oklch\([^)]+\)/gi, '--color-emerald-100: #d1fae5')
-              .replace(/--color-emerald-50:\s*oklch\([^)]+\)/gi, '--color-emerald-50: #f0fdf4')
-              .replace(/--color-teal-900:\s*oklch\([^)]+\)/gi, '--color-teal-900: #134e4a')
-              .replace(/--color-teal-700:\s*oklch\([^)]+\)/gi, '--color-teal-700: #0f766e')
-              .replace(/oklch\([^)]+\)/gi, '#334155');
+              .replace(/--color-slate-950:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-950: #020617')
+              .replace(/--color-slate-900:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-900: #0f172a')
+              .replace(/--color-slate-800:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-800: #1e293b')
+              .replace(/--color-slate-700:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-700: #334155')
+              .replace(/--color-slate-600:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-600: #475569')
+              .replace(/--color-slate-500:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-500: #64748b')
+              .replace(/--color-slate-400:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-400: #94a3b8')
+              .replace(/--color-slate-300:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-300: #cbd5e1')
+              .replace(/--color-slate-200:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-200: #e2e8f0')
+              .replace(/--color-slate-100:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-100: #f1f5f9')
+              .replace(/--color-slate-50:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-50: #f8fafc')
+              .replace(/--color-emerald-900:\s*(oklch|oklab)\([^)]+\)/gi, '--color-emerald-900: #064e3b')
+              .replace(/--color-emerald-800:\s*(oklch|oklab)\([^)]+\)/gi, '--color-emerald-800: #065f46')
+              .replace(/--color-emerald-700:\s*(oklch|oklab)\([^)]+\)/gi, '--color-emerald-700: #047857')
+              .replace(/--color-emerald-600:\s*(oklch|oklab)\([^)]+\)/gi, '--color-emerald-600: #059669')
+              .replace(/--color-emerald-500:\s*(oklch|oklab)\([^)]+\)/gi, '--color-emerald-500: #10b981')
+              .replace(/--color-emerald-100:\s*(oklch|oklab)\([^)]+\)/gi, '--color-emerald-100: #d1fae5')
+              .replace(/--color-emerald-50:\s*(oklch|oklab)\([^)]+\)/gi, '--color-emerald-50: #f0fdf4')
+              .replace(/--color-teal-900:\s*(oklch|oklab)\([^)]+\)/gi, '--color-teal-900: #134e4a')
+              .replace(/--color-teal-700:\s*(oklch|oklab)\([^)]+\)/gi, '--color-teal-700: #0f766e')
+              .replace(/oklch\([^)]+\)/gi, '#334155')
+              .replace(/oklab\([^)]+\)/gi, '#334155');
           };
 
-          // 1. Sanitize all <style> tags in cloned document by replacing oklch(...) with exact hex colors
           const styleTags = clonedDoc.getElementsByTagName('style');
           for (let i = 0; i < styleTags.length; i++) {
-            const styleTag = styleTags[i];
-            if (styleTag.textContent && styleTag.textContent.includes('oklch')) {
-              styleTag.textContent = mapOklchToHex(styleTag.textContent);
+            if (styleTags[i].textContent) {
+              styleTags[i].textContent = sanitizeColors(styleTags[i].textContent);
             }
           }
 
-          // 2. Sanitize element inline styles and attribute styles
+          try {
+            const sheets = clonedDoc.styleSheets;
+            for (let k = 0; k < sheets.length; k++) {
+              try {
+                const rules = sheets[k].cssRules || sheets[k].rules;
+                if (rules) {
+                  for (let r = 0; r < rules.length; r++) {
+                    if (rules[r].style && rules[r].style.cssText) {
+                      if (rules[r].style.cssText.includes('oklch') || rules[r].style.cssText.includes('oklab')) {
+                        rules[r].style.cssText = sanitizeColors(rules[r].style.cssText);
+                      }
+                    }
+                  }
+                }
+              } catch (e) {}
+            }
+          } catch (e) {}
+
           const container = clonedDoc.getElementById('trader-invoice-document');
-          if (container) {
-            const nodes = [container, ...Array.from(container.querySelectorAll('*'))];
-            nodes.forEach((node) => {
+          const targetNodes = container
+            ? [clonedDoc.documentElement, clonedDoc.body, container, ...Array.from(container.querySelectorAll('*'))]
+            : Array.from(clonedDoc.querySelectorAll('*'));
+
+          targetNodes.forEach((node) => {
+            if (node && node.getAttribute) {
               const inlineStyle = node.getAttribute('style') || '';
-              if (inlineStyle.includes('oklch')) {
-                node.setAttribute('style', mapOklchToHex(inlineStyle));
+              if (inlineStyle.includes('oklch') || inlineStyle.includes('oklab')) {
+                node.setAttribute('style', sanitizeColors(inlineStyle));
               }
-            });
-          }
+            }
+          });
         }
       });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgData = canvas.toDataURL('image/jpeg', 0.78);
+      const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4', compress: true });
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+      const subPageTopMargin = 12; // Top margin space on Page 2 and below only
+
+      let heightLeft = imgHeight;
+      let renderedCanvasY = 0;
+
+      // Render Page 1 (offset 0 - no top margin on Page 1)
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, imgHeight, undefined, 'FAST');
+      renderedCanvasY += pageHeight;
+      heightLeft -= pageHeight;
+
+      // Render Page 2 and below (with top margin space at starting of Page 2+)
+      while (heightLeft > 0) {
+        const position = subPageTopMargin - renderedCanvasY;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight, undefined, 'FAST');
+        pdf.setFillColor(255, 255, 255);
+        pdf.rect(0, 0, pdfWidth, subPageTopMargin, 'F');
+
+        const canvasSliceOnSubPage = pageHeight - subPageTopMargin;
+        renderedCanvasY += canvasSliceOnSubPage;
+        heightLeft -= canvasSliceOnSubPage;
+      }
+
       pdf.save(`KG-Poultry-Invoice-${invNumber}.pdf`);
     } catch (err) {
       alert('PDF Export Error: ' + err.message);
@@ -159,214 +201,261 @@ Thank you for your business!`;
     window.print();
   };
 
+  const renderDocumentContent = () => (
+    <div
+      id="trader-invoice-document"
+      style={{ backgroundColor: '#ffffff', color: '#0f172a', borderColor: '#e2e8f0', width: '800px', boxSizing: 'border-box' }}
+      className="p-8 border rounded-2xl shadow-sm space-y-6 font-sans print:p-0 print:border-none print:shadow-none"
+    >
+      {/* Top Farm Brand & Official Invoice Header (Side-by-side flex layout) */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <img
+            src="/kg-logo.jpg"
+            alt="KG Poultry Logo"
+            style={{ height: '56px', width: '56px', borderRadius: '9999px', objectFit: 'contain', border: '2px solid #059669', padding: '2px' }}
+            onError={(e) => {
+              e.target.style.display = 'none';
+            }}
+          />
+          <div>
+            <h1 style={{ color: '#0f172a', fontSize: '22px', fontWeight: '900', letterSpacing: '-0.02em', textTransform: 'uppercase', margin: 0 }}>
+              KG POULTRY FARMS
+            </h1>
+            <p style={{ color: '#047857', fontSize: '12px', fontWeight: '800', margin: '2px 0 0 0' }}>
+              Authorized Farmer: Ponni
+            </p>
+            <p style={{ color: '#64748b', fontSize: '11px', fontWeight: '600', margin: '2px 0 0 0' }}>
+              Phone: 9080691947 • Email: kgpoultryfarms@gmail.com
+            </p>
+          </div>
+        </div>
+
+        {/* Light Green Official Invoice Badge Box (Right-aligned compact box) */}
+        <div
+          style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', padding: '12px 18px', borderRadius: '16px', textAlign: 'right', shrink: 0 }}
+        >
+          <div style={{ color: '#166534', fontSize: '10px', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '0.05em' }}>
+            OFFICIAL INVOICE
+          </div>
+          <div style={{ color: '#0f172a', fontSize: '18px', fontWeight: '900', letterSpacing: '-0.02em', margin: '2px 0 0 0' }}>
+            {invNumber}
+          </div>
+          <div style={{ color: '#475569', fontSize: '12px', fontWeight: '700', margin: '2px 0 0 0' }}>
+            Date: {invDate}
+          </div>
+        </div>
+      </div>
+
+      {/* Green Horizontal Dividing Line */}
+      <div style={{ backgroundColor: '#10b981', height: '2px', width: '100%', borderRadius: '9999px' }}></div>
+
+      {/* Billed To & Vehicle Transport Info Container Box (Explicit 2-Column Grid) */}
+      <div
+        style={{
+          backgroundColor: '#f8fafc',
+          border: '1px solid #e2e8f0',
+          borderRadius: '16px',
+          padding: '16px',
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '16px'
+        }}
+      >
+        {/* Left Column: Billed To */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <span style={{ color: '#94a3b8', fontSize: '10px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            BILLED TO
+          </span>
+          <div style={{ color: '#0f172a', fontSize: '14px', fontWeight: '900' }}>
+            {customerName}
+          </div>
+          <div style={{ color: '#475569', fontSize: '12px', fontWeight: '600' }}>
+            Contact: {customerPhone || '9080691947'}
+          </div>
+        </div>
+
+        {/* Right Column: Vehicle & Transport Info */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderLeft: '1px solid #cbd5e1', paddingLeft: '16px' }}>
+          <span style={{ color: '#94a3b8', fontSize: '10px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            VEHICLE & TRANSPORT INFO
+          </span>
+          <div style={{ color: '#0f172a', fontSize: '12px', fontWeight: '700' }}>
+            Vehicle Number: <strong style={{ color: '#047857', fontWeight: '800' }}>{vehicleNo}</strong>
+          </div>
+          <div style={{ color: '#334155', fontSize: '12px', fontWeight: '600' }}>
+            Driver: {driverName}
+          </div>
+          <div style={{ color: '#334155', fontSize: '12px', fontWeight: '600' }}>
+            Dispatch Date: {invDate}
+          </div>
+          <div style={{ color: '#0f172a', fontSize: '12px', fontWeight: '700' }}>
+            Total Boxes: <strong>{totalBoxes} Boxes</strong>
+          </div>
+          <div style={{ color: '#0f172a', fontSize: '12px', fontWeight: '700' }}>
+            Total Birds: <strong>{totalBirds} Birds</strong>
+          </div>
+        </div>
+      </div>
+
+      {/* Weighing Scale Breakdown (Tare & Gross Load) */}
+      <div className="space-y-2">
+        <h3 style={{ color: '#0f172a' }} className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
+          <Layers className="h-4 w-4" style={{ color: '#047857' }} />
+          <span>WEIGHING SCALE BREAKDOWN (TARE & GROSS LOAD)</span>
+        </h3>
+
+        <div style={{ border: '1px solid #cbd5e1', borderRadius: '12px', overflow: 'hidden' }}>
+          <table className="w-full text-left text-xs">
+            <thead style={{ backgroundColor: '#f8fafc', color: '#475569' }} className="font-extrabold uppercase tracking-wider text-[10px] border-b border-slate-300">
+              <tr>
+                <th className="py-2.5 px-3">SET #</th>
+                <th className="py-2.5 px-3">BOXES</th>
+                <th className="py-2.5 px-3">EMPTY TARE WT</th>
+                <th className="py-2.5 px-3">GROSS LOADED WT</th>
+                <th className="py-2.5 px-3">NET CHICKEN WT</th>
+                <th className="py-2.5 px-3">BIRDS</th>
+                <th className="py-2.5 px-3">AVG WT / BIRD</th>
+              </tr>
+            </thead>
+            <tbody style={{ color: '#334155' }} className="divide-y divide-slate-200 font-medium">
+              {boxSets.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="py-4 text-center text-slate-400 font-medium italic">
+                    Total Dispatch Weight: {totalNetWeight.toFixed(2)} kg ({totalBirds} birds)
+                  </td>
+                </tr>
+              ) : (
+                boxSets.map((s, idx) => {
+                  const isLoaded = Number(s.loadedWeight) > 0;
+                  const boxesInSet = Number(s.boxesInSet) || 5;
+                  const totalEmptyTare = Number(s.emptyBoxWeight) || 0;
+                  const gross = isLoaded ? Number(s.loadedWeight) : 0;
+                  const net = isLoaded ? (s.totalChickenWeight || (gross - totalEmptyTare)) : 0;
+
+                  return (
+                    <tr key={s.id || idx} className="hover:bg-slate-50">
+                      <td style={{ color: '#0f172a' }} className="py-2.5 px-3 font-bold">Set #{s.boxSetNumber || (idx + 1)}</td>
+                      <td className="py-2.5 px-3 font-semibold">{boxesInSet} Boxes</td>
+                      <td style={{ color: '#64748b' }} className="py-2.5 px-3">{s.emptyBoxWeight} kg</td>
+                      <td style={{ color: '#0f172a' }} className="py-2.5 px-3 font-semibold">{isLoaded ? `${gross} kg` : 'Pending'}</td>
+                      <td style={{ color: '#047857' }} className="py-2.5 px-3 font-extrabold">{isLoaded ? `${net.toFixed(2)} kg` : '—'}</td>
+                      <td style={{ color: '#0f172a' }} className="py-2.5 px-3 font-bold">{s.chickenCount || '—'}</td>
+                      <td style={{ color: '#475569' }} className="py-2.5 px-3 font-semibold">{isLoaded ? `${s.averageChickenWeight || (net / (s.chickenCount || 1)).toFixed(3)} kg` : '—'}</td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+            <tfoot style={{ backgroundColor: '#ffffff', color: '#0f172a' }} className="font-extrabold border-t-2 border-slate-900 text-xs">
+              <tr>
+                <td style={{ color: '#0f172a' }} className="py-3 px-3 font-black uppercase">TOTALS</td>
+                <td className="py-3 px-3 font-black">{totalBoxes} Boxes</td>
+                <td style={{ color: '#475569' }} className="py-3 px-3 font-extrabold">{totalTareWeight.toFixed(1)} kg</td>
+                <td style={{ color: '#0f172a' }} className="py-3 px-3 font-black">{totalGrossWeight.toFixed(1)} kg</td>
+                <td style={{ color: '#047857' }} className="py-3 px-3 font-black text-sm">{totalNetWeight.toFixed(2)} kg</td>
+                <td style={{ color: '#047857' }} className="py-3 px-3 font-black">{totalBirds} Birds</td>
+                <td style={{ color: '#047857' }} className="py-3 px-3 font-black">{avgWeight} kg/bird</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      {/* Verified Dispatch Seal Stamp Section */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '8px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: '6px' }}>
+          <div
+            style={{
+              borderColor: '#059669',
+              backgroundColor: '#f0fdf4',
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '112px',
+              width: '112px',
+              borderRadius: '9999px',
+              borderWidth: '4px',
+              borderStyle: 'dashed',
+              padding: '8px',
+              transform: 'rotate(-2deg)'
+            }}
+          >
+            <div style={{ borderColor: '#10b981', position: 'absolute', inset: '4px', borderRadius: '9999px', borderWidth: '2px', borderStyle: 'double' }}></div>
+            <div style={{ color: '#065f46', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+              <ShieldCheck className="h-6 w-6 text-emerald-600" />
+              <span style={{ fontSize: '8px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.1em', lineHeight: 1 }}>KG POULTRY</span>
+              <span style={{ color: '#064e3b', fontSize: '9px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '-0.05em' }}>VERIFIED</span>
+              <span style={{ color: '#047857', fontSize: '7px', fontWeight: '700', textTransform: 'uppercase' }}>OFFICIAL SEAL</span>
+            </div>
+          </div>
+          <div style={{ color: '#1e293b', fontSize: '12px', fontWeight: '900' }}>KG Poultry Farms Verified Dispatch</div>
+          <div style={{ color: '#64748b', fontSize: '10px', fontWeight: '600' }}>Authorized Quality & Weight Certificate</div>
+        </div>
+      </div>
+
+      {/* Footer Terms */}
+      <div style={{ borderColor: '#e2e8f0', color: '#94a3b8', borderTop: '1px solid #e2e8f0', paddingTop: '16px', textAlign: 'center', fontSize: '10px', fontWeight: '500' }}>
+        This invoice is computer generated and verified by KG Poultry Farms Weighing System.
+      </div>
+    </div>
+  );
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Trader Invoice - ${vehicleNo}`}
-      maxWidth="max-w-4xl"
+      title={`Dispatch Invoice Options - Vehicle ${vehicleNo}`}
+      maxWidth="max-w-md"
     >
-      <div className="space-y-4">
-        {/* Action Header Controls */}
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200">
-          <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-emerald-600" />
-            <span className="text-xs font-bold text-slate-700">Dispatch Trader Bill & Load Certificate</span>
+      <div className="space-y-4 py-2">
+        {/* Header Icon & Vehicle Meta */}
+        <div className="text-center space-y-1">
+          <div className="mx-auto h-12 w-12 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-700 border border-emerald-200">
+            <FileText className="h-6 w-6" />
           </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleSendToTraderWhatsApp}
-              className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-all active:scale-95 cursor-pointer"
-            >
-              <Send className="h-3.5 w-3.5" />
-              <span>Send to Trader (WhatsApp)</span>
-            </button>
-
-            <button
-              onClick={handleDownloadPDF}
-              disabled={downloading}
-              className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
-            >
-              <Download className="h-3.5 w-3.5 text-emerald-400" />
-              <span>{downloading ? 'Exporting PDF...' : 'Download PDF'}</span>
-            </button>
-
-            <button
-              onClick={handlePrint}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-            >
-              <Printer className="h-3.5 w-3.5 text-slate-500" />
-              <span className="hidden sm:inline">Print</span>
-            </button>
-          </div>
+          <h3 className="text-base font-black text-slate-900">Vehicle {vehicleNo} Invoice</h3>
+          <p className="text-xs text-slate-500 font-semibold">
+            Trader: <strong className="text-slate-800">{customerName}</strong> • Date: <strong className="text-slate-800">{invDate}</strong>
+          </p>
         </div>
 
-        {/* Printable / Capturable Document Container */}
-        <div
-          id="trader-invoice-document"
-          style={{ backgroundColor: '#ffffff', color: '#0f172a' }}
-          className="rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6 font-sans"
-        >
-          {/* Farm Brand Header */}
-          <div
-            style={{ borderBottom: '2px solid #059669' }}
-            className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-5 gap-4"
+        {/* The 3 Action Buttons ONLY */}
+        <div className="grid grid-cols-1 gap-2.5 pt-2">
+          {/* 1. Download PDF */}
+          <button
+            onClick={handleDownloadPDF}
+            disabled={downloading}
+            className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 px-4 py-3 text-xs font-black text-white shadow-sm transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
           >
-            <div className="flex items-center gap-4">
-              <img
-                src="/kg-logo.jpg"
-                alt="KG Poultry Farms Official Logo"
-                className="h-16 w-16 sm:h-20 sm:w-20 object-contain rounded-2xl shadow-xs border border-emerald-200 p-1 bg-white shrink-0"
-              />
-              <div>
-                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                  <span>KG POULTRY FARMS</span>
-                  <span
-                    style={{ backgroundColor: '#d1fae5', color: '#065f46' }}
-                    className="rounded-md px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider"
-                  >
-                    Verified Farm
-                  </span>
-                </h1>
-                <p style={{ color: '#047857' }} className="text-xs font-semibold">Broiler Meat Sales & Wholesale Vehicle Dispatch</p>
-                <p className="text-[11px] font-medium text-slate-500 mt-1">
-                  Plot #45, Farm Zone, Palani Road, Dindigul, Tamil Nadu - 624001
-                </p>
-                <p className="text-[11px] font-medium text-slate-400">
-                  Phone: +91 98421 01234 • Email: sales@kgpoultryfarms.com
-                </p>
-              </div>
-            </div>
+            <Download className="h-4 w-4 text-emerald-400" />
+            <span>{downloading ? 'Exporting PDF...' : 'Download PDF Invoice'}</span>
+          </button>
 
-            <div
-              style={{ backgroundColor: '#f0fdf4', borderColor: '#d1fae5' }}
-              className="text-left sm:text-right p-3 rounded-2xl border shrink-0"
-            >
-              <div style={{ color: '#047857' }} className="text-xs uppercase font-extrabold tracking-wider">Official Invoice</div>
-              <div className="text-lg font-black text-slate-900 tracking-tight mt-0.5">{invNumber}</div>
-              <div className="text-xs text-slate-600 font-bold mt-1">Date: {invDate}</div>
-            </div>
-          </div>
-
-          {/* Trader & Dispatch Details Grid */}
-          <div
-            style={{ backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }}
-            className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl border text-xs"
+          {/* 2. Send to Trader (WhatsApp) */}
+          <button
+            onClick={handleSendToTraderWhatsApp}
+            className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 px-4 py-3 text-xs font-black text-white shadow-sm transition-all active:scale-95 cursor-pointer"
           >
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider block">Billed To (Trader / Customer)</span>
-              <div className="font-black text-slate-900 text-sm">{customerName}</div>
-              {customerPhone && <div className="text-slate-600 font-medium">Contact: {customerPhone}</div>}
-              <div className="text-slate-600 font-medium">Destination: Wholesale Poultry Market</div>
-            </div>
+            <Send className="h-4 w-4 text-white" />
+            <span>Send to Trader (WhatsApp)</span>
+          </button>
 
-            <div className="space-y-1.5 sm:border-l sm:border-slate-200 sm:pl-4">
-              <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider block">Vehicle & Transport Info</span>
-              <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                <Truck className="h-3.5 w-3.5 text-emerald-600" />
-                <span>Vehicle Number: <strong style={{ color: '#047857' }}>{vehicleNo}</strong></span>
-              </div>
-              <div className="text-slate-600 font-medium flex items-center gap-1.5">
-                <User className="h-3.5 w-3.5 text-slate-400" />
-                <span>Driver: {driverName}</span>
-              </div>
-              <div className="text-slate-600 font-medium flex items-center gap-1.5">
-                <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                <span>Dispatch Time: {invDate}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Complete Box Sets Load & Empty Tare Breakdown Table */}
-          <div className="space-y-2">
-            <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-              <Layers className="h-4 w-4 text-emerald-600" />
-              <span>Weighing Scale Breakdown (Tare & Gross Load)</span>
-            </h3>
-
-            <div style={{ borderColor: '#e2e8f0' }} className="overflow-x-auto rounded-xl border">
-              <table className="w-full text-left text-xs">
-                <thead style={{ backgroundColor: '#f1f5f9', color: '#334155' }} className="font-bold uppercase tracking-wider text-[10px] border-b border-slate-200">
-                  <tr>
-                    <th className="py-2.5 px-3">Set #</th>
-                    <th className="py-2.5 px-3">Boxes</th>
-                    <th className="py-2.5 px-3">Empty Tare Wt</th>
-                    <th className="py-2.5 px-3">Gross Loaded Wt</th>
-                    <th className="py-2.5 px-3">Net Chicken Wt</th>
-                    <th className="py-2.5 px-3">Birds</th>
-                    <th className="py-2.5 px-3">Avg Wt / Bird</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
-                  {boxSets.length === 0 ? (
-                    <tr>
-                      <td colSpan="7" className="py-4 text-center text-slate-400">
-                        Total Dispatch Weight: {totalNetWeight.toFixed(2)} kg ({totalBirds} birds)
-                      </td>
-                    </tr>
-                  ) : (
-                    boxSets.map((s) => {
-                      const isLoaded = Number(s.loadedWeight) > 0;
-                      const boxesInSet = Number(s.boxesInSet) || 5;
-                      const totalEmptyTare = (Number(s.emptyBoxWeight) || 0) * boxesInSet;
-                      const gross = isLoaded ? Number(s.loadedWeight) : 0;
-                      const net = isLoaded ? (s.totalChickenWeight || (gross - totalEmptyTare)) : 0;
-
-                      return (
-                        <tr key={s.id || s.boxSetNumber} className="hover:bg-slate-50/60">
-                          <td className="py-2 px-3 font-bold text-slate-900">Set #{s.boxSetNumber}</td>
-                          <td className="py-2 px-3">{boxesInSet} Boxes</td>
-                          <td className="py-2 px-3 text-slate-500">{s.emptyBoxWeight} kg</td>
-                          <td className="py-2 px-3 font-semibold">{isLoaded ? `${gross} kg` : 'Pending'}</td>
-                          <td style={{ color: '#047857' }} className="py-2 px-3 font-bold">{isLoaded ? `${net.toFixed(2)} kg` : '—'}</td>
-                          <td className="py-2 px-3">{s.chickenCount || '—'}</td>
-                          <td className="py-2 px-3 text-slate-600">{isLoaded ? `${s.averageChickenWeight || (net / (s.chickenCount || 1)).toFixed(3)} kg` : '—'}</td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-                <tfoot style={{ backgroundColor: '#f8fafc', color: '#0f172a' }} className="font-bold border-t border-slate-200 text-xs">
-                  <tr>
-                    <td className="py-2.5 px-3">TOTALS</td>
-                    <td className="py-2.5 px-3">{totalBoxes} Boxes</td>
-                    <td className="py-2.5 px-3 text-slate-600">{totalTareWeight.toFixed(1)} kg</td>
-                    <td className="py-2.5 px-3 text-slate-800">{totalGrossWeight.toFixed(1)} kg</td>
-                    <td style={{ color: '#047857' }} className="py-2.5 px-3 font-black text-sm">{totalNetWeight.toFixed(2)} kg</td>
-                    <td style={{ color: '#0f766e' }} className="py-2.5 px-3 font-extrabold">{totalBirds} Birds</td>
-                    <td style={{ color: '#064e3b' }} className="py-2.5 px-3">{avgWeight} kg/bird</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-
-          {/* Verified Farm Seal Stamp Section */}
-          <div className="flex justify-end pt-2">
-            <div className="flex flex-col items-center justify-center p-3 text-center space-y-2">
-              <div
-                style={{ borderColor: '#059669', backgroundColor: '#f0fdf4' }}
-                className="relative flex items-center justify-center h-28 w-28 rounded-full border-4 border-dashed shadow-xs p-2 transform rotate-[-3deg]"
-              >
-                <div style={{ borderColor: '#10b981' }} className="absolute inset-1 rounded-full border"></div>
-                <div style={{ color: '#065f46' }} className="flex flex-col items-center justify-center space-y-0.5 text-center">
-                  <ShieldCheck className="h-6 w-6 text-emerald-600" />
-                  <span className="text-[8px] font-black uppercase tracking-widest leading-none">KG POULTRY</span>
-                  <span style={{ color: '#064e3b' }} className="text-[9px] font-extrabold uppercase tracking-tighter">VERIFIED</span>
-                  <span style={{ color: '#047857' }} className="text-[7px] font-bold uppercase">OFFICIAL SEAL</span>
-                </div>
-              </div>
-              <div className="text-[11px] font-bold text-slate-700">KG Poultry Farms Verified Dispatch</div>
-              <div className="text-[10px] text-slate-400 font-medium">Authorized Quality & Weight Certificate</div>
-            </div>
-          </div>
-
-          {/* Footer Terms */}
-          <div className="border-t border-slate-200 pt-4 text-center text-[10px] text-slate-400 font-medium">
-            This invoice is computer generated and verified by KG Poultry Farms Weighing System • All weights measured on calibrated digital scales.
-          </div>
+          {/* 3. Print Invoice */}
+          <button
+            onClick={handlePrint}
+            className="w-full flex items-center justify-center gap-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 px-4 py-3 text-xs font-bold text-slate-800 shadow-2xs transition-all active:scale-95 cursor-pointer"
+          >
+            <Printer className="h-4 w-4 text-slate-600" />
+            <span>Print Invoice</span>
+          </button>
         </div>
+      </div>
+
+      {/* Offscreen document for PDF Export & Print */}
+      <div style={{ position: 'fixed', left: '-9999px', top: '-9999px', width: '800px', opacity: 0, pointerEvents: 'none', zIndex: -100 }}>
+        {renderDocumentContent()}
       </div>
     </Modal>
   );

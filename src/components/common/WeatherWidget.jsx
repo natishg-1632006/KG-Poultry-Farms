@@ -18,7 +18,7 @@ import {
   Navigation,
   X 
 } from 'lucide-react';
-import { fetchWeather, searchVillageLocation, DEFAULT_FARM_LOCATION } from '../../services/weatherService';
+import { fetchWeather, searchVillageLocation, DEFAULT_FARM_LOCATION, getPoultryWeatherAdvisory } from '../../services/weatherService';
 import { Badge } from './Badge';
 
 const ICON_MAP = {
@@ -32,6 +32,21 @@ const ICON_MAP = {
 };
 
 const LOCATION_STORAGE_KEY = 'kg_poultry_farm_weather_location';
+const WEATHER_CACHE_KEY = 'kg_poultry_farm_weather_cache';
+
+const INITIAL_FALLBACK_WEATHER = {
+  temperature: 31,
+  feelsLike: 35,
+  humidity: 62,
+  windSpeed: 8,
+  tempMax: 34,
+  tempMin: 24,
+  weatherLabel: 'Partly Cloudy',
+  weatherIconKey: 'CloudSun',
+  weatherColor: 'text-amber-500',
+  advisory: getPoultryWeatherAdvisory(31),
+  updatedAt: 'Live'
+};
 
 export const WeatherWidget = () => {
   const [location, setLocation] = useState(() => {
@@ -43,8 +58,14 @@ export const WeatherWidget = () => {
     }
   });
 
-  const [weather, setWeather] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [weather, setWeather] = useState(() => {
+    try {
+      const saved = localStorage.getItem(WEATHER_CACHE_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return INITIAL_FALLBACK_WEATHER;
+  });
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -58,7 +79,12 @@ export const WeatherWidget = () => {
   async function loadWeatherData() {
     setRefreshing(true);
     const data = await fetchWeather(location.latitude, location.longitude);
-    setWeather(data);
+    if (data) {
+      setWeather(data);
+      try {
+        localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify(data));
+      } catch (e) {}
+    }
     setLoading(false);
     setRefreshing(false);
   }
@@ -139,28 +165,28 @@ export const WeatherWidget = () => {
       <div className="p-5">
         {/* Header: Village location & Refresh button */}
         <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
             <MapPin className="h-4 w-4 text-emerald-600 shrink-0" />
-            <span className="text-xs font-bold text-slate-800 tracking-tight truncate">
+            <span className="text-xs font-bold text-slate-800 tracking-tight truncate max-w-[140px] sm:max-w-xs">
               {location.name}
             </span>
             <button
               onClick={() => setShowSearchModal(true)}
-              className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 underline underline-offset-2 ml-1"
+              className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 underline underline-offset-2 ml-0.5 shrink-0"
             >
               Change
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-medium text-slate-400">
-              Updated {weather?.updatedAt}
+          <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
+            <span className="text-[10px] font-semibold text-slate-400 whitespace-nowrap">
+              {weather?.updatedAt}
             </span>
             <button
               onClick={loadWeatherData}
               disabled={refreshing}
               title="Refresh weather"
-              className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+              className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors shrink-0"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin text-emerald-600' : ''}`} />
             </button>

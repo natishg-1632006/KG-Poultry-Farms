@@ -5,6 +5,8 @@ import { Modal } from '../components/common/Modal';
 import { Badge } from '../components/common/Badge';
 import { useAuth } from '../context/AuthContext';
 import { Layers, Plus, Search, Edit, Trash2, RotateCcw } from 'lucide-react';
+import CustomSelect from '../components/common/CustomSelect';
+import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
 export const BatchesPage = () => {
   const { userProfile: currentUserProfile } = useAuth();
@@ -36,9 +38,10 @@ export const BatchesPage = () => {
 
   async function loadData() {
     try {
-      const [bList, uList] = await Promise.all([dbGetBatches(), dbGetUsers()]);
+      const [bList] = await Promise.all([dbGetBatches(), dbGetUsers()]);
+      const defaultKgFarmer = { uid: 'kg-poultry-farms', name: 'KG Poultry Farms', farmName: 'KG Main Farm' };
       setBatches(bList);
-      setFarmers(uList.filter(u => u.role === 'Farmer' && u.active));
+      setFarmers([defaultKgFarmer]);
     } catch (err) {
       console.error('Failed loading batches:', err);
     } finally {
@@ -55,8 +58,8 @@ export const BatchesPage = () => {
       batchName: nextName,
       chickArrivalDate: new Date().toISOString().split('T')[0],
       initialChickCount: 5000,
-      assignedFarmerId: farmers[0]?.uid || '',
-      assignedFarmerName: farmers[0]?.name || '',
+      assignedFarmerId: 'kg-poultry-farms',
+      assignedFarmerName: 'KG Poultry Farms',
       vehicleNumber: '',
       driverName: '',
       status: 'Draft'
@@ -71,8 +74,8 @@ export const BatchesPage = () => {
       batchName: batch.batchName,
       chickArrivalDate: batch.chickArrivalDate,
       initialChickCount: batch.initialChickCount,
-      assignedFarmerId: batch.assignedFarmerId || '',
-      assignedFarmerName: batch.assignedFarmerName || '',
+      assignedFarmerId: 'kg-poultry-farms',
+      assignedFarmerName: 'KG Poultry Farms',
       vehicleNumber: batch.vehicleNumber || '',
       driverName: batch.driverName || '',
       status: batch.status || 'Draft'
@@ -82,11 +85,11 @@ export const BatchesPage = () => {
 
   const handleFarmerChange = (e) => {
     const farmerId = e.target.value;
-    const farmerObj = farmers.find(f => f.uid === farmerId);
+    const farmerObj = farmers.find(f => f.uid === farmerId) || { uid: 'kg-poultry-farms', name: 'KG Poultry Farms' };
     setFormData({
       ...formData,
       assignedFarmerId: farmerId,
-      assignedFarmerName: farmerObj ? farmerObj.name : ''
+      assignedFarmerName: farmerObj.name
     });
   };
 
@@ -142,30 +145,40 @@ export const BatchesPage = () => {
     }
   };
 
-  const filteredBatches = batches.filter((b) => {
-    const matchesSearch =
-      b.batchNumber.toLowerCase().includes(search.toLowerCase()) ||
-      b.batchName.toLowerCase().includes(search.toLowerCase()) ||
-      (b.assignedFarmerName && b.assignedFarmerName.toLowerCase().includes(search.toLowerCase()));
-    const matchesStatus = statusFilter === 'ALL' || b.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredBatches = batches
+    .filter((b) => {
+      const matchesSearch =
+        b.batchNumber.toLowerCase().includes(search.toLowerCase()) ||
+        b.batchName.toLowerCase().includes(search.toLowerCase()) ||
+        (b.assignedFarmerName && b.assignedFarmerName.toLowerCase().includes(search.toLowerCase()));
+      const matchesStatus = statusFilter === 'ALL' || b.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      const statusA = (a.status || '').toLowerCase();
+      const statusB = (b.status || '').toLowerCase();
+      if (statusA === 'active' && statusB !== 'active') return -1;
+      if (statusA !== 'active' && statusB === 'active') return 1;
 
-  if (loading) return <div className="p-8 text-center text-slate-500">Loading Batch Management...</div>;
+      const dateA = new Date(a.chickArrivalDate || a.startDate || a.createdAt || 0).getTime();
+      const dateB = new Date(b.chickArrivalDate || b.startDate || b.createdAt || 0).getTime();
+      return dateB - dateA;
+    });
+
+  if (loading) return <LoadingSpinner message="Loading Batch Management..." />;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900">Batch Management</h1>
-          <p className="text-sm font-medium text-slate-500">Create, assign, edit, and track broiler chick batches (Draft → Active → Completed).</p>
-        </div>
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-lg sm:text-2xl font-black tracking-tight text-slate-900 shrink-0">
+          Batch Management
+        </h1>
         <button
           onClick={handleOpenCreateModal}
-          className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs font-bold text-white shadow-sm transition-all active:scale-95 shrink-0 whitespace-nowrap cursor-pointer"
         >
-          <Plus className="h-4 w-4" />
-          Create New Batch
+          <Plus className="h-4 w-4 shrink-0" />
+          <span>Create New Batch</span>
         </button>
       </div>
 
@@ -184,22 +197,115 @@ export const BatchesPage = () => {
 
         <div className="flex items-center gap-2">
           <label className="text-xs font-bold text-slate-500">Status:</label>
-          <select
+          <CustomSelect
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-700 focus:border-emerald-600 focus:outline-hidden"
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="Draft">Draft Only</option>
-            <option value="Active">Active Only</option>
-            <option value="Completed">Completed Only</option>
-          </select>
+            options={[
+              { value: 'ALL', label: 'All Statuses' },
+              { value: 'Draft', label: 'Draft Only' },
+              { value: 'Active', label: 'Active Only' },
+              { value: 'Completed', label: 'Completed Only' },
+            ]}
+          />
         </div>
       </div>
 
-      {/* Batches Table */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="overflow-x-auto">
+      {/* Batches List - Mobile Cards View & Desktop Table View */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm">
+        {/* Mobile View: Cards Layout */}
+        <div className="sm:hidden space-y-3">
+          {filteredBatches.length === 0 ? (
+            <div className="py-8 text-center text-xs text-slate-400">
+              No batches match the search criteria.
+            </div>
+          ) : (
+            filteredBatches.map((b) => (
+              <div
+                key={b.id}
+                className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3 shadow-2xs hover:border-emerald-300 transition-all"
+              >
+                {/* Header: Batch # & Status */}
+                <div className="flex items-start justify-between gap-2 border-b border-slate-200/60 pb-2.5">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-900">{b.batchNumber}</h3>
+                    <p className="text-[11px] font-semibold text-slate-500">{b.batchName}</p>
+                  </div>
+                  <Badge variant={b.status}>{b.status}</Badge>
+                </div>
+
+                {/* Details Grid */}
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-white p-2.5 rounded-lg border border-slate-100 space-y-0.5">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Arrival Date</span>
+                    <span className="font-bold text-slate-700">{b.chickArrivalDate}</span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-slate-100 space-y-0.5">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Chicks (Init / Rem)</span>
+                    <span className="font-bold text-slate-900">{b.initialChickCount} / <strong className="text-emerald-700">{b.remainingChickCount ?? b.initialChickCount}</strong></span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-slate-100 space-y-0.5">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Assigned Farmer</span>
+                    <span className="font-bold text-slate-800">{b.assignedFarmerName || 'KG Poultry Farms'}</span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-slate-100 space-y-0.5">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Vehicle / Driver</span>
+                    <span className="font-semibold text-slate-700">{b.vehicleNumber || 'N/A'} <span className="text-[10px] text-slate-400 font-normal">({b.driverName || 'N/A'})</span></span>
+                  </div>
+                </div>
+
+                {/* Card Actions Footer */}
+                <div className="flex items-center justify-between border-t border-slate-200/60 pt-2.5">
+                  <div>
+                    {b.status === 'Draft' && (
+                      <button
+                        onClick={() => handleChangeStatus(b, 'Active')}
+                        className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 active:scale-95 transition-all"
+                      >
+                        Set Active
+                      </button>
+                    )}
+                    {b.status === 'Active' && (
+                      <button
+                        onClick={() => handleChangeStatus(b, 'Completed')}
+                        className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 active:scale-95 transition-all"
+                      >
+                        Complete Batch
+                      </button>
+                    )}
+                    {b.status === 'Completed' && (
+                      <button
+                        onClick={() => handleChangeStatus(b, 'Active')}
+                        className="rounded-lg bg-slate-100 border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200 flex items-center gap-1 active:scale-95 transition-all"
+                      >
+                        <RotateCcw className="h-3 w-3" /> Reopen Batch
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleOpenEditModal(b)}
+                      className="rounded-lg p-2 text-slate-500 hover:bg-slate-200/60 hover:text-slate-900 border border-slate-200/60 bg-white"
+                      title="Edit Batch"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(b.id)}
+                      className="rounded-lg p-2 text-rose-500 hover:bg-rose-50 hover:text-rose-700 border border-rose-200/60 bg-white"
+                      title="Delete Batch"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop View: Table Layout */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
@@ -230,7 +336,7 @@ export const BatchesPage = () => {
                       <span className="text-slate-400"> / </span>
                       <span className="font-bold text-emerald-700">{b.remainingChickCount ?? b.initialChickCount}</span>
                     </td>
-                    <td className="py-3 px-2 text-slate-800 font-semibold">{b.assignedFarmerName || 'Unassigned'}</td>
+                    <td className="py-3 px-2 text-slate-800 font-semibold">{b.assignedFarmerName || 'KG Poultry Farms'}</td>
                     <td className="py-3 px-2 text-slate-600">
                       <div>{b.vehicleNumber || 'N/A'}</div>
                       <div className="text-[10px] text-slate-400">{b.driverName || 'N/A'}</div>
@@ -348,31 +454,29 @@ export const BatchesPage = () => {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Assigned Farmer *</label>
-              <select
-                value={formData.assignedFarmerId}
+              <CustomSelect
+                value={formData.assignedFarmerId || 'kg-poultry-farms'}
                 onChange={handleFarmerChange}
-                className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600 focus:outline-hidden"
-              >
-                <option value="">-- Select Farmer --</option>
-                {farmers.map((f) => (
-                  <option key={f.uid} value={f.uid}>
-                    {f.name} ({f.farmName || 'Shed'})
-                  </option>
-                ))}
-              </select>
+                options={farmers.map((f) => ({
+                  value: f.uid,
+                  label: `${f.name}${f.farmName ? ` (${f.farmName})` : ''}`
+                }))}
+                className="w-full justify-between border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 shadow-2xs"
+              />
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Batch Workflow Status *</label>
-              <select
+              <CustomSelect
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600 focus:outline-hidden"
-              >
-                <option value="Draft">Draft (Preparation)</option>
-                <option value="Active">Active (Farmer Recording Allowed)</option>
-                <option value="Completed">Completed (Read-Only for Farmer)</option>
-              </select>
+                options={[
+                  { value: 'Draft', label: 'Draft (Preparation)' },
+                  { value: 'Active', label: 'Active (Farmer Recording Allowed)' },
+                  { value: 'Completed', label: 'Completed (Read-Only for Farmer)' },
+                ]}
+                className="w-full justify-between border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 shadow-2xs"
+              />
             </div>
           </div>
 
