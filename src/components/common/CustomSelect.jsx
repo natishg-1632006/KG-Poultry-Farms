@@ -6,7 +6,8 @@ import { ChevronDown, Check, X } from 'lucide-react';
  * CustomSelect Component
  * Premium custom dropdown menu styled with farm theme colors,
  * replacing native OS dropdown popups with custom floating popover cards.
- * Uses React Portal and smart positioning to prevent clipping inside modals or popups.
+ * Uses React Portal and compact smart positioning (capped width) to prevent
+ * full-width stretching and clipping inside modals or popups.
  * 
  * Props:
  * - value: current selected value
@@ -55,7 +56,7 @@ export default function CustomSelect({
   const selectedOption = normalizedOptions.find((opt) => String(opt.value) === String(value));
   const displayLabel = selectedOption ? selectedOption.label : placeholder;
 
-  // Calculate popup position
+  // Calculate popup position with sleek compact width (between 180px and 260px)
   const calculatePosition = () => {
     if (!buttonRef.current) return { top: 0, left: 0, width: 0, placement: 'bottom', isMobile: false, ready: false };
     const isMob = window.innerWidth < 640;
@@ -64,7 +65,8 @@ export default function CustomSelect({
     }
 
     const rect = buttonRef.current.getBoundingClientRect();
-    const menuWidth = Math.max(rect.width, 180);
+    // Cap menu width to compact size so it doesn't stretch across the full width of wide inputs
+    const menuWidth = Math.min(Math.max(rect.width, 180), 260);
     const menuHeight = Math.min(260, normalizedOptions.length * 40 + 16);
 
     const spaceBelow = window.innerHeight - rect.bottom;
@@ -85,7 +87,7 @@ export default function CustomSelect({
       left = Math.max(16, window.innerWidth - menuWidth - 16);
     }
 
-    return { top, left, width: rect.width, placement, isMobile: false, ready: true };
+    return { top, left, width: menuWidth, placement, isMobile: false, ready: true };
   };
 
   const handleToggle = (e) => {
@@ -161,7 +163,7 @@ export default function CustomSelect({
         key={String(opt.value)}
         type="button"
         onClick={() => handleSelect(opt.value)}
-        className={`w-full flex items-center justify-between px-3 py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-150 cursor-pointer ${
+        className={`w-full flex items-center justify-between px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-150 cursor-pointer ${
           isSelected
             ? 'bg-emerald-600 text-white font-bold shadow-xs'
             : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-950'
@@ -191,7 +193,7 @@ export default function CustomSelect({
         type="button"
         disabled={disabled}
         onClick={handleToggle}
-        className={`group inline-flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 border cursor-pointer ${
+        className={`group inline-flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 border cursor-pointer ${
           isOpen
             ? 'bg-emerald-100/90 border-emerald-500 text-emerald-950 shadow-xs ring-2 ring-emerald-500/20'
             : 'bg-emerald-50/80 border-emerald-300/80 text-emerald-900 hover:bg-emerald-100/70 hover:border-emerald-400 shadow-2xs'
@@ -238,14 +240,14 @@ export default function CustomSelect({
               </div>
             </div>
           ) : (
-            /* Desktop View: Fixed Smart Positioned Portal Card */
+            /* Desktop View: Fixed Compact Smart Positioned Portal Card */
             <div
               ref={popoverRef}
               style={{
                 position: 'fixed',
                 top: `${popoverPos.top}px`,
                 left: `${popoverPos.left}px`,
-                minWidth: `${Math.max(popoverPos.width, 180)}px`,
+                width: `${popoverPos.width || 220}px`,
                 zIndex: 9999,
                 opacity: popoverPos.ready ? 1 : 0,
                 pointerEvents: popoverPos.ready ? 'auto' : 'none'
