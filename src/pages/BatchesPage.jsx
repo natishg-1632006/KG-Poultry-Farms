@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { dbGetBatches, dbSaveBatch, dbDeleteBatch, dbGetUsers, dbLogAuditEvent } from '../services/dbService';
 import { generateBatchNumber, generateBatchName } from '../utils/calculations';
 import { Modal } from '../components/common/Modal';
+import { ConfirmModal } from '../components/common/ConfirmModal';
 import { Badge } from '../components/common/Badge';
 import { useAuth } from '../context/AuthContext';
 import { Layers, Plus, Search, Edit, Trash2, RotateCcw } from 'lucide-react';
@@ -15,6 +16,15 @@ export const BatchesPage = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
+
+  // Delete Confirmation Modal state
+  const [deleteModal, setDeleteModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    loading: false
+  });
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -132,17 +142,28 @@ export const BatchesPage = () => {
     }
   };
 
-  const handleDelete = async (batchId) => {
-    if (!window.confirm(`Are you sure you want to delete batch ${batchId}? All daily records will be deleted.`)) {
-      return;
-    }
-    try {
-      await dbDeleteBatch(batchId);
-      await dbLogAuditEvent('BATCH_DELETED', `Deleted batch ${batchId}`, currentUserProfile?.name);
-      loadData();
-    } catch (err) {
-      alert('Failed deleting batch.');
-    }
+  const handleDelete = (batch) => {
+    const batchId = typeof batch === 'object' ? batch.id : batch;
+    const batchName = typeof batch === 'object' ? (batch.batchName || batch.batchNumber || batch.id) : batch;
+
+    setDeleteModal({
+      isOpen: true,
+      title: `Delete Batch ${batchName}?`,
+      message: `Are you sure you want to delete batch "${batchName}"? All associated daily records and logs will be permanently deleted.`,
+      loading: false,
+      onConfirm: async () => {
+        setDeleteModal(prev => ({ ...prev, loading: true }));
+        try {
+          await dbDeleteBatch(batchId);
+          await dbLogAuditEvent('BATCH_DELETED', `Deleted batch ${batchId}`, currentUserProfile?.name);
+          loadData();
+          setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false });
+        } catch (err) {
+          setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false });
+          alert('Failed deleting batch.');
+        }
+      }
+    });
   };
 
   const filteredBatches = batches
@@ -520,6 +541,16 @@ export const BatchesPage = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Custom Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false })}
+        onConfirm={deleteModal.onConfirm}
+        title={deleteModal.title}
+        message={deleteModal.message}
+        loading={deleteModal.loading}
+      />
     </div>
   );
 };

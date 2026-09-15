@@ -5,6 +5,7 @@ import { calculateRemainingChickens, validateRecordDate, deductFeedStock, bagsTo
 import { KG_PER_BAG, FEED_CONSUMPTION_TARGETS, AVERAGE_WEIGHT_TARGETS } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
 import { Modal } from '../components/common/Modal';
+import { ConfirmModal } from '../components/common/ConfirmModal';
 import { ClipboardList, AlertCircle, Save, CheckCircle2, Edit, Trash2, Layers, Plus, X, Calendar, Package, Scale, Target, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 import CustomSelect from '../components/common/CustomSelect';
 import CustomDatePicker from '../components/common/CustomDatePicker';
@@ -23,6 +24,15 @@ export const DailyRecordsPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [showTargetsTable, setShowTargetsTable] = useState(false);
   const [viewingRecord, setViewingRecord] = useState(null);
+
+  // Delete Confirmation Modal state
+  const [deleteModal, setDeleteModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    loading: false
+  });
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -136,17 +146,28 @@ export const DailyRecordsPage = () => {
     });
   };
 
-  const handleDeleteRecord = async (recordDate) => {
-    if (!confirm(`Are you sure you want to delete the daily record for ${recordDate}?`)) return;
-    try {
-      await dbDeleteDailyRecord(selectedBatchId, recordDate);
-      await dbLogAuditEvent('DAILY_RECORD_DELETED', `Deleted daily record for ${selectedBatch?.batchNumber} on ${recordDate}`, userProfile?.name);
-      setSuccessMsg(`Daily record for ${recordDate} deleted successfully.`);
-      loadRecordsForBatch(selectedBatchId);
-      loadBatches();
-    } catch (err) {
-      alert('Failed deleting record.');
-    }
+  const handleDeleteRecord = (recordDate) => {
+    if (isReadOnly) return;
+    setDeleteModal({
+      isOpen: true,
+      title: `Delete Daily Record (${recordDate})?`,
+      message: `Are you sure you want to delete the daily record for ${recordDate}? Mortality, culls, and feed log for this date will be permanently deleted.`,
+      loading: false,
+      onConfirm: async () => {
+        setDeleteModal(prev => ({ ...prev, loading: true }));
+        try {
+          await dbDeleteDailyRecord(selectedBatchId, recordDate);
+          await dbLogAuditEvent('DAILY_RECORD_DELETED', `Deleted daily record for ${selectedBatch?.batchNumber} on ${recordDate}`, userProfile?.name);
+          setSuccessMsg(`Daily record for ${recordDate} deleted successfully.`);
+          loadRecordsForBatch(selectedBatchId);
+          loadBatches();
+          setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false });
+        } catch (err) {
+          setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false });
+          alert('Failed deleting record.');
+        }
+      }
+    });
   };
 
   const handleDateChange = (newDate) => {
@@ -1055,6 +1076,16 @@ export const DailyRecordsPage = () => {
           </div>
         )}
       </div>
+
+      {/* Custom Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false })}
+        onConfirm={deleteModal.onConfirm}
+        title={deleteModal.title}
+        message={deleteModal.message}
+        loading={deleteModal.loading}
+      />
     </div>
   );
 };

@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { dbGetBatches, dbGetMedicineRecords, dbAddMedicineRecord, dbDeleteMedicineRecord, dbLogAuditEvent } from '../services/dbService';
 import { MEDICINE_UNITS } from '../constants/companyTargets';
 import { Modal } from '../components/common/Modal';
+import { ConfirmModal } from '../components/common/ConfirmModal';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { Syringe, Plus, Trash2, Edit, Save, CheckCircle2, Layers, Pill, User, Calendar, Eye, AlertCircle } from 'lucide-react';
 
@@ -22,6 +23,15 @@ export const MedicinePage = () => {
   const [successMsg, setSuccessMsg] = useState('');
   const [editingRecordId, setEditingRecordId] = useState(null);
   const [showForm, setShowForm] = useState(false);
+
+  // Delete Confirmation Modal state
+  const [deleteModal, setDeleteModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    loading: false
+  });
 
   const [activeHistoryTab, setActiveHistoryTab] = useState('Vaccine');
   const [recordType, setRecordType] = useState('Vaccine');
@@ -118,17 +128,27 @@ export const MedicinePage = () => {
     }
   };
 
-  const handleDeleteRecord = async (recordId) => {
+  const handleDeleteRecord = (recordId) => {
     if (isReadOnly) return;
-    if (!confirm('Are you sure you want to delete this medication/vaccine log entry?')) return;
-    try {
-      await dbDeleteMedicineRecord(selectedBatchId, recordId);
-      await dbLogAuditEvent('MEDICINE_DELETED', `Deleted medicine/vaccine record for ${selectedBatch?.batchNumber}`, userProfile?.name);
-      setSuccessMsg('Record deleted successfully.');
-      loadRecords(selectedBatchId);
-    } catch (err) {
-      alert('Failed deleting record.');
-    }
+    setDeleteModal({
+      isOpen: true,
+      title: 'Delete Medication / Vaccine Entry?',
+      message: 'Are you sure you want to delete this medication/vaccine log entry? This action cannot be undone.',
+      loading: false,
+      onConfirm: async () => {
+        setDeleteModal(prev => ({ ...prev, loading: true }));
+        try {
+          await dbDeleteMedicineRecord(selectedBatchId, recordId);
+          await dbLogAuditEvent('MEDICINE_DELETED', `Deleted medicine/vaccine record for ${selectedBatch?.batchNumber}`, userProfile?.name);
+          setSuccessMsg('Record deleted successfully.');
+          loadRecords(selectedBatchId);
+          setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false });
+        } catch (err) {
+          setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false });
+          alert('Failed deleting record.');
+        }
+      }
+    });
   };
 
   const handleAddVaccineField = () => {
@@ -984,6 +1004,16 @@ export const MedicinePage = () => {
           </div>
         </Modal>
       )}
+
+      {/* Custom Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false })}
+        onConfirm={deleteModal.onConfirm}
+        title={deleteModal.title}
+        message={deleteModal.message}
+        loading={deleteModal.loading}
+      />
     </div>
   );
 };

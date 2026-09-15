@@ -5,6 +5,7 @@ import { formatFeedStock, bagsToKg, kgToBags } from '../utils/calculations';
 import { KG_PER_BAG } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
 import { Modal } from '../components/common/Modal';
+import { ConfirmModal } from '../components/common/ConfirmModal';
 import { Package, Wheat, Truck, Save, CheckCircle2, Edit, Trash2, Layers, Plus, Eye, User, Calendar, FileText, RotateCcw, AlertCircle } from 'lucide-react';
 import CustomSelect from '../components/common/CustomSelect';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
@@ -21,6 +22,15 @@ export const FeedPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [viewingDetail, setViewingDetail] = useState(null);
   const [transactionFilter, setTransactionFilter] = useState('ALL');
+
+  // Delete Confirmation Modal state
+  const [deleteModal, setDeleteModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    loading: false
+  });
 
   const [formData, setFormData] = useState({
     transactionType: 'Receive',
@@ -140,17 +150,27 @@ export const FeedPage = () => {
     });
   };
 
-  const handleDeleteArrival = async (feedId) => {
+  const handleDeleteArrival = (feedId) => {
     if (isReadOnly) return;
-    if (!confirm('Are you sure you want to delete this feed entry? Stock KPI cards will recalculate.')) return;
-    try {
-      await dbDeleteFeedArrival(selectedBatchId, feedId);
-      await dbLogAuditEvent('FEED_DELETED', `Deleted feed entry for batch ${selectedBatch?.batchNumber}`, userProfile?.name);
-      setSuccessMsg('Feed record deleted successfully.');
-      await loadFeedArrivals(selectedBatchId);
-    } catch (err) {
-      alert('Failed deleting feed record.');
-    }
+    setDeleteModal({
+      isOpen: true,
+      title: 'Delete Feed Record?',
+      message: 'Are you sure you want to delete this feed entry? Stock KPI cards will automatically recalculate.',
+      loading: false,
+      onConfirm: async () => {
+        setDeleteModal(prev => ({ ...prev, loading: true }));
+        try {
+          await dbDeleteFeedArrival(selectedBatchId, feedId);
+          await dbLogAuditEvent('FEED_DELETED', `Deleted feed entry for batch ${selectedBatch?.batchNumber}`, userProfile?.name);
+          setSuccessMsg('Feed record deleted successfully.');
+          await loadFeedArrivals(selectedBatchId);
+          setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false });
+        } catch (err) {
+          setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false });
+          alert('Failed deleting feed record.');
+        }
+      }
+    });
   };
 
   const handleAddArrival = async (e) => {
@@ -783,6 +803,16 @@ export const FeedPage = () => {
           )}
         </div>
       </div>
+
+      {/* Custom Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false })}
+        onConfirm={deleteModal.onConfirm}
+        title={deleteModal.title}
+        message={deleteModal.message}
+        loading={deleteModal.loading}
+      />
     </div>
   );
 };

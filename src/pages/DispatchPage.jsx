@@ -14,6 +14,7 @@ import {
 import { calculateBoxSetWeights } from '../utils/calculations';
 import { Badge } from '../components/common/Badge';
 import { Modal } from '../components/common/Modal';
+import { ConfirmModal } from '../components/common/ConfirmModal';
 import { TraderInvoiceModal } from '../components/invoice/TraderInvoiceModal';
 import CustomSelect from '../components/common/CustomSelect';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
@@ -76,6 +77,15 @@ export const DispatchPage = () => {
 
   // Custom Extra Set Prompt Popup Modal
   const [showExtraSetPromptModal, setShowExtraSetPromptModal] = useState(false);
+
+  // Delete Confirmation Modal state
+  const [deleteModal, setDeleteModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    loading: false
+  });
 
   const [dispatchHeader, setDispatchHeader] = useState({
     vehicleName: '',
@@ -222,28 +232,41 @@ export const DispatchPage = () => {
     scrollToTop();
   };
 
-  const handleDeleteDispatch = async (dId, e) => {
+  const handleDeleteDispatch = (d, e) => {
     if (e) e.stopPropagation();
     if (isReadOnly) return;
-    if (!confirm('Are you sure you want to delete this vehicle dispatch card and all its box sets?')) return;
-    try {
-      await dbDeleteDispatch(dId);
-      if (activeDispatch?.id === dId) {
-        setActiveDispatch(null);
-        setViewMode('grid');
+    const dId = d.id || d;
+    const vName = d.vehicleName || d.vehicleNumber || 'Vehicle Card';
+
+    setDeleteModal({
+      isOpen: true,
+      title: 'Delete Vehicle Dispatch Card?',
+      message: `Are you sure you want to delete "${vName}" and all its recorded box sets? This action cannot be undone.`,
+      loading: false,
+      onConfirm: async () => {
+        setDeleteModal(prev => ({ ...prev, loading: true }));
+        try {
+          await dbDeleteDispatch(dId);
+          if (activeDispatch?.id === dId) {
+            setActiveDispatch(null);
+            setViewMode('grid');
+          }
+          await dbLogAuditEvent(
+            'DISPATCH_DELETED',
+            `Deleted vehicle dispatch ${dId}`,
+            userProfile?.name
+          );
+          setSuccessMsg('Vehicle dispatch card deleted.');
+          if (selectedBatchId) {
+            loadDispatchesForBatch(selectedBatchId);
+          }
+          setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false });
+        } catch (err) {
+          setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false });
+          alert('Failed deleting dispatch: ' + err.message);
+        }
       }
-      await dbLogAuditEvent(
-        'DISPATCH_DELETED',
-        `Deleted vehicle dispatch ${dId}`,
-        userProfile?.name
-      );
-      setSuccessMsg('Vehicle dispatch card deleted.');
-      if (selectedBatchId) {
-        loadDispatchesForBatch(selectedBatchId);
-      }
-    } catch (err) {
-      alert('Failed deleting dispatch: ' + err.message);
-    }
+    });
   };
 
   const handleSaveDispatchHeader = async (e) => {
@@ -524,33 +547,49 @@ export const DispatchPage = () => {
     }
   };
 
-  const handleDeleteBoxSet = async (setId) => {
-    if (!confirm('Are you sure you want to delete this box set?')) return;
-    try {
-      await dbDeleteBoxSet(activeDispatch.id, setId);
-      setSuccessMsg('Box set deleted.');
+  const handleDeleteBoxSet = (s) => {
+    if (isReadOnly) return;
+    const setId = s.id || s;
+    const setNum = s.boxSetNumber || '';
 
-      const updatedSets = await dbGetBoxSets(activeDispatch.id);
-      const loadedSets = updatedSets.filter(s => Number(s.loadedWeight) > 0);
-      const combinedWeight = loadedSets.reduce((acc, s) => acc + (s.totalChickenWeight || 0), 0);
-      const combinedChicks = loadedSets.reduce((acc, s) => acc + (s.chickenCount || 0), 0);
-      const combinedLoadedBoxes = loadedSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
-      const combinedAvg = combinedChicks > 0 ? parseFloat((combinedWeight / combinedChicks).toFixed(3)) : 0;
+    setDeleteModal({
+      isOpen: true,
+      title: `Delete Box Set ${setNum ? `#${setNum}` : ''}?`,
+      message: `Are you sure you want to delete Box Set ${setNum ? `#${setNum}` : ''}? This action cannot be undone.`,
+      loading: false,
+      onConfirm: async () => {
+        setDeleteModal(prev => ({ ...prev, loading: true }));
+        try {
+          await dbDeleteBoxSet(activeDispatch.id, setId);
+          setSuccessMsg('Box set deleted.');
 
-      const updatedDispatch = {
-        ...activeDispatch,
-        totalWeight: parseFloat(combinedWeight.toFixed(2)),
-        averageWeight: combinedAvg,
-        status: combinedLoadedBoxes >= activeDispatch.totalBoxCount ? 'Completed' : 'In Progress'
-      };
+          const updatedSets = await dbGetBoxSets(activeDispatch.id);
+          const loadedSets = updatedSets.filter(x => Number(x.loadedWeight) > 0);
+          const combinedWeight = loadedSets.reduce((acc, x) => acc + (x.totalChickenWeight || 0), 0);
+          const combinedChicks = loadedSets.reduce((acc, x) => acc + (x.chickenCount || 0), 0);
+          const combinedLoadedBoxes = loadedSets.reduce((acc, x) => acc + (Number(x.boxesInSet) || 1), 0);
+          const combinedAvg = combinedChicks > 0 ? parseFloat((combinedWeight / combinedChicks).toFixed(3)) : 0;
 
-      await dbSaveDispatch(updatedDispatch);
-      setActiveDispatch(updatedDispatch);
-      await loadDispatchesForBatch(selectedBatch.id);
-      await loadBoxSetsForDispatch(activeDispatch.id, updatedDispatch);
-    } catch (err) {
-      alert('Failed deleting box set.');
-    }
+          const updatedDispatch = {
+            ...activeDispatch,
+            totalWeight: parseFloat(combinedWeight.toFixed(2)),
+            averageWeight: combinedAvg,
+            status: combinedLoadedBoxes >= activeDispatch.totalBoxCount ? 'Completed' : 'In Progress'
+          };
+
+          await dbSaveDispatch(updatedDispatch);
+          setActiveDispatch(updatedDispatch);
+          if (selectedBatch) {
+            await loadDispatchesForBatch(selectedBatch.id);
+          }
+          await loadBoxSetsForDispatch(activeDispatch.id, updatedDispatch);
+          setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false });
+        } catch (err) {
+          setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false });
+          alert('Failed deleting box set.');
+        }
+      }
+    });
   };
 
   const handleEditBoxSet = (s) => {
@@ -852,7 +891,7 @@ export const DispatchPage = () => {
                                   <Edit className="h-3.5 w-3.5" />
                                 </button>
                                 <button
-                                  onClick={(e) => handleDeleteDispatch(d.id, e)}
+                                  onClick={(e) => handleDeleteDispatch(d, e)}
                                   className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
                                   title="Delete Dispatch Card"
                                 >
@@ -1732,6 +1771,16 @@ export const DispatchPage = () => {
           onRateChange={setRatePerKg}
         />
       )}
+
+      {/* Custom Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false })}
+        onConfirm={deleteModal.onConfirm}
+        title={deleteModal.title}
+        message={deleteModal.message}
+        loading={deleteModal.loading}
+      />
     </div>
   );
 };
