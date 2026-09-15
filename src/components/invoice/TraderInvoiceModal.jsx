@@ -132,11 +132,19 @@ Thank you for your business!`;
   const renderDocumentContent = () => (
     <div
       id="trader-invoice-document"
-      style={{ backgroundColor: '#ffffff', color: '#0f172a', borderColor: '#e2e8f0', width: '800px', boxSizing: 'border-box' }}
-      className="p-8 border rounded-2xl shadow-sm space-y-6 font-sans print:p-0 print:border-none print:shadow-none"
+      style={{
+        backgroundColor: '#ffffff',
+        color: '#0f172a',
+        border: '1px solid #e2e8f0',
+        borderRadius: '16px',
+        padding: '32px',
+        width: '800px',
+        boxSizing: 'border-box',
+        fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+      }}
     >
-      {/* Top Farm Brand & Official Invoice Header (Side-by-side flex layout) */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '16px' }}>
+      {/* 1. Top Farm Brand & Official Invoice Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '16px', marginBottom: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <img
             src="/kg-logo.jpg"
@@ -159,9 +167,9 @@ Thank you for your business!`;
           </div>
         </div>
 
-        {/* Light Green Official Invoice Badge Box (Right-aligned compact box) */}
+        {/* Official Invoice Badge Box */}
         <div
-          style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', padding: '12px 18px', borderRadius: '16px', textAlign: 'right', shrink: 0 }}
+          style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', padding: '12px 18px', borderRadius: '16px', textAlign: 'right', flexShrink: 0 }}
         >
           <div style={{ color: '#166534', fontSize: '10px', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '0.05em' }}>
             OFFICIAL INVOICE
@@ -176,9 +184,9 @@ Thank you for your business!`;
       </div>
 
       {/* Green Horizontal Dividing Line */}
-      <div style={{ backgroundColor: '#10b981', height: '2px', width: '100%', borderRadius: '9999px' }}></div>
+      <div style={{ backgroundColor: '#10b981', height: '2px', width: '100%', borderRadius: '9999px', marginBottom: '24px' }}></div>
 
-      {/* Billed To & Vehicle Transport Info Container Box (Explicit 2-Column Grid) */}
+      {/* 2. Billed To & Vehicle Transport Info Container Box */}
       <div
         style={{
           backgroundColor: '#f8fafc',
@@ -187,7 +195,8 @@ Thank you for your business!`;
           padding: '16px',
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
-          gap: '16px'
+          gap: '16px',
+          marginBottom: '24px'
         }}
       >
         {/* Left Column: Billed To */}
@@ -226,30 +235,30 @@ Thank you for your business!`;
         </div>
       </div>
 
-      {/* Weighing Scale Breakdown (Tare & Gross Load) */}
-      <div className="space-y-2">
-        <h3 style={{ color: '#0f172a' }} className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
+      {/* 3. Weighing Scale Breakdown (Tare & Gross Load) */}
+      <div style={{ marginBottom: '24px' }}>
+        <h3 style={{ color: '#0f172a', fontSize: '12px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
           <Layers className="h-4 w-4" style={{ color: '#047857' }} />
           <span>WEIGHING SCALE BREAKDOWN (TARE & GROSS LOAD)</span>
         </h3>
 
         <div style={{ border: '1px solid #cbd5e1', borderRadius: '12px', overflow: 'hidden' }}>
-          <table className="w-full text-left text-xs">
-            <thead style={{ backgroundColor: '#f8fafc', color: '#475569' }} className="font-extrabold uppercase tracking-wider text-[10px] border-b border-slate-300">
+          <table style={{ width: '100%', textAlign: 'left', fontSize: '12px', borderCollapse: 'collapse' }}>
+            <thead style={{ backgroundColor: '#f8fafc', color: '#475569', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '10px', borderBottom: '1px solid #cbd5e1' }}>
               <tr>
-                <th className="py-2.5 px-3">SET #</th>
-                <th className="py-2.5 px-3">BOXES</th>
-                <th className="py-2.5 px-3">EMPTY TARE WT</th>
-                <th className="py-2.5 px-3">GROSS LOADED WT</th>
-                <th className="py-2.5 px-3">NET CHICKEN WT</th>
-                <th className="py-2.5 px-3">BIRDS</th>
-                <th className="py-2.5 px-3">AVG WT / BIRD</th>
+                <th style={{ padding: '10px 12px' }}>SET #</th>
+                <th style={{ padding: '10px 12px' }}>BOXES</th>
+                <th style={{ padding: '10px 12px' }}>EMPTY TARE WT</th>
+                <th style={{ padding: '10px 12px' }}>GROSS LOADED WT</th>
+                <th style={{ padding: '10px 12px' }}>NET CHICKEN WT</th>
+                <th style={{ padding: '10px 12px' }}>BIRDS</th>
+                <th style={{ padding: '10px 12px' }}>AVG WT / BIRD</th>
               </tr>
             </thead>
-            <tbody style={{ color: '#334155' }} className="divide-y divide-slate-200 font-medium">
+            <tbody style={{ color: '#334155', fontWeight: '500' }}>
               {boxSets.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="py-4 text-center text-slate-400 font-medium italic">
+                  <td colSpan="7" style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', fontStyle: 'italic', fontWeight: '500' }}>
                     Total Dispatch Weight: {totalNetWeight.toFixed(2)} kg ({totalBirds} birds)
                   </td>
                 </tr>
@@ -262,36 +271,36 @@ Thank you for your business!`;
                   const net = isLoaded ? (s.totalChickenWeight || (gross - totalEmptyTare)) : 0;
 
                   return (
-                    <tr key={s.id || idx} className="hover:bg-slate-50">
-                      <td style={{ color: '#0f172a' }} className="py-2.5 px-3 font-bold">Set #{s.boxSetNumber || (idx + 1)}</td>
-                      <td className="py-2.5 px-3 font-semibold">{boxesInSet} Boxes</td>
-                      <td style={{ color: '#64748b' }} className="py-2.5 px-3">{s.emptyBoxWeight} kg</td>
-                      <td style={{ color: '#0f172a' }} className="py-2.5 px-3 font-semibold">{isLoaded ? `${gross} kg` : 'Pending'}</td>
-                      <td style={{ color: '#047857' }} className="py-2.5 px-3 font-extrabold">{isLoaded ? `${net.toFixed(2)} kg` : '—'}</td>
-                      <td style={{ color: '#0f172a' }} className="py-2.5 px-3 font-bold">{s.chickenCount || '—'}</td>
-                      <td style={{ color: '#475569' }} className="py-2.5 px-3 font-semibold">{isLoaded ? `${s.averageChickenWeight || (net / (s.chickenCount || 1)).toFixed(3)} kg` : '—'}</td>
+                    <tr key={s.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '10px 12px', color: '#0f172a', fontWeight: '700' }}>Set #{s.boxSetNumber || (idx + 1)}</td>
+                      <td style={{ padding: '10px 12px', fontWeight: '600' }}>{boxesInSet} Boxes</td>
+                      <td style={{ padding: '10px 12px', color: '#64748b' }}>{s.emptyBoxWeight} kg</td>
+                      <td style={{ padding: '10px 12px', color: '#0f172a', fontWeight: '600' }}>{isLoaded ? `${gross} kg` : 'Pending'}</td>
+                      <td style={{ padding: '10px 12px', color: '#047857', fontWeight: '800' }}>{isLoaded ? `${net.toFixed(2)} kg` : '—'}</td>
+                      <td style={{ padding: '10px 12px', color: '#0f172a', fontWeight: '700' }}>{s.chickenCount || '—'}</td>
+                      <td style={{ padding: '10px 12px', color: '#475569', fontWeight: '600' }}>{isLoaded ? `${s.averageChickenWeight || (net / (s.chickenCount || 1)).toFixed(3)} kg` : '—'}</td>
                     </tr>
                   );
                 })
               )}
             </tbody>
-            <tfoot style={{ backgroundColor: '#ffffff', color: '#0f172a' }} className="font-extrabold border-t-2 border-slate-900 text-xs">
+            <tfoot style={{ backgroundColor: '#ffffff', color: '#0f172a', fontWeight: '800', borderTop: '2px solid #0f172a', fontSize: '12px' }}>
               <tr>
-                <td style={{ color: '#0f172a' }} className="py-3 px-3 font-black uppercase">TOTALS</td>
-                <td className="py-3 px-3 font-black">{totalBoxes} Boxes</td>
-                <td style={{ color: '#475569' }} className="py-3 px-3 font-extrabold">{totalTareWeight.toFixed(1)} kg</td>
-                <td style={{ color: '#0f172a' }} className="py-3 px-3 font-black">{totalGrossWeight.toFixed(1)} kg</td>
-                <td style={{ color: '#047857' }} className="py-3 px-3 font-black text-sm">{totalNetWeight.toFixed(2)} kg</td>
-                <td style={{ color: '#047857' }} className="py-3 px-3 font-black">{totalBirds} Birds</td>
-                <td style={{ color: '#047857' }} className="py-3 px-3 font-black">{avgWeight} kg/bird</td>
+                <td style={{ padding: '12px 12px', color: '#0f172a', fontWeight: '900', textTransform: 'uppercase' }}>TOTALS</td>
+                <td style={{ padding: '12px 12px', color: '#0f172a', fontWeight: '900' }}>{totalBoxes} Boxes</td>
+                <td style={{ padding: '12px 12px', color: '#475569', fontWeight: '800' }}>{totalTareWeight.toFixed(1)} kg</td>
+                <td style={{ padding: '12px 12px', color: '#0f172a', fontWeight: '900' }}>{totalGrossWeight.toFixed(1)} kg</td>
+                <td style={{ padding: '12px 12px', color: '#047857', fontWeight: '900', fontSize: '14px' }}>{totalNetWeight.toFixed(2)} kg</td>
+                <td style={{ padding: '12px 12px', color: '#047857', fontWeight: '900' }}>{totalBirds} Birds</td>
+                <td style={{ padding: '12px 12px', color: '#047857', fontWeight: '900' }}>{avgWeight} kg/bird</td>
               </tr>
             </tfoot>
           </table>
         </div>
       </div>
 
-      {/* Verified Dispatch Seal Stamp Section */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '8px' }}>
+      {/* 4. Verified Dispatch Seal Stamp Section */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '16px', marginTop: '16px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: '6px' }}>
           <div
             style={{
@@ -312,7 +321,7 @@ Thank you for your business!`;
           >
             <div style={{ borderColor: '#10b981', position: 'absolute', inset: '4px', borderRadius: '9999px', borderWidth: '2px', borderStyle: 'double' }}></div>
             <div style={{ color: '#065f46', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-              <ShieldCheck className="h-6 w-6 text-emerald-600" />
+              <ShieldCheck className="h-6 w-6 text-emerald-600" style={{ color: '#059669', height: '24px', width: '24px' }} />
               <span style={{ fontSize: '8px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.1em', lineHeight: 1 }}>KG POULTRY</span>
               <span style={{ color: '#064e3b', fontSize: '9px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '-0.05em' }}>VERIFIED</span>
               <span style={{ color: '#047857', fontSize: '7px', fontWeight: '700', textTransform: 'uppercase' }}>OFFICIAL SEAL</span>
@@ -323,8 +332,8 @@ Thank you for your business!`;
         </div>
       </div>
 
-      {/* Footer Terms */}
-      <div style={{ borderColor: '#e2e8f0', color: '#94a3b8', borderTop: '1px solid #e2e8f0', paddingTop: '16px', textAlign: 'center', fontSize: '10px', fontWeight: '500' }}>
+      {/* 5. Footer Terms */}
+      <div style={{ borderColor: '#e2e8f0', color: '#94a3b8', borderTop: '1px solid #e2e8f0', paddingTop: '16px', marginTop: '24px', textAlign: 'center', fontSize: '10px', fontWeight: '500' }}>
         This invoice is computer generated and verified by KG Poultry Farms Weighing System.
       </div>
     </div>
