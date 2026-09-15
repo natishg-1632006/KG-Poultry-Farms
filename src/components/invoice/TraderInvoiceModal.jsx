@@ -29,11 +29,10 @@ export const TraderInvoiceModal = ({
 
   // Normalize data between direct dispatch object or saved invoiceData
   const invNumber = invoiceData?.id || `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`;
-  const invDate = invoiceData?.invoiceDate || dispatch?.dispatchDate || new Date().toISOString().split('T')[0];
-  const customerName = invoiceData?.customerName || dispatch?.vehicleName || dispatch?.traderName || 'KG Wholesale Poultry Traders';
-  const customerPhone = invoiceData?.customerPhone || dispatch?.driverMobileNumber || '';
-  const vehicleNo = invoiceData?.vehicleNumber || dispatch?.vehicleNumber || 'TN-38-C-5544';
-  const driverName = invoiceData?.driverName || dispatch?.driverName || 'Karthik';
+  const customerName = invoiceData?.customerName || dispatch?.vehicleName || dispatch?.traderName || dispatch?.customerName || 'General Trader';
+  const customerPhone = invoiceData?.customerPhone || dispatch?.customerPhone || dispatch?.driverMobileNumber || '';
+  const vehicleNo = invoiceData?.vehicleNumber || dispatch?.vehicleNumber || 'TN-38-AX-1234';
+  const driverName = invoiceData?.driverName || dispatch?.driverName || 'Suresh';
 
   // Calculate totals from boxSets or invoiceData
   const loadedSets = boxSets.filter(s => Number(s.loadedWeight) > 0);
@@ -41,98 +40,25 @@ export const TraderInvoiceModal = ({
   const totalTareWeight = boxSets.reduce((acc, s) => acc + (Number(s.emptyBoxWeight) || 0), 0);
   const totalGrossWeight = boxSets.reduce((acc, s) => acc + (Number(s.loadedWeight) || 0), 0);
   
-  const totalNetWeight = loadedSets.length > 0
-    ? loadedSets.reduce((acc, s) => acc + (Number(s.totalChickenWeight) || 0), 0)
-    : (invoiceData?.totalWeightKg || dispatch?.totalWeight || 0);
+  const totalNetWeight = (boxSets && boxSets.length > 0)
+    ? boxSets.reduce((sum, s) => sum + (Number(s.totalChickenWeight) || 0), 0)
+    : (invoiceData?.totalWeightKg || dispatch?.totalWeight || dispatch?.netWeight || 0);
 
-  const totalBirds = loadedSets.length > 0
-    ? loadedSets.reduce((acc, s) => acc + (Number(s.chickenCount) || 0), 0)
+  const totalBirds = (boxSets && boxSets.length > 0)
+    ? boxSets.reduce((sum, s) => sum + (Number(s.chickenCount) || 0), 0)
     : (invoiceData?.totalChickens || dispatch?.totalBirds || dispatch?.birdsCount || 0);
 
   const currentRate = invoiceData?.ratePerKg || ratePerKg || 135;
   const avgWeight = totalBirds > 0 ? (totalNetWeight / totalBirds).toFixed(3) : (dispatch?.averageWeight || 0);
 
-  // PDF Generation Function - with oklch/oklab color parser fix
+  // PDF Generation Function - using captureSafeCanvas to sanitize host document oklch styles
   const handleDownloadPDF = async () => {
     const el = document.getElementById('trader-invoice-document');
     if (!el) return;
     setDownloading(true);
     try {
-      const canvas = await html2canvas(el, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        onclone: (clonedDoc) => {
-          const sanitizeColors = (text) => {
-            if (!text) return text;
-            if (!text.includes('oklch') && !text.includes('oklab')) return text;
-            return text
-              .replace(/--color-slate-950:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-950: #020617')
-              .replace(/--color-slate-900:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-900: #0f172a')
-              .replace(/--color-slate-800:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-800: #1e293b')
-              .replace(/--color-slate-700:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-700: #334155')
-              .replace(/--color-slate-600:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-600: #475569')
-              .replace(/--color-slate-500:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-500: #64748b')
-              .replace(/--color-slate-400:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-400: #94a3b8')
-              .replace(/--color-slate-300:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-300: #cbd5e1')
-              .replace(/--color-slate-200:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-200: #e2e8f0')
-              .replace(/--color-slate-100:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-100: #f1f5f9')
-              .replace(/--color-slate-50:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-50: #f8fafc')
-              .replace(/--color-emerald-900:\s*(oklch|oklab)\([^)]+\)/gi, '--color-emerald-900: #064e3b')
-              .replace(/--color-emerald-800:\s*(oklch|oklab)\([^)]+\)/gi, '--color-emerald-800: #065f46')
-              .replace(/--color-emerald-700:\s*(oklch|oklab)\([^)]+\)/gi, '--color-emerald-700: #047857')
-              .replace(/--color-emerald-600:\s*(oklch|oklab)\([^)]+\)/gi, '--color-emerald-600: #059669')
-              .replace(/--color-emerald-500:\s*(oklch|oklab)\([^)]+\)/gi, '--color-emerald-500: #10b981')
-              .replace(/--color-emerald-100:\s*(oklch|oklab)\([^)]+\)/gi, '--color-emerald-100: #d1fae5')
-              .replace(/--color-emerald-50:\s*(oklch|oklab)\([^)]+\)/gi, '--color-emerald-50: #f0fdf4')
-              .replace(/--color-teal-900:\s*(oklch|oklab)\([^)]+\)/gi, '--color-teal-900: #134e4a')
-              .replace(/--color-teal-700:\s*(oklch|oklab)\([^)]+\)/gi, '--color-teal-700: #0f766e')
-              .replace(/oklch\([^)]+\)/gi, '#334155')
-              .replace(/oklab\([^)]+\)/gi, '#334155');
-          };
-
-          const styleTags = clonedDoc.getElementsByTagName('style');
-          for (let i = 0; i < styleTags.length; i++) {
-            if (styleTags[i].textContent) {
-              styleTags[i].textContent = sanitizeColors(styleTags[i].textContent);
-            }
-          }
-
-          try {
-            const sheets = clonedDoc.styleSheets;
-            for (let k = 0; k < sheets.length; k++) {
-              try {
-                const rules = sheets[k].cssRules || sheets[k].rules;
-                if (rules) {
-                  for (let r = 0; r < rules.length; r++) {
-                    if (rules[r].style && rules[r].style.cssText) {
-                      if (rules[r].style.cssText.includes('oklch') || rules[r].style.cssText.includes('oklab')) {
-                        rules[r].style.cssText = sanitizeColors(rules[r].style.cssText);
-                      }
-                    }
-                  }
-                }
-              } catch (e) {}
-            }
-          } catch (e) {}
-
-          const container = clonedDoc.getElementById('trader-invoice-document');
-          const targetNodes = container
-            ? [clonedDoc.documentElement, clonedDoc.body, container, ...Array.from(container.querySelectorAll('*'))]
-            : Array.from(clonedDoc.querySelectorAll('*'));
-
-          targetNodes.forEach((node) => {
-            if (node && node.getAttribute) {
-              const inlineStyle = node.getAttribute('style') || '';
-              if (inlineStyle.includes('oklch') || inlineStyle.includes('oklab')) {
-                node.setAttribute('style', sanitizeColors(inlineStyle));
-              }
-            }
-          });
-        }
-      });
-      const imgData = canvas.toDataURL('image/jpeg', 0.78);
+      const canvas = await captureSafeCanvas(el);
+      const imgData = canvas.toDataURL('image/jpeg', 0.85);
       const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4', compress: true });
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();

@@ -12,7 +12,7 @@ import {
   Truck
 } from 'lucide-react';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { captureSafeCanvas } from '../../utils/pdfGenerator';
 
 export const generateBatchReportPDF = async (batchName = 'KgPoultryBatch-2') => {
   const container = document.getElementById('batch-invoice-document');
@@ -27,86 +27,9 @@ export const generateBatchReportPDF = async (batchName = 'KgPoultryBatch-2') => 
 
     for (let i = 0; i < pageElements.length; i++) {
       const pageEl = pageElements[i];
+      const canvas = await captureSafeCanvas(pageEl);
 
-      const canvas = await html2canvas(pageEl, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        onclone: (clonedDoc) => {
-          const mapOklchToHex = (text) => {
-            if (!text) return text;
-            if (!text.includes('oklch') && !text.includes('oklab')) return text;
-            return text
-              .replace(/--color-slate-950:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-950: #020617')
-              .replace(/--color-slate-900:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-900: #0f172a')
-              .replace(/--color-slate-800:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-800: #1e293b')
-              .replace(/--color-slate-700:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-700: #334155')
-              .replace(/--color-slate-600:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-600: #475569')
-              .replace(/--color-slate-500:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-500: #64748b')
-              .replace(/--color-slate-400:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-400: #94a3b8')
-              .replace(/--color-slate-300:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-300: #cbd5e1')
-              .replace(/--color-slate-200:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-200: #e2e8f0')
-              .replace(/--color-slate-100:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-100: #f1f5f9')
-              .replace(/--color-slate-50:\s*(oklch|oklab)\([^)]+\)/gi, '--color-slate-50: #f8fafc')
-              .replace(/--color-emerald-900:\s*(oklch|oklab)\([^)]+\)/gi, '--color-emerald-900: #064e3b')
-              .replace(/--color-emerald-800:\s*(oklch|oklab)\([^)]+\)/gi, '--color-emerald-800: #065f46')
-              .replace(/--color-emerald-700:\s*(oklch|oklab)\([^)]+\)/gi, '--color-emerald-700: #047857')
-              .replace(/--color-emerald-600:\s*(oklch|oklab)\([^)]+\)/gi, '--color-emerald-600: #059669')
-              .replace(/--color-emerald-500:\s*(oklch|oklab)\([^)]+\)/gi, '--color-emerald-500: #10b981')
-              .replace(/--color-emerald-100:\s*(oklch|oklab)\([^)]+\)/gi, '--color-emerald-100: #d1fae5')
-              .replace(/--color-emerald-50:\s*(oklch|oklab)\([^)]+\)/gi, '--color-emerald-50: #f0fdf4')
-              .replace(/--color-teal-900:\s*(oklch|oklab)\([^)]+\)/gi, '--color-teal-900: #134e4a')
-              .replace(/--color-teal-700:\s*(oklch|oklab)\([^)]+\)/gi, '--color-teal-700: #0f766e')
-              .replace(/oklab\([^)]+\)/gi, '#334155')
-              .replace(/oklch\([^)]+\)/gi, '#334155');
-          };
-
-          // 1. Sanitize all <style> text content
-          const styleTags = clonedDoc.getElementsByTagName('style');
-          for (let s = 0; s < styleTags.length; s++) {
-            if (styleTags[s].textContent) {
-              styleTags[s].textContent = mapOklchToHex(styleTags[s].textContent);
-            }
-          }
-
-          // 2. Sanitize CSSOM rules across all stylesheets
-          try {
-            const sheets = clonedDoc.styleSheets;
-            for (let k = 0; k < sheets.length; k++) {
-              try {
-                const rules = sheets[k].cssRules || sheets[k].rules;
-                if (rules) {
-                  for (let r = 0; r < rules.length; r++) {
-                    if (rules[r].style && rules[r].style.cssText) {
-                      if (rules[r].style.cssText.includes('oklch') || rules[r].style.cssText.includes('oklab')) {
-                        rules[r].style.cssText = mapOklchToHex(rules[r].style.cssText);
-                      }
-                    }
-                  }
-                }
-              } catch (e) {}
-            }
-          } catch (e) {}
-
-          // 3. Sanitize inline styles on document elements & batch-invoice-document nodes
-          const container = clonedDoc.getElementById('batch-invoice-document');
-          const targetNodes = container
-            ? [clonedDoc.documentElement, clonedDoc.body, container, ...Array.from(container.querySelectorAll('*'))]
-            : Array.from(clonedDoc.querySelectorAll('*'));
-
-          targetNodes.forEach((node) => {
-            if (node && node.getAttribute) {
-              const inlineStyle = node.getAttribute('style') || '';
-              if (inlineStyle.includes('oklch') || inlineStyle.includes('oklab')) {
-                node.setAttribute('style', mapOklchToHex(inlineStyle));
-              }
-            }
-          });
-        }
-      });
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.78);
+      const imgData = canvas.toDataURL('image/jpeg', 0.85);
       const imgHeight = (canvas.height * pdfWidth) / canvas.width;
 
       if (i > 0) {
