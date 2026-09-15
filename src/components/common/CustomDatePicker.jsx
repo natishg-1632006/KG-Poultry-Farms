@@ -21,6 +21,7 @@ export default function CustomDatePicker({
   min,
   max,
   loggedDates = [],
+  showPending = false,
   disabled = false,
   placeholder = 'Select date...',
   className = ''
@@ -161,7 +162,7 @@ export default function CustomDatePicker({
 
     const isLogged = loggedSet.has(currentStr);
     const isWithinBatch = (!min || currentStr >= min) && (!max || currentStr <= max);
-    const isPending = !isLogged && isWithinBatch;
+    const isPending = showPending && !isLogged && isWithinBatch;
 
     dayCells.push(
       <button
@@ -263,10 +264,12 @@ export default function CustomDatePicker({
               <span className="h-2 w-2 rounded-full bg-emerald-600"></span>
               <span className="text-emerald-900">Updated / Logged</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-amber-500"></span>
-              <span className="text-amber-800">Pending Entry</span>
-            </div>
+            {showPending && (
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+                <span className="text-amber-800">Pending Entry</span>
+              </div>
+            )}
           </div>
 
           {/* Days of Week Header */}

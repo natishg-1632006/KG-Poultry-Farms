@@ -588,6 +588,7 @@ export const DailyRecordsPage = () => {
               max={todayStr}
               disabled={isReadOnly}
               loggedDates={Object.keys(recordsMap || {})}
+              showPending={true}
               onChange={(newDate) => handleDateChange(newDate)}
             />
           </div>
