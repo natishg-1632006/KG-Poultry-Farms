@@ -7,6 +7,7 @@ import { Badge } from '../components/common/Badge';
 import { useAuth } from '../context/AuthContext';
 import { Layers, Plus, Search, Edit, Trash2, RotateCcw } from 'lucide-react';
 import CustomSelect from '../components/common/CustomSelect';
+import CustomDatePicker from '../components/common/CustomDatePicker';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
 export const BatchesPage = () => {
@@ -451,12 +452,10 @@ export const BatchesPage = () => {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Chick Arrival Date *</label>
-              <input
-                type="date"
-                required
+              <CustomDatePicker
                 value={formData.chickArrivalDate}
-                onChange={(e) => setFormData({ ...formData, chickArrivalDate: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 focus:outline-hidden"
+                onChange={(dStr) => setFormData({ ...formData, chickArrivalDate: dStr })}
+                loggedDates={batches.map(b => b.chickArrivalDate)}
               />
             </div>
             <div>
