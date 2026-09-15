@@ -334,57 +334,56 @@ Thank you for your business!`;
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Dispatch Invoice - Vehicle ${vehicleNo}`}
-      maxWidth="max-w-4xl"
+      title={`Dispatch Invoice Options - Vehicle ${vehicleNo}`}
+      maxWidth="max-w-md"
     >
-      <div className="space-y-4 py-1">
-        {/* Header Bar: Meta & Action Buttons */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <div className="h-10 w-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700 border border-emerald-200 shrink-0">
-              <FileText className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="text-sm sm:text-base font-black text-slate-900 truncate">Vehicle {vehicleNo} Invoice</h3>
-              <p className="text-xs text-slate-500 font-semibold truncate">
-                Trader: <strong className="text-slate-800">{customerName}</strong> • Date: <strong className="text-slate-800">{invDate}</strong>
-              </p>
-            </div>
+      <div className="space-y-4 py-2">
+        {/* Header Icon & Vehicle Meta */}
+        <div className="text-center space-y-1">
+          <div className="mx-auto h-12 w-12 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-700 border border-emerald-200">
+            <FileText className="h-6 w-6" />
           </div>
-
-          {/* Action Buttons */}
-          <div className="grid grid-cols-3 gap-2 w-full sm:w-auto shrink-0">
-            <button
-              onClick={handleDownloadPDF}
-              disabled={downloading}
-              className="flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 px-3 py-2 text-xs font-black text-white shadow-sm transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
-            >
-              <Download className="h-3.5 w-3.5 text-emerald-400" />
-              <span>{downloading ? 'Exporting...' : 'PDF'}</span>
-            </button>
-
-            <button
-              onClick={handleSendToTraderWhatsApp}
-              className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 px-3 py-2 text-xs font-black text-white shadow-sm transition-all active:scale-95 cursor-pointer"
-            >
-              <Send className="h-3.5 w-3.5 text-white" />
-              <span>WhatsApp</span>
-            </button>
-
-            <button
-              onClick={handlePrint}
-              className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800 shadow-2xs transition-all active:scale-95 cursor-pointer"
-            >
-              <Printer className="h-3.5 w-3.5 text-slate-600" />
-              <span>Print</span>
-            </button>
-          </div>
+          <h3 className="text-base font-black text-slate-900">Vehicle {vehicleNo} Invoice</h3>
+          <p className="text-xs text-slate-500 font-semibold">
+            Trader: <strong className="text-slate-800">{customerName}</strong> • Date: <strong className="text-slate-800">{invDate}</strong>
+          </p>
         </div>
 
-        {/* Scrollable Document Preview for Mobile & Desktop */}
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-slate-100/60 p-2 sm:p-4 flex justify-center max-w-full">
-          {renderDocumentContent()}
+        {/* The 3 Action Buttons ONLY */}
+        <div className="grid grid-cols-1 gap-2.5 pt-2">
+          {/* 1. Download PDF */}
+          <button
+            onClick={handleDownloadPDF}
+            disabled={downloading}
+            className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 px-4 py-3 text-xs font-black text-white shadow-sm transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+          >
+            <Download className="h-4 w-4 text-emerald-400" />
+            <span>{downloading ? 'Exporting PDF...' : 'Download PDF Invoice'}</span>
+          </button>
+
+          {/* 2. Send to Trader (WhatsApp) */}
+          <button
+            onClick={handleSendToTraderWhatsApp}
+            className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 px-4 py-3 text-xs font-black text-white shadow-sm transition-all active:scale-95 cursor-pointer"
+          >
+            <Send className="h-4 w-4 text-white" />
+            <span>Send to Trader (WhatsApp)</span>
+          </button>
+
+          {/* 3. Print Invoice */}
+          <button
+            onClick={handlePrint}
+            className="w-full flex items-center justify-center gap-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 px-4 py-3 text-xs font-bold text-slate-800 shadow-2xs transition-all active:scale-95 cursor-pointer"
+          >
+            <Printer className="h-4 w-4 text-slate-600" />
+            <span>Print Invoice</span>
+          </button>
         </div>
+      </div>
+
+      {/* Offscreen document template captured safely via iframe by captureSafeCanvas */}
+      <div style={{ position: 'fixed', left: '-9999px', top: '-9999px', width: '800px', opacity: 0, pointerEvents: 'none', zIndex: -100 }}>
+        {renderDocumentContent()}
       </div>
     </Modal>
   );
