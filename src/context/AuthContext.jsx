@@ -85,57 +85,41 @@ export const AuthProvider = ({ children }) => {
       throw new Error(errMsg);
     }
 
-    try {
-      // 1. Primary: Verify email & password directly via Firebase Authentication
-      const res = await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
-      const profile = await loadUserProfile(res.user.uid, res.user.email);
-      if (!profile) {
-        throw new Error('Access Denied: Unauthorized account. Please sign in with an authorized farm account.');
-      }
-      dbLogAuditEvent('LOGIN', `User ${cleanEmail} logged in`, profile?.name || cleanEmail);
-      return profile;
-    } catch (fbErr) {
-      // If Firebase Auth returned invalid credentials, reject immediately
-      if (
-        fbErr.code === 'auth/wrong-password' ||
-        fbErr.code === 'auth/invalid-credential' ||
-        fbErr.code === 'auth/user-not-found' ||
-        fbErr.code === 'auth/invalid-email'
-      ) {
-        const invMsg = 'Invalid email or password. Please try again.';
-        setError(invMsg);
-        throw new Error(invMsg);
-      }
+    // 1. Fetch authorized users dynamically from the database
+    const users = await dbGetUsers();
+    const matched = users.find(u => (u.email || '').trim().toLowerCase() === cleanEmail);
 
-      // 2. Offline / local fallback mode
-      const users = await dbGetUsers();
-      const matched = users.find(u => (u.email || '').trim().toLowerCase() === cleanEmail);
-      
-      if (!matched) {
-        const invMsg = 'Invalid email or password. Please try again.';
-        setError(invMsg);
-        throw new Error(invMsg);
-      }
-
-      if (!matched.active) {
-        const inactiveMsg = 'Account is inactive. Please contact Administrator.';
-        setError(inactiveMsg);
-        throw new Error(inactiveMsg);
-      }
-
-      const expectedPassword = matched.password || (cleanEmail.includes('kgpoultryfarms') ? 'kgpoultry123' : 'farmer123');
-      if (cleanPassword !== expectedPassword) {
-        const invMsg = 'Invalid email or password. Please try again.';
-        setError(invMsg);
-        throw new Error(invMsg);
-      }
-
-      setCurrentUser({ uid: matched.uid, email: matched.email });
-      setUserProfile(matched);
-      localStorage.setItem('kg_poultry_active_session', JSON.stringify(matched));
-      dbLogAuditEvent('LOGIN', `User ${matched.email} logged in`, matched.name);
-      return matched;
+    if (!matched) {
+      const invMsg = 'Invalid email or password. Please try again.';
+      setError(invMsg);
+      throw new Error(invMsg);
     }
+
+    if (!matched.active) {
+      const inactiveMsg = 'Account is inactive. Please contact Administrator.';
+      setError(inactiveMsg);
+      throw new Error(inactiveMsg);
+    }
+
+    // 2. Validate password dynamically against database record
+    if (cleanPassword !== matched.password) {
+      const invMsg = 'Invalid email or password. Please try again.';
+      setError(invMsg);
+      throw new Error(invMsg);
+    }
+
+    // 3. Attempt Firebase Auth if available, fallback to DB record
+    try {
+      await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
+    } catch (_fbErr) {
+      // Proceed with verified DB user record
+    }
+
+    setCurrentUser({ uid: matched.uid, email: matched.email });
+    setUserProfile(matched);
+    localStorage.setItem('kg_poultry_active_session', JSON.stringify(matched));
+    dbLogAuditEvent('LOGIN', `User ${matched.email} logged in`, matched.name || matched.email);
+    return matched;
   };
 
   const loginWithGoogle = async () => {
@@ -143,30 +127,16 @@ export const AuthProvider = ({ children }) => {
     try {
       const res = await signInWithPopup(auth, googleProvider);
       const googleEmail = (res.user.email || '').toLowerCase().trim();
-      const ALLOWED_EMAIL = 'kgpoultryfarms@gmail.com';
 
-      if (googleEmail !== ALLOWED_EMAIL) {
-        try { await firebaseSignOut(auth); } catch (_e) {}
-        const deniedMsg = 'Access Denied: Unauthorized account. Please sign in with an authorized farm account.';
-        setError(deniedMsg);
-        throw new Error(deniedMsg);
-      }
-
+      // Look up user dynamically in the database
       const users = await dbGetUsers();
       let matched = users.find(u => (u.email || '').toLowerCase().trim() === googleEmail);
 
       if (!matched) {
-        matched = {
-          uid: res.user.uid,
-          name: 'KG Poultry Farms',
-          email: ALLOWED_EMAIL,
-          role: 'Farmer',
-          active: true,
-          farmName: 'KG Poultry Farms',
-          assignedBatches: ['KG001', 'KG002'],
-          createdAt: new Date().toISOString()
-        };
-        await dbSaveUser(matched);
+        try { await firebaseSignOut(auth); } catch (_e) {}
+        const deniedMsg = 'Access Denied: Account not authorized in farm database.';
+        setError(deniedMsg);
+        throw new Error(deniedMsg);
       }
 
       if (!matched.active) {
@@ -174,6 +144,11 @@ export const AuthProvider = ({ children }) => {
         const inactiveMsg = 'Your account is inactive. Please contact Administrator.';
         setError(inactiveMsg);
         throw new Error(inactiveMsg);
+      }
+
+      if (!matched.uid || matched.uid !== res.user.uid) {
+        matched.uid = res.user.uid;
+        await dbSaveUser(matched);
       }
 
       setUserProfile(matched);

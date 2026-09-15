@@ -88,4 +88,18 @@
   input[type="date"]::-webkit-calendar-picker-indicator:hover {
     background-color: #d1fae5;
   }
+
+  /* Disable focus outlines, borders, and tap highlights for Recharts graphs */
+  .recharts-wrapper,
+  .recharts-surface,
+  .recharts-wrapper *,
+  .recharts-surface *,
+  .recharts-responsive-container,
+  .recharts-responsive-container * {
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    -webkit-touch-callout: none !important;
+  }
 }

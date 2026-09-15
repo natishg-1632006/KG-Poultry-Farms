@@ -7,38 +7,7 @@ const MOCK_STORAGE_KEY = 'kg_poultry_local_db_v4';
 
 // Initial seed state for local fallback mode
 const INITIAL_LOCAL_STATE = {
-  "users": {
-    "farmer-uid-1": {
-      "uid": "farmer-uid-1",
-      "name": "KG Poultry Farms",
-      "email": "kgpoultryfarms@gmail.com",
-      "password": "kgpoultry123",
-      "phone": "+91 9876543211",
-      "farmName": "KG Poultry Farms",
-      "role": "Farmer",
-      "active": true,
-      "assignedBatches": [
-        "KG001",
-        "KG002"
-      ],
-      "createdAt": "2026-07-25T00:00:00.000Z"
-    },
-    "farmer-uid-2": {
-      "uid": "farmer-uid-2",
-      "name": "KG Poultry Farms",
-      "email": "farmer@kgpoultry.com",
-      "password": "farmer123",
-      "phone": "+91 9876543211",
-      "farmName": "KG Poultry Farms",
-      "role": "Farmer",
-      "active": true,
-      "assignedBatches": [
-        "KG001",
-        "KG002"
-      ],
-      "createdAt": "2026-07-25T00:00:00.000Z"
-    }
-  },
+  "users": {},
   "batches": {
     "KG001": {
       "id": "KG001",
@@ -2953,10 +2922,14 @@ export function recalculateBatchRemainingChickens(batchId, local = getLocalDB())
 export async function dbGetUsers() {
   try {
     const snap = await withTimeout(get(ref(db, 'users')));
-    if (snap.exists()) return Object.values(snap.val());
+    if (snap.exists()) {
+      const val = snap.val();
+      return Array.isArray(val) ? val : Object.values(val);
+    }
   } catch (_err) {
     // fallback
   }
+
   const local = getLocalDB();
   return Object.values(local.users || {});
 }

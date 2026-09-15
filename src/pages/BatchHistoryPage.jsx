@@ -214,12 +214,17 @@ export const BatchHistoryPage = () => {
   };
 
   useEffect(() => {
-    scrollToTop();
     setCurrentPageTraders(1);
     setCurrentPageFeed(1);
     setCurrentPageMedicines(1);
     setCurrentPageDaily(1);
-  }, [selectedTraderDetail, selectedBatchId, activeTab]);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (selectedTraderDetail || selectedBatchId) {
+      scrollToTop();
+    }
+  }, [selectedTraderDetail, selectedBatchId]);
 
   const handleBatchChange = async (newBatchId) => {
     setSelectedBatchId(newBatchId);
