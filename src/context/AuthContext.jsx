@@ -157,9 +157,12 @@ export const AuthProvider = ({ children }) => {
       return matched;
     } catch (err) {
       console.error('Google login error:', err);
-      const msg = err.code === 'auth/popup-closed-by-user'
-        ? 'Sign-in window closed before completion.'
-        : (err.message || 'Google Sign-In failed.');
+      let msg = err.message || 'Google Sign-In failed.';
+      if (err.code === 'auth/popup-closed-by-user') {
+        msg = 'Sign-in window closed before completion.';
+      } else if (err.code === 'auth/unauthorized-domain') {
+        msg = 'Unauthorized Domain: Please add kg-poultry-farms.vercel.app to Authorized Domains in Firebase Console (Authentication > Settings > Authorized domains).';
+      }
       setError(msg);
       throw new Error(msg);
     }
