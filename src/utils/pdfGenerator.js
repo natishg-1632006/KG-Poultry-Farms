@@ -27,51 +27,53 @@ function mapOklchToHex(text) {
     .replace(/--color-emerald-50:\s*(oklch|oklab)\([^)]+\)/gi, '--color-emerald-50: #f0fdf4')
     .replace(/--color-teal-900:\s*(oklch|oklab)\([^)]+\)/gi, '--color-teal-900: #134e4a')
     .replace(/--color-teal-700:\s*(oklch|oklab)\([^)]+\)/gi, '--color-teal-700: #0f766e')
+    .replace(/color-mix\(in oklch[^)]+\)/gi, '#0f172a')
+    .replace(/color-mix\(in oklab[^)]+\)/gi, '#0f172a')
     .replace(/oklch\([^)]+\)/gi, '#334155')
     .replace(/oklab\([^)]+\)/gi, '#334155');
 }
 
 /**
  * Captures an HTML element into a canvas by rendering it inside an iframe loaded with the host document's
- * sanitized stylesheets, guaranteeing pixel-perfect styling (Screenshot 2) with 0 oklch color errors.
+ * sanitized CSSOM rules, guaranteeing pixel-perfect styling with 0 oklch color errors.
  */
 export async function captureSafeCanvas(element, options = {}) {
   if (!element) {
     throw new Error('Element for PDF capture was not found.');
   }
 
-  // 1. Gather all style and link tags from host document and sanitize oklch color definitions
+  // 1. Extract and sanitize ALL loaded CSS rules directly from document.styleSheets
   let hostStylesHtml = '';
-  document.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
-    if (node.tagName.toLowerCase() === 'style') {
-      const sanitized = mapOklchToHex(node.textContent || '');
-      hostStylesHtml += `<style>${sanitized}</style>\n`;
-    } else if (node.tagName.toLowerCase() === 'link') {
-      hostStylesHtml += node.outerHTML + '\n';
-    }
-  });
 
-  // Also check document.styleSheets for constructable or dynamically added stylesheets
   try {
     for (let i = 0; i < document.styleSheets.length; i++) {
-      const sheet = document.styleSheets[i];
-      if (!sheet.ownerNode) {
-        try {
-          const rules = sheet.cssRules || sheet.rules;
-          if (rules && rules.length > 0) {
-            let cssText = '';
-            for (let j = 0; j < rules.length; j++) {
-              cssText += rules[j].cssText + '\n';
-            }
-            const sanitized = mapOklchToHex(cssText);
-            hostStylesHtml += `<style>${sanitized}</style>\n`;
-          }
-        } catch (_e) {}
+      try {
+        const sheet = document.styleSheets[i];
+        const rules = sheet.cssRules || sheet.rules;
+        if (!rules) continue;
+        let sheetCss = '';
+        for (let j = 0; j < rules.length; j++) {
+          sheetCss += rules[j].cssText + '\n';
+        }
+        if (sheetCss) {
+          const sanitizedCss = mapOklchToHex(sheetCss);
+          hostStylesHtml += `<style>${sanitizedCss}</style>\n`;
+        }
+      } catch (_err) {
+        // Fallback for cross-origin sheet access
       }
     }
-  } catch (_e) {}
+  } catch (_err) {}
 
-  // 2. Create clean isolated iframe with full sanitized host styles
+  // Fallback: If no CSS rules extracted from document.styleSheets, read inline style tags
+  if (!hostStylesHtml) {
+    document.querySelectorAll('style').forEach((tag) => {
+      const sanitized = mapOklchToHex(tag.textContent || '');
+      hostStylesHtml += `<style>${sanitized}</style>\n`;
+    });
+  }
+
+  // 2. Create clean isolated hidden iframe loaded with full sanitized CSS
   const iframe = document.createElement('iframe');
   iframe.style.position = 'fixed';
   iframe.style.left = '-9999px';
@@ -108,10 +110,10 @@ export async function captureSafeCanvas(element, options = {}) {
     const clone = element.cloneNode(true);
     
     // Ensure raw outer HTML has no oklch strings
-    const cloneHtml = clone.outerHTML.replace(/oklch\([^)]+\)/gi, '#334155').replace(/oklab\([^)]+\)/gi, '#334155');
+    const cloneHtml = mapOklchToHex(clone.outerHTML);
     wrapper.innerHTML = cloneHtml;
 
-    // Small delay to allow CSS & layout rendering
+    // Wait 200ms for iframe styling and layout to compute
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     const targetNode = wrapper.firstElementChild || wrapper;
@@ -123,6 +125,14 @@ export async function captureSafeCanvas(element, options = {}) {
       logging: false,
       backgroundColor: '#ffffff',
       windowWidth: 850,
+      onclone: (clonedDoc) => {
+        const styleEls = clonedDoc.querySelectorAll('style');
+        styleEls.forEach((styleTag) => {
+          if (styleTag.textContent && (styleTag.textContent.includes('oklch') || styleTag.textContent.includes('oklab'))) {
+            styleTag.textContent = mapOklchToHex(styleTag.textContent);
+          }
+        });
+      },
       ...options
     });
 
@@ -133,5 +143,6 @@ export async function captureSafeCanvas(element, options = {}) {
     }
   }
 }
+
 
 
