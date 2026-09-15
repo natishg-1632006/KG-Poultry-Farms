@@ -62,14 +62,12 @@ export const StatCard = ({
       if (isUnit) {
         const unit = lastPart;
         const numPart = parts.slice(0, -1).join(' ');
-        const totalLen = strVal.length;
-        const fontSize = totalLen > 14 ? 'text-sm sm:text-base lg:text-lg' : totalLen > 10 ? 'text-base sm:text-lg lg:text-xl' : 'text-xl sm:text-2xl lg:text-3xl';
         return (
           <div className="flex items-baseline gap-1.5 whitespace-nowrap min-w-0 overflow-hidden" title={strVal}>
-            <span className={`${fontSize} font-black tracking-tight text-slate-900 shrink-0`}>
+            <span className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 shrink-0">
               {numPart}
             </span>
-            <span className="text-xs sm:text-sm font-black text-slate-500 uppercase tracking-wider shrink-0">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider shrink-0">
               {unit}
             </span>
           </div>
@@ -78,10 +76,8 @@ export const StatCard = ({
     }
 
     // Default string without separate unit
-    const strLen = strVal.length;
-    const fontSize = strLen > 14 ? 'text-sm sm:text-base lg:text-lg' : strLen > 10 ? 'text-base sm:text-lg lg:text-xl' : strLen > 7 ? 'text-lg sm:text-xl lg:text-2xl' : 'text-xl sm:text-2xl lg:text-3xl';
     return (
-      <div className={`${fontSize} font-black tracking-tight text-slate-900 whitespace-nowrap truncate`} title={strVal}>
+      <div className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 whitespace-nowrap truncate" title={strVal}>
         {strVal}
       </div>
     );
