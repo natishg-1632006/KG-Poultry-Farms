@@ -50,6 +50,43 @@ export const StatCard = ({
     { label: 'ARRIVED', value: arrivedValue, labelColor: 'text-blue-600', valueColor: 'text-blue-600' }
   ] : null);
 
+  const renderFormattedValue = (val) => {
+    if (val === null || val === undefined) return null;
+    const strVal = String(val);
+
+    // Check if value ends with a unit string like "Bags", "kg", "g", "L", etc.
+    const parts = strVal.trim().split(' ');
+    if (parts.length > 1) {
+      const lastPart = parts[parts.length - 1];
+      const isUnit = /^(bags|bag|kg|g|liter|liters|l|pcs|chicks)$/i.test(lastPart);
+      if (isUnit) {
+        const unit = lastPart;
+        const numPart = parts.slice(0, -1).join(' ');
+        const numLen = numPart.length;
+        const fontSize = numLen > 14 ? 'text-base sm:text-lg lg:text-xl' : numLen > 10 ? 'text-lg sm:text-xl lg:text-2xl' : 'text-xl sm:text-2xl lg:text-3xl';
+        return (
+          <div className="flex items-baseline gap-1.5 flex-wrap min-w-0">
+            <span className={`${fontSize} font-black tracking-tight text-slate-900 shrink-0`}>
+              {numPart}
+            </span>
+            <span className="text-xs sm:text-sm font-black text-slate-500 uppercase tracking-wider shrink-0">
+              {unit}
+            </span>
+          </div>
+        );
+      }
+    }
+
+    // Default string without separate unit
+    const strLen = strVal.length;
+    const fontSize = strLen > 16 ? 'text-sm sm:text-base lg:text-lg' : strLen > 12 ? 'text-base sm:text-lg lg:text-xl' : strLen > 9 ? 'text-lg sm:text-xl lg:text-2xl' : 'text-xl sm:text-2xl lg:text-3xl';
+    return (
+      <div className={`${fontSize} font-black tracking-tight text-slate-900 truncate`} title={strVal}>
+        {strVal}
+      </div>
+    );
+  };
+
   return (
     <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md min-w-0">
       {/* Top accent bar */}
@@ -67,7 +104,7 @@ export const StatCard = ({
         {!items && (
           <div>
             {valueLabel && <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">{valueLabel}</span>}
-            <div className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-slate-900 break-words">{availableValue || value}</div>
+            {renderFormattedValue(availableValue || value)}
           </div>
         )}
 
@@ -103,4 +140,3 @@ export const StatCard = ({
     </div>
   );
 };
-
