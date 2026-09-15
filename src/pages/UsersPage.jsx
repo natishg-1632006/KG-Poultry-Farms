@@ -333,14 +333,15 @@ export const UsersPage = () => {
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">System Role *</label>
-              <select
+              <CustomSelect
                 value={formData.role}
                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600 focus:outline-hidden"
-              >
-                <option value="Farmer">Farmer / Field User</option>
-                <option value="Admin">System Admin</option>
-              </select>
+                options={[
+                  { value: 'Farmer', label: 'Farmer / Field User' },
+                  { value: 'Admin', label: 'System Admin' }
+                ]}
+                className="w-full"
+              />
             </div>
           </div>
 

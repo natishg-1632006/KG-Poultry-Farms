@@ -5,7 +5,7 @@ import { Modal } from '../components/common/Modal';
 import { ConfirmModal } from '../components/common/ConfirmModal';
 import { Badge } from '../components/common/Badge';
 import { useAuth } from '../context/AuthContext';
-import { Layers, Plus, Search, Edit, Trash2, RotateCcw } from 'lucide-react';
+import { Layers, Plus, Search, Edit, Trash2, RotateCcw, AlertCircle } from 'lucide-react';
 import CustomSelect from '../components/common/CustomSelect';
 import CustomDatePicker from '../components/common/CustomDatePicker';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
@@ -60,7 +60,11 @@ export const BatchesPage = () => {
     }
   }
 
+  const activeBatch = batches.find(b => (b.status || '').toLowerCase() === 'active');
+  const hasActiveBatch = Boolean(activeBatch);
+
   const handleOpenCreateModal = () => {
+    if (hasActiveBatch) return;
     setSelectedBatch(null);
     const nextNum = generateBatchNumber(batches.length);
     const nextName = generateBatchName(batches.length);
@@ -196,13 +200,37 @@ export const BatchesPage = () => {
           Batch Management
         </h1>
         <button
+          disabled={hasActiveBatch}
           onClick={handleOpenCreateModal}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs font-bold text-white shadow-sm transition-all active:scale-95 shrink-0 whitespace-nowrap cursor-pointer"
+          title={
+            hasActiveBatch
+              ? `Active Batch (${activeBatch?.batchName || activeBatch?.batchNumber}) is currently active. Complete it before creating a new batch.`
+              : 'Create New Batch'
+          }
+          className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs font-bold text-white shadow-sm transition-all shrink-0 whitespace-nowrap ${
+            hasActiveBatch
+              ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
+              : 'bg-emerald-600 hover:bg-emerald-700 active:scale-95 cursor-pointer'
+          }`}
         >
           <Plus className="h-4 w-4 shrink-0" />
           <span>Create New Batch</span>
         </button>
       </div>
+
+      {hasActiveBatch && (
+        <div className="flex items-center justify-between gap-3 rounded-2xl bg-amber-50/90 border border-amber-200/90 p-3.5 text-xs font-semibold text-amber-900 shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+            <span>
+              <strong>Active Batch Running:</strong> {activeBatch?.batchName || activeBatch?.batchNumber} is currently active. Complete this batch before creating a new one.
+            </span>
+          </div>
+          <span className="rounded-lg bg-amber-200/80 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-950 shrink-0">
+            Active Batch
+          </span>
+        </div>
+      )}
 
       {/* Filter & Search Bar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">

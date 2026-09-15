@@ -355,15 +355,12 @@ export const MedicinePage = () => {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Unit *</label>
-                  <select
+                  <CustomSelect
                     value={medicineUnit}
                     onChange={(e) => setMedicineUnit(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600"
-                  >
-                    {MEDICINE_UNITS.map(u => (
-                      <option key={u} value={u}>{u}</option>
-                    ))}
-                  </select>
+                    options={MEDICINE_UNITS.map(u => ({ value: u, label: u }))}
+                    className="w-full"
+                  />
                 </div>
               </div>
             </div>
@@ -408,15 +405,12 @@ export const MedicinePage = () => {
                         onChange={(e) => handleVaccineChange(idx, 'quantity', e.target.value)}
                         className="w-full rounded-lg border border-slate-200 bg-white py-1.5 px-3 text-xs font-medium"
                       />
-                      <select
+                      <CustomSelect
                         value={vac.unit}
                         onChange={(e) => handleVaccineChange(idx, 'unit', e.target.value)}
-                        className="w-full rounded-lg border border-slate-200 bg-white py-1.5 px-3 text-xs font-bold"
-                      >
-                        {MEDICINE_UNITS.map(u => (
-                          <option key={u} value={u}>{u}</option>
-                        ))}
-                      </select>
+                        options={MEDICINE_UNITS.map(u => ({ value: u, label: u }))}
+                        className="w-full"
+                      />
                     </div>
                   </div>
                 ))}

@@ -458,27 +458,29 @@ export const FeedPage = () => {
         <form onSubmit={handleAddArrival} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Transaction Type *</label>
-            <select
+            <CustomSelect
               value={formData.transactionType}
               onChange={(e) => setFormData({ ...formData, transactionType: e.target.value })}
-              className="w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600"
-            >
-              <option value="Receive">Receive Feed (Stock In +)</option>
-              <option value="Return">Return Feed (Stock Out - Reduces Inventory)</option>
-            </select>
+              options={[
+                { value: 'Receive', label: 'Receive Feed (Stock In +)' },
+                { value: 'Return', label: 'Return Feed (Stock Out - Reduces Inventory)' }
+              ]}
+              className="w-full"
+            />
           </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Feed Type *</label>
-            <select
+            <CustomSelect
               value={formData.feedType}
               onChange={(e) => setFormData({ ...formData, feedType: e.target.value })}
-              className="w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600"
-            >
-              <option value="Pre-Starter">Pre-Starter (Blue Bag)</option>
-              <option value="Starter">Starter (Green Bag)</option>
-              <option value="Finisher">Finisher (Orange Bag)</option>
-            </select>
+              options={[
+                { value: 'Pre-Starter', label: 'Pre-Starter (Blue Bag)' },
+                { value: 'Starter', label: 'Starter (Green Bag)' },
+                { value: 'Finisher', label: 'Finisher (Orange Bag)' }
+              ]}
+              className="w-full"
+            />
           </div>
 
           <div className="space-y-2">
