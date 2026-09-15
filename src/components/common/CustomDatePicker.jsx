@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Check, X } from 'lucide-react';
 
@@ -6,7 +6,7 @@ import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Check, X } from 'l
  * CustomDatePicker Component
  * Theme-designed calendar popup styled with emerald farm theme,
  * replacing native browser date pickers.
- * Supports smart space-based positioning (opens top/bottom based on available viewport space)
+ * Supports zero-flicker smart positioning (calculates placement synchronously on click)
  * and full mobile modal view to prevent hiding/clipping inside containers or modals.
  * 
  * Props:
@@ -33,7 +33,7 @@ export default function CustomDatePicker({
   const [isOpen, setIsOpen] = useState(false);
   const buttonRef = useRef(null);
   const popoverRef = useRef(null);
-  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0, placement: 'bottom', isMobile: false });
+  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0, placement: 'bottom', isMobile: false, ready: false });
 
   // Parse input string "YYYY-MM-DD" into Date object or fallback to today
   const parseDateStr = (dateStr) => {
@@ -62,13 +62,12 @@ export default function CustomDatePicker({
   // Create quick lookup set for logged dates
   const loggedSet = new Set(Array.isArray(loggedDates) ? loggedDates : []);
 
-  // Update popup position based on available viewport space & mobile status
-  const updatePosition = () => {
-    if (!buttonRef.current) return;
+  // Synchronous position calculation function
+  const calculatePosition = () => {
+    if (!buttonRef.current) return { top: 0, left: 0, placement: 'bottom', isMobile: false, ready: false };
     const isMob = window.innerWidth < 640;
     if (isMob) {
-      setPopoverPos(prev => ({ ...prev, isMobile: true }));
-      return;
+      return { top: 0, left: 0, placement: 'bottom', isMobile: true, ready: true };
     }
 
     const rect = buttonRef.current.getBoundingClientRect();
@@ -93,11 +92,31 @@ export default function CustomDatePicker({
       left = Math.max(16, window.innerWidth - calendarWidth - 16);
     }
 
-    setPopoverPos({ top, left, placement, isMobile: false });
+    return { top, left, placement, isMobile: false, ready: true };
   };
 
-  // Click outside, scroll, resize & Escape listeners
+  // Synchronously calculate position when user clicks trigger button
+  const handleToggle = (e) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    if (disabled) return;
+    if (!isOpen) {
+      const pos = calculatePosition();
+      setPopoverPos(pos);
+      setIsOpen(true);
+    } else {
+      setIsOpen(false);
+    }
+  };
+
+  // Update popup position on scroll or resize
   useEffect(() => {
+    function updateOnEvent() {
+      if (isOpen) {
+        setPopoverPos(calculatePosition());
+      }
+    }
+
     function handleClickOutside(event) {
       if (
         buttonRef.current && !buttonRef.current.contains(event.target) &&
@@ -114,18 +133,17 @@ export default function CustomDatePicker({
     }
 
     if (isOpen) {
-      updatePosition();
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('keydown', handleKeyDown);
-      window.addEventListener('resize', updatePosition);
-      window.addEventListener('scroll', updatePosition, true);
+      window.addEventListener('resize', updateOnEvent);
+      window.addEventListener('scroll', updateOnEvent, true);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('resize', updatePosition);
-      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updateOnEvent);
+      window.removeEventListener('scroll', updateOnEvent, true);
     };
   }, [isOpen]);
 
@@ -345,7 +363,7 @@ export default function CustomDatePicker({
         ref={buttonRef}
         type="button"
         disabled={disabled}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggle}
         className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 border cursor-pointer ${
           isOpen
             ? 'bg-emerald-100/90 border-emerald-500 text-emerald-950 shadow-xs ring-2 ring-emerald-500/20'
@@ -383,7 +401,9 @@ export default function CustomDatePicker({
                 position: 'fixed',
                 top: `${popoverPos.top}px`,
                 left: `${popoverPos.left}px`,
-                zIndex: 9999
+                zIndex: 9999,
+                opacity: popoverPos.ready ? 1 : 0,
+                pointerEvents: popoverPos.ready ? 'auto' : 'none'
               }}
               className="w-80 rounded-2xl bg-white p-4 shadow-2xl border border-emerald-100 ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-150 space-y-3 select-none"
             >
