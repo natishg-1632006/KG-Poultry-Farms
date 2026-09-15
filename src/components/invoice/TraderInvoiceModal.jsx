@@ -41,8 +41,8 @@ export const TraderInvoiceModal = ({
   const totalGrossWeight = boxSets.reduce((acc, s) => acc + (Number(s.loadedWeight) || 0), 0);
   
   const totalNetWeight = (boxSets && boxSets.length > 0)
-    ? boxSets.reduce((sum, s) => sum + (Number(s.totalChickenWeight) || 0), 0)
-    : (invoiceData?.totalWeightKg || dispatch?.totalWeight || dispatch?.netWeight || 0);
+    ? parseFloat(boxSets.reduce((sum, s) => sum + (Number(s.totalChickenWeight) || 0), 0).toFixed(2))
+    : parseFloat(Number(invoiceData?.totalWeightKg || dispatch?.totalWeight || dispatch?.netWeight || 0).toFixed(2));
 
   const totalBirds = (boxSets && boxSets.length > 0)
     ? boxSets.reduce((sum, s) => sum + (Number(s.chickenCount) || 0), 0)

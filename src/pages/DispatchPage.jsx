@@ -572,7 +572,7 @@ export const DispatchPage = () => {
   const totalWeighedBoxes = loadedBoxSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
   const loadedBoxesCount = totalWeighedBoxes;
   const totalDispatchedBirds = loadedBoxSets.reduce((acc, s) => acc + (Number(s.chickenCount) || 0), 0);
-  const totalNetWeight = loadedBoxSets.reduce((acc, s) => acc + (Number(s.totalChickenWeight) || 0), 0);
+  const totalNetWeight = parseFloat(loadedBoxSets.reduce((acc, s) => acc + (Number(s.totalChickenWeight) || 0), 0).toFixed(2));
   const avgBirdWeight = totalDispatchedBirds > 0 ? parseFloat((totalNetWeight / totalDispatchedBirds).toFixed(3)) : 0;
 
   // SORTING & FILTERING ENGINE FOR BOX SETS
@@ -933,7 +933,7 @@ export const DispatchPage = () => {
                         <div className="grid grid-cols-3 gap-2 text-center py-2 border-t border-slate-100">
                           <div className="bg-slate-50 p-1.5 rounded-xl border border-slate-100">
                             <span className="text-[9px] uppercase font-extrabold text-slate-400 block">Net Wt</span>
-                            <span className="text-xs font-black text-slate-900">{totalWeight.toFixed(1)} kg</span>
+                            <span className="text-xs font-black text-slate-900">{totalWeight.toFixed(2)} kg</span>
                           </div>
                           <div className="bg-emerald-50 p-1.5 rounded-xl border border-emerald-100">
                             <span className="text-[9px] uppercase font-extrabold text-emerald-700 block">Birds</span>
@@ -1047,7 +1047,7 @@ export const DispatchPage = () => {
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             <div className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-2xs">
               <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Total Net Weight</span>
-              <span className="text-lg sm:text-xl font-black text-slate-900">{totalNetWeight} <span className="text-xs font-medium text-slate-500">kg</span></span>
+              <span className="text-lg sm:text-xl font-black text-slate-900">{totalNetWeight.toFixed(2)} <span className="text-xs font-medium text-slate-500">kg</span></span>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-2xs">
               <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Birds Dispatched</span>
