@@ -52,20 +52,20 @@ export const StatCard = ({
 
   const renderFormattedValue = (val) => {
     if (val === null || val === undefined) return null;
-    const strVal = String(val);
+    const strVal = String(val).trim();
 
     // Check if value ends with a unit string like "Bags", "kg", "g", "L", etc.
-    const parts = strVal.trim().split(' ');
+    const parts = strVal.split(' ');
     if (parts.length > 1) {
       const lastPart = parts[parts.length - 1];
       const isUnit = /^(bags|bag|kg|g|liter|liters|l|pcs|chicks)$/i.test(lastPart);
       if (isUnit) {
         const unit = lastPart;
         const numPart = parts.slice(0, -1).join(' ');
-        const numLen = numPart.length;
-        const fontSize = numLen > 14 ? 'text-base sm:text-lg lg:text-xl' : numLen > 10 ? 'text-lg sm:text-xl lg:text-2xl' : 'text-xl sm:text-2xl lg:text-3xl';
+        const totalLen = strVal.length;
+        const fontSize = totalLen > 14 ? 'text-sm sm:text-base lg:text-lg' : totalLen > 10 ? 'text-base sm:text-lg lg:text-xl' : 'text-xl sm:text-2xl lg:text-3xl';
         return (
-          <div className="flex items-baseline gap-1.5 flex-wrap min-w-0">
+          <div className="flex items-baseline gap-1.5 whitespace-nowrap min-w-0 overflow-hidden" title={strVal}>
             <span className={`${fontSize} font-black tracking-tight text-slate-900 shrink-0`}>
               {numPart}
             </span>
@@ -79,9 +79,9 @@ export const StatCard = ({
 
     // Default string without separate unit
     const strLen = strVal.length;
-    const fontSize = strLen > 16 ? 'text-sm sm:text-base lg:text-lg' : strLen > 12 ? 'text-base sm:text-lg lg:text-xl' : strLen > 9 ? 'text-lg sm:text-xl lg:text-2xl' : 'text-xl sm:text-2xl lg:text-3xl';
+    const fontSize = strLen > 14 ? 'text-sm sm:text-base lg:text-lg' : strLen > 10 ? 'text-base sm:text-lg lg:text-xl' : strLen > 7 ? 'text-lg sm:text-xl lg:text-2xl' : 'text-xl sm:text-2xl lg:text-3xl';
     return (
-      <div className={`${fontSize} font-black tracking-tight text-slate-900 truncate`} title={strVal}>
+      <div className={`${fontSize} font-black tracking-tight text-slate-900 whitespace-nowrap truncate`} title={strVal}>
         {strVal}
       </div>
     );
