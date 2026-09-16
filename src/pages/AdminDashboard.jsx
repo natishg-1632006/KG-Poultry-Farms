@@ -1,19 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
-import { dbGetBatches, dbGetUsers, dbGetDispatches, dbGetAuditLogs } from '../services/dbService';
+import { dbGetBatches, dbGetUsers, dbGetDispatches, dbGetAuditLogs, dbGetDailyRecords } from '../services/dbService';
+import { calculateActiveBatchFCR } from '../utils/calculations';
 import { StatCard } from '../components/common/StatCard';
 import { Badge } from '../components/common/Badge';
 import { WeatherWidget } from '../components/common/WeatherWidget';
-import { Layers, Users, Truck, AlertCircle, PlusCircle, ArrowRight, ShieldCheck, Activity } from 'lucide-react';
+import { Layers, Users, Truck, AlertCircle, PlusCircle, ArrowRight, ShieldCheck, Activity, Scale } from 'lucide-react';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
 export const AdminDashboard = () => {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const [batches, setBatches] = useState([]);
   const [users, setUsers] = useState([]);
   const [dispatches, setDispatches] = useState([]);
   const [logs, setLogs] = useState([]);
+  const [activeFCR, setActiveFCR] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,6 +31,19 @@ export const AdminDashboard = () => {
         setUsers(uList);
         setDispatches(dList);
         setLogs(lList);
+
+        // Calculate FCR for active batch
+        const activeBatchesList = bList.filter(b => (b.status || '').toLowerCase() === 'active');
+        if (activeBatchesList.length > 0) {
+          const currentActive = activeBatchesList[activeBatchesList.length - 1];
+          const rawDailyMap = await dbGetDailyRecords(currentActive.id);
+          const dailyRecords = Object.values(rawDailyMap || {}).sort((a, b) => b.recordDate.localeCompare(a.recordDate));
+          const totalFeedConsumedKg = dailyRecords.reduce((sum, r) => sum + Number(r.feedConsumption || 0), 0);
+          const latestAvgWeight = dailyRecords.length > 0 ? Number(dailyRecords[0].averageWeight || 0) : 0;
+          const remainingChicks = Number(currentActive.remainingChickCount ?? currentActive.initialChickCount ?? 0);
+          const computedFCR = calculateActiveBatchFCR(totalFeedConsumedKg, latestAvgWeight, remainingChicks);
+          setActiveFCR(computedFCR);
+        }
       } catch (err) {
         console.error('Failed loading admin dashboard data:', err);
       } finally {
@@ -74,8 +89,8 @@ export const AdminDashboard = () => {
       {/* Farm Village Weather Widget */}
       <WeatherWidget />
 
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* KPI Cards Grid including Active FCR */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
           title={t('activeBatches')}
           value={batches.filter(b => b.status === 'Active').length}
@@ -103,6 +118,13 @@ export const AdminDashboard = () => {
           subtext={t('completedSalesDispatches')}
           icon={Truck}
           color="blue"
+        />
+        <StatCard
+          title={language === 'ta' ? 'FCR விகிதம்' : 'FCR'}
+          value={activeFCR ? activeFCR : '—'}
+          subtext={activeFCR ? (language === 'ta' ? 'தீவன மாற்று விகிதம்' : 'Feed Conversion Ratio') : (language === 'ta' ? 'FCR தரவு இல்லை' : 'No active batch FCR')}
+          icon={Activity}
+          color="emerald"
         />
       </div>
 

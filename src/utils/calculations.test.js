@@ -7,7 +7,9 @@ import {
   calculateDayOfBatch,
   deductFeedStock,
   generateBatchNumber,
-  generateBatchName
+  generateBatchName,
+  calculateFCR,
+  calculateActiveBatchFCR
 } from './calculations';
 
 describe('Calculations Utility Tests', () => {
@@ -113,4 +115,21 @@ describe('Calculations Utility Tests', () => {
       expect(generateBatchName(9)).toBe('KgPoultryBatch-10');
     });
   });
+
+  describe('calculateFCR and calculateActiveBatchFCR', () => {
+    it('calculates FCR correctly given total feed kg and total live weight kg', () => {
+      expect(calculateFCR(5000, 3125)).toBe(1.60);
+      expect(calculateFCR(0, 3125)).toBeNull();
+      expect(calculateFCR(5000, 0)).toBeNull();
+    });
+
+    it('calculates active batch FCR using feed kg, avg weight grams, and bird count', () => {
+      // 2100 kg feed / (1.4 kg avg weight * 1000 birds) = 2100 / 1400 = 1.50
+      expect(calculateActiveBatchFCR(2100, 1400, 1000)).toBe(1.50);
+      // Handles avg weight specified directly in kg (< 20)
+      expect(calculateActiveBatchFCR(2100, 1.4, 1000)).toBe(1.50);
+      expect(calculateActiveBatchFCR(0, 1400, 1000)).toBeNull();
+    });
+  });
 });
+

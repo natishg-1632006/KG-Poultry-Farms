@@ -24,7 +24,8 @@ import {
   Trash2,
   X,
   Download,
-  Eye
+  Eye,
+  Activity
 } from 'lucide-react';
 import { dbGetBatches, dbGetBatchHistoryData } from '../services/dbService';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -868,7 +869,7 @@ export const BatchHistoryPage = () => {
           </div>
 
           {/* Modern Color-Coded Summary Stat Cards Grid */}
-          <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-6 print:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 print:grid-cols-3">
             {/* Initial Chicks */}
             <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 sm:p-4 shadow-2xs transition-all hover:border-emerald-300 hover:shadow-xs min-w-0">
               <div className="flex items-center justify-between gap-1">
@@ -978,6 +979,26 @@ export const BatchHistoryPage = () => {
                 </div>
                 <div className="mt-1 text-[10px] sm:text-xs font-extrabold text-emerald-700 whitespace-nowrap truncate">
                   {historyData.avgBirdWeight > 0 ? `${(historyData.avgBirdWeight * 1000).toFixed(0)} g / ${language === 'ta' ? 'கோழி' : 'bird'}` : (language === 'ta' ? 'எடை பதிவு இல்லை' : 'No weight data')}
+                </div>
+              </div>
+            </div>
+
+            {/* FCR (Feed Conversion Ratio) Card */}
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 sm:p-4 shadow-2xs transition-all hover:border-teal-300 hover:shadow-xs min-w-0">
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-400 whitespace-nowrap truncate">{language === 'ta' ? 'FCR விகிதம்' : 'FCR'}</span>
+                <div className="rounded-xl bg-teal-50 p-1.5 text-teal-700 border border-teal-100 shrink-0">
+                  <Activity className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-xl sm:text-2xl font-black text-teal-800 tracking-tight whitespace-nowrap">
+                  {historyData.fcr ? historyData.fcr : '—'}
+                </div>
+                <div className="mt-1 text-[10px] sm:text-xs font-extrabold text-teal-700 whitespace-nowrap truncate">
+                  {historyData.fcr 
+                    ? (language === 'ta' ? 'தீவன மாற்று விகிதம்' : 'Feed Conversion Ratio')
+                    : (language === 'ta' ? 'FCR தரவு இல்லை' : 'No FCR data')}
                 </div>
               </div>
             </div>

@@ -1086,7 +1086,7 @@ export const DispatchPage = () => {
           </div>
 
           {/* Dispatched KPI Summary Cards */}
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-4">
             <div className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-2xs">
               <span className="text-xs uppercase tracking-wider text-slate-500 font-extrabold block mb-1">{t('totalNetWeight')}</span>
               <span className="text-xl sm:text-xl font-black text-slate-900">{totalNetWeight.toFixed(2)} <span className="text-sm sm:text-xs font-medium text-slate-500">kg</span></span>

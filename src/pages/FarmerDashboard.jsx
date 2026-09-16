@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { dbGetBatches, dbGetDailyRecords, dbGetFeedArrivals } from '../services/dbService';
-import { formatFeedStock, kgToBags } from '../utils/calculations';
+import { formatFeedStock, kgToBags, calculateActiveBatchFCR } from '../utils/calculations';
 import { KG_PER_BAG } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
 import { Badge } from '../components/common/Badge';
@@ -13,7 +13,7 @@ import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
 export const FarmerDashboard = () => {
   const { userProfile } = useAuth();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const [assignedBatches, setAssignedBatches] = useState([]);
   const [activeBatch, setActiveBatch] = useState(null);
   const [records, setRecords] = useState([]);
@@ -60,6 +60,11 @@ export const FarmerDashboard = () => {
     ? Number(activeBatch.remainingChickCount)
     : Math.max(0, initialChicks - totalMortality);
 
+  const totalFeedConsumedKg = records.reduce((acc, r) => {
+    const kg = Number(r.feedConsumption || 0) || (Number(r.feedConsumptionBags || 0) * KG_PER_BAG);
+    return acc + kg;
+  }, 0);
+
   const totalFeedConsumedBags = records.reduce((acc, r) => {
     const bags = r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG);
     return acc + Number(bags || 0);
@@ -83,6 +88,9 @@ export const FarmerDashboard = () => {
 
   const latestRecord = records.length > 0 ? records[0] : null;
   const latestAvgWeight = latestRecord ? Number(latestRecord.averageWeight || 0) : 0;
+
+  // Active FCR calculation: Total feed consumed (kg) / (Current day's avg weight in kg * Current bird count)
+  const activeFCR = calculateActiveBatchFCR(totalFeedConsumedKg, latestAvgWeight, remainingChicks);
 
   let flockAgeDays = 1;
   if (activeBatch?.chickArrivalDate) {
@@ -116,8 +124,8 @@ export const FarmerDashboard = () => {
         </div>
       ) : (
         <>
-          {/* 4 Essential KPI Cards Grid */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* 5 Essential KPI Cards Grid including FCR */}
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
             <StatCard
               title={t('chicksCount')}
               value={`${Number(remainingChicks).toLocaleString()} / ${initialChicks.toLocaleString()}`}
@@ -144,6 +152,13 @@ export const FarmerDashboard = () => {
               value={`${latestAvgWeight} g`}
               subtext={latestRecord ? `${t('latestEntry')}: ${latestRecord.recordDate}` : t('noDailyRecordsYet')}
               icon={Scale}
+              color="emerald"
+            />
+            <StatCard
+              title={language === 'ta' ? 'FCR விகிதம்' : 'FCR'}
+              value={activeFCR ? activeFCR : '—'}
+              subtext={activeFCR ? (language === 'ta' ? 'தீவன மாற்று விகிதம்' : 'Feed Conversion Ratio') : (language === 'ta' ? 'FCR தரவு இல்லை' : 'No FCR data')}
+              icon={Activity}
               color="emerald"
             />
           </div>

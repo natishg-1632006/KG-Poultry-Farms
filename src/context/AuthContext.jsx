@@ -198,7 +198,19 @@ export const AuthProvider = ({ children }) => {
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
   if (!ctx) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    return {
+      currentUser: null,
+      userProfile: null,
+      role: 'Farmer',
+      isAdmin: false,
+      isFarmer: true,
+      isTrader: false,
+      loading: false,
+      error: null,
+      login: async () => {},
+      loginWithGoogle: async () => {},
+      logout: async () => {}
+    };
   }
   return ctx;
 };

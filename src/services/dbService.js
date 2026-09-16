@@ -3667,6 +3667,22 @@ export async function dbGetBatchHistoryData(batchId) {
     avgBirdWeight = rawVal > 20 ? parseFloat((rawVal / 1000).toFixed(3)) : rawVal;
   }
 
+  // FCR (Feed Conversion Ratio) Calculation
+  // Formula for completed: total feed weight (kg) / total final weight of birds (kg)
+  // Formula for active: total feed weight at current (kg) / (that day's avg weight in kg * current bird count)
+  let fcr = null;
+  const isCompleted = (selectedBatch.status || '').toLowerCase() === 'completed';
+  if (isCompleted && totalDispatchedWeight > 0) {
+    fcr = totalFeedConsumedKg > 0 ? parseFloat((totalFeedConsumedKg / totalDispatchedWeight).toFixed(2)) : null;
+  } else {
+    const rawAvg = avgBirdWeight;
+    const avgKg = rawAvg > 20 ? (rawAvg / 1000) : rawAvg;
+    const totalLiveWeightKg = avgKg * remainingChickCount;
+    if (totalFeedConsumedKg > 0 && totalLiveWeightKg > 0) {
+      fcr = parseFloat((totalFeedConsumedKg / totalLiveWeightKg).toFixed(2));
+    }
+  }
+
   return {
     batch: selectedBatch,
     initialChickCount,
@@ -3679,6 +3695,7 @@ export async function dbGetBatchHistoryData(batchId) {
     totalDispatchedBirds,
     totalCratesCount,
     avgBirdWeight,
+    fcr,
     traderBreakdown,
     dailyRecords,
     feedArrivals,
