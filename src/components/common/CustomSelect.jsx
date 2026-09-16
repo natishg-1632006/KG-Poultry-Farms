@@ -181,26 +181,26 @@ export default function CustomSelect({
   };
 
   return (
-    <div className="relative inline-block w-full text-left select-none">
+    <div className="relative inline-block w-full text-left select-none min-w-0">
       {/* Trigger Button */}
       <button
         ref={buttonRef}
         type="button"
         disabled={disabled}
         onClick={handleToggle}
-        className={`group w-full inline-flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 border cursor-pointer ${
+        className={`group w-full flex items-center justify-between gap-1.5 px-2.5 py-2 sm:px-3 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 border cursor-pointer min-w-0 ${
           isOpen
             ? 'bg-emerald-100/90 border-emerald-500 text-emerald-950 shadow-xs ring-2 ring-emerald-500/20'
             : 'bg-emerald-50/80 border-emerald-300/80 text-emerald-900 hover:bg-emerald-100/70 hover:border-emerald-400 shadow-2xs'
         } ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
       >
-        <div className="flex items-center gap-2 overflow-hidden truncate">
+        <div className="flex items-center gap-1.5 overflow-hidden truncate min-w-0">
           {Icon && <Icon className="h-4 w-4 text-emerald-600 shrink-0 group-hover:scale-105 transition-transform" />}
-          <span className="truncate">{displayLabel}</span>
+          <span className="truncate min-w-0">{displayLabel}</span>
         </div>
         <ChevronDown
-          className={`h-4 w-4 text-emerald-700 shrink-0 transition-transform duration-200 ${
-            isOpen ? 'rotate-180 text-emerald-900' : 'group-hover:translate-y-[1px]'
+          className={`h-4 w-4 text-emerald-600 shrink-0 transition-transform duration-200 ${
+            isOpen ? 'rotate-180 text-emerald-800' : 'group-hover:translate-y-0.5'
           }`}
         />
       </button>

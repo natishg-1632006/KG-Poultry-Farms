@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Modal } from './Modal';
 import { LogOut, Menu, AlertTriangle } from 'lucide-react';
 
 export const Header = ({ onToggleSidebar }) => {
   const { userProfile, logout } = useAuth();
+  const { t } = useLanguage();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -39,13 +41,13 @@ export const Header = ({ onToggleSidebar }) => {
               className="h-10 w-10 object-contain rounded-xl shadow-xs ring-1 ring-emerald-500/20 bg-white"
             />
             <div>
-              <h1 className="text-base font-black leading-tight tracking-tight text-slate-900">KG Poultry Farms</h1>
-              <p className="text-[11px] font-semibold text-slate-400 hidden sm:block">Broiler Farm Operations & Intelligence</p>
+              <h1 className="text-base font-black leading-tight tracking-tight text-slate-900">{t('appName')}</h1>
+              <p className="text-[11px] font-semibold text-slate-400 hidden sm:block">{t('appSubtitle')}</p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           {userProfile && (
             <button
               onClick={() => setShowLogoutModal(true)}
@@ -53,7 +55,7 @@ export const Header = ({ onToggleSidebar }) => {
               title="Sign Out"
             >
               <LogOut className="h-3.5 w-3.5" />
-              <span>Logout</span>
+              <span>{t('logout')}</span>
             </button>
           )}
         </div>

@@ -3,12 +3,14 @@ import { dbGetUsers, dbSaveUser, dbGetBatches, dbLogAuditEvent } from '../servic
 import { Modal } from '../components/common/Modal';
 import { Badge } from '../components/common/Badge';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { UserPlus, Search, Edit, ToggleLeft, ToggleRight } from 'lucide-react';
 import CustomSelect from '../components/common/CustomSelect';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
 export const UsersPage = () => {
   const { userProfile: currentUserProfile } = useAuth();
+  const { language } = useLanguage();
   const [users, setUsers] = useState([]);
   const [batches, setBatches] = useState([]);
   const [search, setSearch] = useState('');
@@ -281,24 +283,24 @@ export const UsersPage = () => {
       <Modal
         isOpen={isUserModalOpen}
         onClose={() => setIsUserModalOpen(false)}
-        title={selectedUser ? 'Edit User Profile' : 'Add New User'}
+        title={selectedUser ? (language === 'ta' ? 'பயனர் விவரங்களைத் திருத்து' : 'Edit User Profile') : (language === 'ta' ? 'புதிய பயனரைச் சேர்' : 'Add New User')}
       >
         <form onSubmit={handleSaveUser} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">User Full Name *</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'பயனரின் முழு பெயர் *' : 'User Full Name *'}</label>
             <input
               type="text"
               required
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="e.g. Ramesh Kumar"
+              placeholder={language === 'ta' ? 'எ.கா. ரமேஷ் குமார்' : 'e.g. Ramesh Kumar'}
               className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 focus:outline-hidden"
             />
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Email Address *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'மின்னஞ்சல் முகவரி *' : 'Email Address *'}</label>
               <input
                 type="email"
                 required
@@ -309,7 +311,7 @@ export const UsersPage = () => {
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Phone Number</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'கைபேசி எண்' : 'Phone Number'}</label>
               <input
                 type="tel"
                 value={formData.phone}
@@ -322,23 +324,23 @@ export const UsersPage = () => {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Farm / Shed Name</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'பண்ணை / கொட்டகை பெயர்' : 'Farm / Shed Name'}</label>
               <input
                 type="text"
                 value={formData.farmName}
                 onChange={(e) => setFormData({ ...formData, farmName: e.target.value })}
-                placeholder="e.g. KG North Shed 1"
+                placeholder={language === 'ta' ? 'எ.கா. KG வடக்கு கொட்டகை 1' : 'e.g. KG North Shed 1'}
                 className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 focus:outline-hidden"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">System Role *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'அமைப்பின் பங்கு *' : 'System Role *'}</label>
               <CustomSelect
                 value={formData.role}
                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                 options={[
-                  { value: 'Farmer', label: 'Farmer / Field User' },
-                  { value: 'Admin', label: 'System Admin' }
+                  { value: 'Farmer', label: language === 'ta' ? 'பண்ணையாளர் / களப் பயனர்' : 'Farmer / Field User' },
+                  { value: 'Admin', label: language === 'ta' ? 'அமைப்பின் நிர்வாகி' : 'System Admin' }
                 ]}
                 className="w-full"
               />
@@ -354,7 +356,7 @@ export const UsersPage = () => {
               className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
             />
             <label htmlFor="userActiveCheck" className="text-xs font-bold text-slate-700">
-              Account Active (User can log in)
+              {language === 'ta' ? 'கணக்கு செயலில் உள்ளது (உள்நுழையலாம்)' : 'Account Active (User can log in)'}
             </label>
           </div>
 
@@ -364,13 +366,13 @@ export const UsersPage = () => {
               onClick={() => setIsUserModalOpen(false)}
               className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100"
             >
-              Cancel
+              {language === 'ta' ? 'ரத்து' : 'Cancel'}
             </button>
             <button
               type="submit"
               className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700"
             >
-              Save User
+              {language === 'ta' ? 'பயனரைச் சேமி' : 'Save User'}
             </button>
           </div>
         </form>
@@ -380,16 +382,16 @@ export const UsersPage = () => {
       <Modal
         isOpen={isAssignModalOpen}
         onClose={() => setIsAssignModalOpen(false)}
-        title={`Assign Batches to ${selectedUser?.name}`}
+        title={language === 'ta' ? `${selectedUser?.name}-க்கு தொகுதிகளை ஒதுக்குக` : `Assign Batches to ${selectedUser?.name}`}
       >
         <div className="space-y-4">
           <p className="text-xs text-slate-500">
-            Select farm batches that <strong>{selectedUser?.name}</strong> can manage daily operational records for:
+            {language === 'ta' ? `தினசரி நடவடிக்கைகளைப் பதிவு செய்ய ${selectedUser?.name}-க்கு பண்ணைத் தொகுதிகளைத் தேர்ந்தெடுக்கவும்:` : `Select farm batches that ${selectedUser?.name} can manage daily operational records for:`}
           </p>
 
           <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl p-2">
             {batches.length === 0 ? (
-              <p className="p-4 text-center text-xs text-slate-400">No batches available.</p>
+              <p className="p-4 text-center text-xs text-slate-400">{language === 'ta' ? 'தொகுதிகள் எதுவும் கிடைக்கவில்லை.' : 'No batches available.'}</p>
             ) : (
               batches.map((b) => {
                 const checked = assignedBatchNumbers.includes(b.batchNumber) || assignedBatchNumbers.includes(b.id);
@@ -410,7 +412,7 @@ export const UsersPage = () => {
                       />
                       <div>
                         <div className="text-xs font-bold text-slate-900">{b.batchNumber} ({b.batchName})</div>
-                        <div className="text-[10px] text-slate-400">Arrival: {b.chickArrivalDate} | Chicks: {b.initialChickCount}</div>
+                        <div className="text-[10px] text-slate-400">{language === 'ta' ? 'வந்த தேதி' : 'Arrival'}: {b.chickArrivalDate} | {language === 'ta' ? 'எண்ணிக்கை' : 'Chicks'}: {b.initialChickCount}</div>
                       </div>
                     </div>
                     <Badge variant={b.status}>{b.status}</Badge>
@@ -425,13 +427,13 @@ export const UsersPage = () => {
               onClick={() => setIsAssignModalOpen(false)}
               className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100"
             >
-              Cancel
+              {language === 'ta' ? 'ரத்து' : 'Cancel'}
             </button>
             <button
               onClick={handleSaveBatchAssignment}
               className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700"
             >
-              Save Assignment
+              {language === 'ta' ? 'ஒதுக்கீட்டைச் சேமி' : 'Save Assignment'}
             </button>
           </div>
         </div>

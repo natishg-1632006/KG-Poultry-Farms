@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useLanguage } from '../context/LanguageContext';
 import { dbGetBatches, dbGetUsers, dbGetDispatches, dbGetAuditLogs } from '../services/dbService';
 import { StatCard } from '../components/common/StatCard';
 import { Badge } from '../components/common/Badge';
@@ -8,6 +9,7 @@ import { Layers, Users, Truck, AlertCircle, PlusCircle, ArrowRight, ShieldCheck,
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
 export const AdminDashboard = () => {
+  const { t } = useLanguage();
   const [batches, setBatches] = useState([]);
   const [users, setUsers] = useState([]);
   const [dispatches, setDispatches] = useState([]);
@@ -49,7 +51,7 @@ export const AdminDashboard = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-2 min-w-0">
         <div className="min-w-0">
-          <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900 truncate">Admin Dashboard</h1>
+          <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900 truncate">{t('adminDashboard')}</h1>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Link
@@ -57,14 +59,14 @@ export const AdminDashboard = () => {
             className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-3 py-2 sm:px-4 sm:py-2.5 text-xs font-black text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95 shrink-0 whitespace-nowrap cursor-pointer"
           >
             <PlusCircle className="h-4 w-4 shrink-0" />
-            <span>New Batch</span>
+            <span>{t('newBatch')}</span>
           </Link>
           <Link
             to="/admin/users"
             className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 sm:px-4 sm:py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors shrink-0"
           >
             <Users className="h-4 w-4 shrink-0" />
-            <span>Manage Users</span>
+            <span>{t('manageUsers')}</span>
           </Link>
         </div>
       </div>
@@ -75,30 +77,30 @@ export const AdminDashboard = () => {
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Active Batches"
+          title={t('activeBatches')}
           value={batches.filter(b => b.status === 'Active').length}
-          subtext="In production shed"
+          subtext={t('inProductionShed')}
           icon={Layers}
           color="emerald"
         />
         <StatCard
-          title="Total Farmers"
+          title={t('totalFarmers')}
           value={farmersCount}
-          subtext="Registered active accounts"
+          subtext={t('registeredActiveAccounts')}
           icon={Users}
           color="emerald"
         />
         <StatCard
-          title="Total Live Chicks"
+          title={t('totalLiveChicks')}
           value={totalChicks.toLocaleString()}
-          subtext="Across active batches"
-          icon={TrendingUp}
+          subtext={t('acrossActiveBatches')}
+          icon={Activity}
           color="emerald"
         />
         <StatCard
-          title="Total Dispatched Weight"
+          title={t('totalDispatchedWeight')}
           value={`${totalDispatchedKg.toLocaleString()} kg`}
-          subtext="Completed sales dispatches"
+          subtext={t('completedSalesDispatches')}
           icon={Truck}
           color="blue"
         />
@@ -109,9 +111,9 @@ export const AdminDashboard = () => {
         {/* Batches Status Table */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-2">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
-            <h2 className="text-base font-bold text-slate-900">Farm Batches Overview</h2>
+            <h2 className="text-base font-bold text-slate-900">{t('farmBatchesOverview')}</h2>
             <Link to="/admin/batches" className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1">
-              View All <ArrowRight className="h-3.5 w-3.5" />
+              {t('viewAll')} <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
 
@@ -119,12 +121,12 @@ export const AdminDashboard = () => {
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
-                  <th className="pb-3 px-2">Batch #</th>
-                  <th className="pb-3 px-2">Arrival Date</th>
+                  <th className="pb-3 px-2">{t('batchNumber')}</th>
+                  <th className="pb-3 px-2">{t('date')}</th>
                   <th className="pb-3 px-2">Initial Chicks</th>
                   <th className="pb-3 px-2">Remaining</th>
-                  <th className="pb-3 px-2">Assigned Farmer</th>
-                  <th className="pb-3 px-2 text-right">Status</th>
+                  <th className="pb-3 px-2">{t('assignedFarmer')}</th>
+                  <th className="pb-3 px-2 text-right">{t('status')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
@@ -156,10 +158,10 @@ export const AdminDashboard = () => {
           <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-emerald-600" />
-              Audit Log Feed
+              {t('auditLogFeed')}
             </h2>
             <Link to="/admin/audit-logs" className="text-xs font-bold text-emerald-600 hover:underline">
-              Logs
+              {t('logs')}
             </Link>
           </div>
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { dbGetBatches, dbGetDailyRecords, dbGetCompanyTargets, dbGetDispatches } from '../services/dbService';
 import { calculateDayOfBatch } from '../utils/calculations';
 import {
@@ -19,7 +20,7 @@ import { BarChart3, TrendingUp, Wheat, Activity, Bird } from 'lucide-react';
 import CustomSelect from '../components/common/CustomSelect';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
-const CustomTooltip = ({ active, payload, label }) => {
+const CustomTooltip = ({ active, payload, label, language }) => {
   if (active && payload && payload.length) {
     const dataItem = payload[0]?.payload;
     return (
@@ -39,7 +40,7 @@ const CustomTooltip = ({ active, payload, label }) => {
               </span>
               <span className="text-white font-extrabold">
                 {typeof entry.value === 'number' ? entry.value.toLocaleString() : entry.value}
-                {entry.name.toLowerCase().includes('weight') ? ' g' : entry.name.toLowerCase().includes('feed (g') ? ' g' : entry.name.toLowerCase().includes('kg') ? ' kg' : ' birds'}
+                {entry.name.toLowerCase().includes('weight') || entry.name.includes('எடை') ? ' கி' : entry.name.toLowerCase().includes('feed (g') || entry.name.includes('தீவனம் (கி') ? ' கி' : entry.name.toLowerCase().includes('kg') || entry.name.includes('கிலோ') ? ' கிலோ' : language === 'ta' ? '' : ' birds'}
               </span>
             </div>
           ))}
@@ -52,6 +53,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 export const ReportsPage = () => {
   const { userProfile } = useAuth();
+  const { language } = useLanguage();
   const [batches, setBatches] = useState([]);
   const [selectedBatchId, setSelectedBatchId] = useState('');
   const [dailyRecords, setDailyRecords] = useState([]);
@@ -112,7 +114,7 @@ export const ReportsPage = () => {
 
   const selectedBatch = batches.find(b => b.id === selectedBatchId);
 
-  if (loading) return <LoadingSpinner message="Loading Analytics & Reports..." />;
+  if (loading) return <LoadingSpinner message={language === 'ta' ? 'அறிக்கைகள் & பகுப்பாய்வு ஏற்றப்படுகிறது...' : 'Loading Analytics & Reports...'} />;
 
   // Prepare chart dataset for selected batch
   const chartData = dailyRecords.map((r) => {
@@ -123,7 +125,7 @@ export const ReportsPage = () => {
 
     return {
       date: r.recordDate,
-      day: `Day ${dayIdx}`,
+      day: language === 'ta' ? `நாள் ${dayIdx}` : `Day ${dayIdx}`,
       mortality: r.mortalityCount || 0,
       remaining: r.remainingChickCount || 0,
       actualWeight: r.averageWeight || 0,
@@ -152,16 +154,16 @@ export const ReportsPage = () => {
             <TrendingUp className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Reports & Analytics</h1>
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">{language === 'ta' ? 'அறிக்கைகள் & பகுப்பாய்வு' : 'Reports & Analytics'}</h1>
             <p className="text-xs font-semibold text-slate-500 mt-0.5">
-              Visual growth metrics, mortality trends, and feed efficiency targets
+              {language === 'ta' ? 'வளர்ச்சி மற்றும் இறப்புப் பகுப்பாய்வு' : 'Visual growth metrics and mortality trends'}
             </p>
           </div>
         </div>
 
         {selectedBatch && (
           <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs font-extrabold text-slate-700 whitespace-nowrap">Select Batch:</span>
+            <span className="text-xs font-extrabold text-slate-700 whitespace-nowrap">{language === 'ta' ? 'தொகுதி:' : 'Select Batch:'}</span>
             <CustomSelect
               value={selectedBatchId}
               onChange={(e) => setSelectedBatchId(e.target.value)}
@@ -176,7 +178,7 @@ export const ReportsPage = () => {
 
       {chartData.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 p-12 text-center text-slate-400 font-medium text-xs">
-          No daily record history available for this batch to render analytics graphs.
+          {language === 'ta' ? 'பகுப்பாய்வு வரைபடங்களைக் காட்ட இந்தத் தொகுதிக்கு பதிவுகள் எதுவும் இல்லை.' : 'No daily record history available for this batch to render analytics graphs.'}
         </div>
       ) : (
         <>
@@ -185,56 +187,56 @@ export const ReportsPage = () => {
             {/* Live Birds Left */}
             <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Live Flock</span>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 truncate">{language === 'ta' ? 'உயிருள்ளவை' : 'Live Flock'}</span>
                 <div className="rounded-xl bg-emerald-50 p-2 text-emerald-600 border border-emerald-100">
                   <Bird className="h-4 w-4" />
                 </div>
               </div>
               <div className="mt-2">
                 <span className="text-2xl font-black text-slate-900 tracking-tight">{latestLiveBirds.toLocaleString()}</span>
-                <span className="text-xs font-bold text-slate-500 ml-1">birds</span>
+                {language !== 'ta' && <span className="text-xs font-bold text-slate-500 ml-1">birds</span>}
               </div>
             </div>
 
             {/* Total Mortality */}
             <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Total Mortality</span>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 truncate">{language === 'ta' ? 'மொத்த இறப்பு' : 'Total Mortality'}</span>
                 <div className="rounded-xl bg-rose-50 p-2 text-rose-600 border border-rose-100">
                   <Activity className="h-4 w-4" />
                 </div>
               </div>
               <div className="mt-2">
                 <span className="text-2xl font-black text-rose-700 tracking-tight">{totalMortality.toLocaleString()}</span>
-                <span className="text-xs font-bold text-slate-500 ml-1">birds</span>
+                {language !== 'ta' && <span className="text-xs font-bold text-slate-500 ml-1">birds</span>}
               </div>
             </div>
 
             {/* Latest Avg Bird Weight */}
             <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Latest Avg Wt</span>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 truncate">{language === 'ta' ? 'சராசரி எடை' : 'Latest Avg Wt'}</span>
                 <div className="rounded-xl bg-purple-50 p-2 text-purple-600 border border-purple-100">
                   <TrendingUp className="h-4 w-4" />
                 </div>
               </div>
               <div className="mt-2">
                 <span className="text-2xl font-black text-purple-800 tracking-tight">{latestAvgWeight}</span>
-                <span className="text-xs font-bold text-slate-500 ml-1">g</span>
+                <span className="text-xs font-bold text-slate-500 ml-1">{language === 'ta' ? 'கி' : 'g'}</span>
               </div>
             </div>
 
             {/* Total Feed Consumed */}
             <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Total Feed</span>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 truncate">{language === 'ta' ? 'மொத்த தீவனம்' : 'Total Feed'}</span>
                 <div className="rounded-xl bg-amber-50 p-2 text-amber-600 border border-amber-100">
                   <Wheat className="h-4 w-4" />
                 </div>
               </div>
               <div className="mt-2">
                 <span className="text-2xl font-black text-slate-900 tracking-tight">{totalFeedBags}</span>
-                <span className="text-xs font-bold text-slate-500 ml-1">bags ({totalFeedKg.toLocaleString()} kg)</span>
+                <span className="text-xs font-bold text-slate-500 ml-1">{language === 'ta' ? 'பைகள்' : 'bags'}</span>
               </div>
             </div>
           </div>
@@ -250,13 +252,13 @@ export const ReportsPage = () => {
                   </div>
                   <div>
                     <h2 className="text-sm sm:text-base font-extrabold text-slate-900">
-                      Daily Mortality Count ({selectedBatch?.batchNumber})
+                      {language === 'ta' ? `தினசரி இறப்பு (${selectedBatch?.batchNumber})` : `Daily Mortality (${selectedBatch?.batchNumber})`}
                     </h2>
-                    <p className="text-[11px] font-semibold text-slate-400">Daily recorded bird mortality</p>
+                    <p className="text-[11px] font-semibold text-slate-400">{language === 'ta' ? 'தினசரி இறப்புப் பதிவு' : 'Daily recorded bird mortality'}</p>
                   </div>
                 </div>
                 <span className="rounded-xl bg-rose-50 border border-rose-100 px-2.5 py-1 text-xs font-black text-rose-700">
-                  Total: {totalMortality}
+                  {language === 'ta' ? 'மொத்தம்:' : 'Total:'} {totalMortality}
                 </span>
               </div>
 
@@ -272,8 +274,8 @@ export const ReportsPage = () => {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.7} />
                     <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="mortality" fill="url(#mortalityGrad)" name="Daily Mortality" radius={[6, 6, 0, 0]} maxBarSize={32} />
+                    <Tooltip content={<CustomTooltip language={language} />} />
+                    <Bar dataKey="mortality" fill="url(#mortalityGrad)" name={language === 'ta' ? 'தினசரி இறப்பு' : 'Daily Mortality'} radius={[6, 6, 0, 0]} maxBarSize={32} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -288,13 +290,13 @@ export const ReportsPage = () => {
                   </div>
                   <div>
                     <h2 className="text-sm sm:text-base font-extrabold text-slate-900">
-                      Average Weight Growth vs Target
+                      {language === 'ta' ? 'எடை வளர்ச்சி vs இலக்கு' : 'Weight Growth vs Target'}
                     </h2>
-                    <p className="text-[11px] font-semibold text-slate-400">Actual weight in grams vs standard targets</p>
+                    <p className="text-[11px] font-semibold text-slate-400">{language === 'ta' ? 'எடை வளர்ச்சி ஒப்பீடு' : 'Actual weight in grams vs standard targets'}</p>
                   </div>
                 </div>
                 <span className="rounded-xl bg-emerald-50 border border-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-800">
-                  Latest: {latestAvgWeight} g
+                  {latestAvgWeight} {language === 'ta' ? 'கி' : 'g'}
                 </span>
               </div>
 
@@ -310,10 +312,10 @@ export const ReportsPage = () => {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.7} />
                     <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                    <Tooltip content={<CustomTooltip />} />
+                    <Tooltip content={<CustomTooltip language={language} />} />
                     <Legend verticalAlign="top" align="right" height={36} iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 700 }} />
-                    <Area type="monotone" dataKey="actualWeight" stroke="#059669" strokeWidth={3} fill="url(#weightGrad)" name="Actual Weight (g)" dot={false} activeDot={{ r: 6, fill: '#059669', stroke: '#fff', strokeWidth: 2 }} />
-                    <Line type="monotone" dataKey="targetWeight" stroke="#a855f7" strokeDasharray="4 4" strokeWidth={2.5} name="Company Target (g)" dot={false} activeDot={{ r: 5 }} />
+                    <Area type="monotone" dataKey="actualWeight" stroke="#059669" strokeWidth={3} fill="url(#weightGrad)" name={language === 'ta' ? 'உண்மையான எடை (கி)' : 'Actual Weight (g)'} dot={false} activeDot={{ r: 6, fill: '#059669', stroke: '#fff', strokeWidth: 2 }} />
+                    <Line type="monotone" dataKey="targetWeight" stroke="#a855f7" strokeDasharray="4 4" strokeWidth={2.5} name={language === 'ta' ? 'நிறுவன இலக்கு (கி)' : 'Company Target (g)'} dot={false} activeDot={{ r: 5 }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -328,13 +330,13 @@ export const ReportsPage = () => {
                   </div>
                   <div>
                     <h2 className="text-sm sm:text-base font-extrabold text-slate-900">
-                      Feed Consumption per Bird vs Target
+                      {language === 'ta' ? 'தீவனப் பயன்பாடு vs இலக்கு' : 'Feed Intake vs Target'}
                     </h2>
-                    <p className="text-[11px] font-semibold text-slate-400">Gram intake per bird vs expected targets</p>
+                    <p className="text-[11px] font-semibold text-slate-400">{language === 'ta' ? 'ஒரு கோழிக்கு தீவன ஒப்பீடு' : 'Gram intake per bird vs expected targets'}</p>
                   </div>
                 </div>
                 <span className="rounded-xl bg-amber-50 border border-amber-100 px-2.5 py-1 text-xs font-black text-amber-800">
-                  g/bird ratio
+                  {language === 'ta' ? 'கி/எண்ணிக்கை' : 'g/bird ratio'}
                 </span>
               </div>
 
@@ -350,10 +352,10 @@ export const ReportsPage = () => {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.7} />
                     <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                    <Tooltip content={<CustomTooltip />} />
+                    <Tooltip content={<CustomTooltip language={language} />} />
                     <Legend verticalAlign="top" align="right" height={36} iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 700 }} />
-                    <Area type="monotone" dataKey="actualFeedGramPerBird" stroke="#d97706" strokeWidth={3} fill="url(#feedGramGrad)" name="Actual Feed (g/bird)" dot={false} activeDot={{ r: 6, fill: '#d97706', stroke: '#fff', strokeWidth: 2 }} />
-                    <Line type="monotone" dataKey="targetFeed" stroke="#10b981" strokeDasharray="4 4" strokeWidth={2.5} name="Company Target (g)" dot={false} activeDot={{ r: 5 }} />
+                    <Area type="monotone" dataKey="actualFeedGramPerBird" stroke="#d97706" strokeWidth={3} fill="url(#feedGramGrad)" name={language === 'ta' ? 'உண்மையான தீவனம் (கி/எண்ணிக்கை)' : 'Actual Feed (g/bird)'} dot={false} activeDot={{ r: 6, fill: '#d97706', stroke: '#fff', strokeWidth: 2 }} />
+                    <Line type="monotone" dataKey="targetFeed" stroke="#10b981" strokeDasharray="4 4" strokeWidth={2.5} name={language === 'ta' ? 'நிறுவன இலக்கு (கி)' : 'Company Target (g)'} dot={false} activeDot={{ r: 5 }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -368,13 +370,13 @@ export const ReportsPage = () => {
                   </div>
                   <div>
                     <h2 className="text-sm sm:text-base font-extrabold text-slate-900">
-                      Daily Total Feed Consumed (kg)
+                      {language === 'ta' ? 'மொத்த தீவனம் (கிலோ)' : 'Total Feed (kg)'}
                     </h2>
-                    <p className="text-[11px] font-semibold text-slate-400">Total daily farm feed usage in kilograms</p>
+                    <p className="text-[11px] font-semibold text-slate-400">{language === 'ta' ? 'தினசரி தீவன அளவு' : 'Total daily farm feed usage in kilograms'}</p>
                   </div>
                 </div>
                 <span className="rounded-xl bg-indigo-50 border border-indigo-100 px-2.5 py-1 text-xs font-black text-indigo-800">
-                  {totalFeedKg.toLocaleString()} kg total
+                  {totalFeedKg.toLocaleString()} {language === 'ta' ? 'கிலோ' : 'kg total'}
                 </span>
               </div>
 
@@ -390,8 +392,8 @@ export const ReportsPage = () => {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.7} />
                     <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="feedConsumptionKg" fill="url(#feedGrad)" name="Feed Consumed (kg)" radius={[6, 6, 0, 0]} maxBarSize={32} />
+                    <Tooltip content={<CustomTooltip language={language} />} />
+                    <Bar dataKey="feedConsumptionKg" fill="url(#feedGrad)" name={language === 'ta' ? 'தீவனப் பயன்பாடு (கிலோ)' : 'Feed Consumed (kg)'} radius={[6, 6, 0, 0]} maxBarSize={32} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

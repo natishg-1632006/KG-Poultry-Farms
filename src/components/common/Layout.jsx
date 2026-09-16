@@ -13,8 +13,8 @@ export const Layout = () => {
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          <div className="mx-auto max-w-7xl">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-6 lg:p-8 min-w-0 max-w-full overflow-x-hidden">
+          <div className="mx-auto max-w-7xl w-full min-w-0">
             <Outlet />
           </div>
         </main>

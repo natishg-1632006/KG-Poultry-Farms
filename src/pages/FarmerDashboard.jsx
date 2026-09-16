@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { dbGetBatches, dbGetDailyRecords, dbGetFeedArrivals } from '../services/dbService';
 import { formatFeedStock, kgToBags } from '../utils/calculations';
 import { KG_PER_BAG } from '../constants/companyTargets';
@@ -12,6 +13,7 @@ import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
 export const FarmerDashboard = () => {
   const { userProfile } = useAuth();
+  const { t } = useLanguage();
   const [assignedBatches, setAssignedBatches] = useState([]);
   const [activeBatch, setActiveBatch] = useState(null);
   const [records, setRecords] = useState([]);
@@ -92,13 +94,13 @@ export const FarmerDashboard = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-2 min-w-0">
-        <div className="min-w-0">
-          <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900 truncate">Farmer Portal</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900">{t('farmerPortal')}</h1>
         </div>
         {activeBatch && (
-          <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200/80 px-3 py-1.5 sm:px-4 sm:py-2 text-xs font-bold text-emerald-900 shadow-xs shrink-0">
-            <span className="truncate">Batch: {activeBatch.batchNumber} • <strong className="text-emerald-700">Day {flockAgeDays}</strong></span>
+          <div className="flex items-center gap-1.5 sm:gap-2 rounded-xl bg-emerald-50 border border-emerald-200/80 px-2.5 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-bold text-emerald-900 shadow-xs shrink-0">
+            <span>{t('batchNumber')}: {activeBatch.batchNumber} • <strong className="text-emerald-700">Day {flockAgeDays}</strong></span>
             <Badge variant={activeBatch.status}>{activeBatch.status}</Badge>
           </div>
         )}
@@ -109,38 +111,38 @@ export const FarmerDashboard = () => {
 
       {!activeBatch ? (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-8 text-center text-emerald-900">
-          <p className="font-bold text-base">No Active Batch Assigned</p>
-          <p className="text-xs mt-1">Please contact your Administrator to assign you an active farm batch.</p>
+          <p className="font-bold text-base">{t('noActiveBatch')}</p>
+          <p className="text-xs mt-1">{t('contactAdminBatch')}</p>
         </div>
       ) : (
         <>
           {/* 4 Essential KPI Cards Grid */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
-              title="Chicks Count"
+              title={t('chicksCount')}
               value={`${Number(remainingChicks).toLocaleString()} / ${initialChicks.toLocaleString()}`}
-              subtext="Live / Initial Chicks"
+              subtext={t('liveInitialChicks')}
               icon={Activity}
               color="emerald"
             />
             <StatCard
-              title="Total Feed Consumed"
+              title={t('totalFeedConsumed')}
               value={`${consumedStr} / ${arrivedStr} Bags`}
-              subtext="Consumed / Total Arrived Bags"
+              subtext={t('consumedTotalArrivedBags')}
               icon={Wheat}
               color="emerald"
             />
             <StatCard
-              title="Total Mortality"
+              title={t('totalMortality')}
               value={totalMortality.toLocaleString()}
-              subtext="Cumulative mortality count"
+              subtext={t('cumulativeMortality')}
               icon={AlertCircle}
               color="amber"
             />
             <StatCard
-              title="Latest Avg Weight"
+              title={t('latestAvgWeight')}
               value={`${latestAvgWeight} g`}
-              subtext={latestRecord ? `Latest entry: ${latestRecord.recordDate}` : 'No daily records yet'}
+              subtext={latestRecord ? `${t('latestEntry')}: ${latestRecord.recordDate}` : t('noDailyRecordsYet')}
               icon={Scale}
               color="emerald"
             />

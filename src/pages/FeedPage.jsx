@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { dbGetBatches, dbGetFeedArrivals, dbAddFeedArrival, dbDeleteFeedArrival, dbLogAuditEvent } from '../services/dbService';
 import { formatFeedStock, bagsToKg, kgToBags } from '../utils/calculations';
 import { KG_PER_BAG } from '../constants/companyTargets';
@@ -13,6 +14,7 @@ import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
 export const FeedPage = () => {
   const { userProfile, isFarmer } = useAuth();
+  const { t, language } = useLanguage();
   const [batches, setBatches] = useState([]);
   const [selectedBatchId, setSelectedBatchId] = useState('');
   const [feedArrivals, setFeedArrivals] = useState([]);
@@ -250,7 +252,7 @@ export const FeedPage = () => {
     return type === transactionFilter;
   });
 
-  if (loading) return <LoadingSpinner message="Loading Feed Management..." />;
+  if (loading) return <LoadingSpinner message="Loading Feed Inventory..." />;
 
   return (
     <div className="space-y-6">
@@ -258,7 +260,7 @@ export const FeedPage = () => {
       <div className="flex items-center justify-between gap-2 min-w-0">
         <div className="min-w-0">
           <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900 truncate">
-            Feed Stock & Return Management
+            {t('feedStockAndReturn')}
           </h1>
         </div>
         {!isReadOnly && (
@@ -280,7 +282,7 @@ export const FeedPage = () => {
             className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-3 py-2 sm:px-4 sm:py-2.5 text-xs font-black text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20 hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95 shrink-0 whitespace-nowrap cursor-pointer"
           >
             <Plus className="h-4 w-4 shrink-0" />
-            <span>Log Feed Stock</span>
+            <span>{t('logFeedStock')}</span>
           </button>
         )}
       </div>
@@ -295,7 +297,7 @@ export const FeedPage = () => {
             </div>
           </div>
           <span className="rounded-md bg-amber-200/80 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-900">
-            Read-Only Mode
+            {t('readOnlyMode')}
           </span>
         </div>
       )}
@@ -303,35 +305,35 @@ export const FeedPage = () => {
       {/* KPI Stock Cards in Bags */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
-          title="1. Pre-Starter Stock"
+          title={t('preStarterStock')}
           value={`${preAvailableBags} Bags`}
           valueLabel="Available Stock"
           availableValue={`${preAvailableBags} Bags`}
           consumedValue={`${preConsumedBags} Bags`}
           arrivedValue={`${preArrivedBags} Bags`}
-          subtext={`First deduction priority (Blue Bag)${preReturnedBags > 0 ? ` • ${preReturnedBags} Returned` : ''}`}
+          subtext={`${t('firstDeductionPriority')}${preReturnedBags > 0 ? ` • ${preReturnedBags} ${t('returned')}` : ''}`}
           icon={Package}
           color="blue"
         />
         <StatCard
-          title="2. Starter Stock"
+          title={t('starterStock')}
           value={`${starterAvailableBags} Bags`}
           valueLabel="Available Stock"
           availableValue={`${starterAvailableBags} Bags`}
           consumedValue={`${starterConsumedBags} Bags`}
           arrivedValue={`${starterArrivedBags} Bags`}
-          subtext={`Second deduction priority (Green Bag)${starterReturnedBags > 0 ? ` • ${starterReturnedBags} Returned` : ''}`}
+          subtext={`${t('secondDeductionPriority')}${starterReturnedBags > 0 ? ` • ${starterReturnedBags} ${t('returned')}` : ''}`}
           icon={Package}
           color="emerald"
         />
         <StatCard
-          title="3. Finisher Stock"
+          title={t('finisherStock')}
           value={`${finisherAvailableBags} Bags`}
           valueLabel="Available Stock"
           availableValue={`${finisherAvailableBags} Bags`}
           consumedValue={`${finisherConsumedBags} Bags`}
           arrivedValue={`${finisherArrivedBags} Bags`}
-          subtext={`Third deduction priority (Orange Bag)${finisherReturnedBags > 0 ? ` • ${finisherReturnedBags} Returned` : ''}`}
+          subtext={`${t('thirdDeductionPriority')}${finisherReturnedBags > 0 ? ` • ${finisherReturnedBags} ${t('returned')}` : ''}`}
           icon={Package}
           color="orange"
         />
@@ -453,31 +455,31 @@ export const FeedPage = () => {
           setShowForm(false);
           setEditingFeedId(null);
         }}
-        title={editingFeedId ? "Edit Feed Entry" : formData.transactionType === 'Return' ? "Return Feed Stock" : "Receive Feed Stock"}
+        title={editingFeedId ? (language === 'ta' ? "தீவனப் பதிவைத் திருத்தவும்" : "Edit Feed Entry") : formData.transactionType === 'Return' ? (language === 'ta' ? "தீவனத்தைத் திரும்பப் பெறுக" : "Return Feed Stock") : (language === 'ta' ? "தீவனப் பெறுகை" : "Receive Feed Stock")}
       >
         <form onSubmit={handleAddArrival} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Transaction Type *</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'பரிவர்த்தனை வகை *' : 'Transaction Type *'}</label>
             <CustomSelect
               value={formData.transactionType}
               onChange={(e) => setFormData({ ...formData, transactionType: e.target.value })}
               options={[
-                { value: 'Receive', label: 'Receive Feed (Stock In +)' },
-                { value: 'Return', label: 'Return Feed (Stock Out - Reduces Inventory)' }
+                { value: 'Receive', label: language === 'ta' ? 'தீவனம் பெறுகை (+ சரக்கு வரவு)' : 'Receive Feed (Stock In +)' },
+                { value: 'Return', label: language === 'ta' ? 'தீவனம் திரும்புதல் (- சரக்குக் குறைவு)' : 'Return Feed (Stock Out - Reduces Inventory)' }
               ]}
               className="w-full"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Feed Type *</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'தீவன வகை *' : 'Feed Type *'}</label>
             <CustomSelect
               value={formData.feedType}
               onChange={(e) => setFormData({ ...formData, feedType: e.target.value })}
               options={[
-                { value: 'Pre-Starter', label: 'Pre-Starter (Blue Bag)' },
-                { value: 'Starter', label: 'Starter (Green Bag)' },
-                { value: 'Finisher', label: 'Finisher (Orange Bag)' }
+                { value: 'Pre-Starter', label: language === 'ta' ? 'ப்ரீ-ஸ்டார்ட்டர் (நீலப் பை)' : 'Pre-Starter (Blue Bag)' },
+                { value: 'Starter', label: language === 'ta' ? 'ஸ்டார்ட்டர் (பச்சை பை)' : 'Starter (Green Bag)' },
+                { value: 'Finisher', label: language === 'ta' ? 'பினிஷர் (ஆரஞ்சு பை)' : 'Finisher (Orange Bag)' }
               ]}
               className="w-full"
             />
@@ -487,7 +489,7 @@ export const FeedPage = () => {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  {formData.transactionType === 'Return' ? 'Bags Returned (Whole Bags)' : 'Bags Received (Whole Bags)'}
+                  {formData.transactionType === 'Return' ? (language === 'ta' ? 'திரும்பப் பெற்ற பைகள்' : 'Bags Returned (Whole Bags)') : (language === 'ta' ? 'பெறப்பட்ட பைகள்' : 'Bags Received (Whole Bags)')}
                 </label>
                 <input
                   type="number"
@@ -495,14 +497,14 @@ export const FeedPage = () => {
                   step="1"
                   value={formData.bagsReceived}
                   onChange={(e) => setFormData({ ...formData, bagsReceived: e.target.value !== '' ? Number(e.target.value) : '' })}
-                  placeholder="e.g. 7"
+                  placeholder={language === 'ta' ? 'எ.கா. 7' : 'e.g. 7'}
                   className="w-full rounded-xl border border-slate-200 py-2.5 px-3 text-sm font-bold text-slate-900 focus:border-emerald-600"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Additional Loose Weight (Kg)
+                  {language === 'ta' ? 'கூடுதல் தீவனம் (கிலோ)' : 'Additional Loose Weight (Kg)'}
                 </label>
                 <input
                   type="number"
@@ -511,7 +513,7 @@ export const FeedPage = () => {
                   step="0.5"
                   value={formData.additionalKg}
                   onChange={(e) => setFormData({ ...formData, additionalKg: e.target.value !== '' ? Number(e.target.value) : '' })}
-                  placeholder="e.g. 55"
+                  placeholder={language === 'ta' ? 'எ.கா. 55' : 'e.g. 55'}
                   className="w-full rounded-xl border border-slate-200 py-2.5 px-3 text-sm font-bold text-slate-900 focus:border-emerald-600"
                 />
               </div>
@@ -519,12 +521,12 @@ export const FeedPage = () => {
 
             {/* Helper Summary Pill */}
             <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 border border-slate-200 text-xs">
-              <span className="text-slate-500 font-bold">Total Entry Quantity:</span>
+              <span className="text-slate-500 font-bold">{language === 'ta' ? 'மொத்தப் பதிவு அளவு:' : 'Total Entry Quantity:'}</span>
               <span className={`font-black ${formData.transactionType === 'Return' ? 'text-amber-700' : 'text-emerald-700'}`}>
-                {formData.transactionType === 'Return' ? '-' : '+'}{Number(formData.bagsReceived || 0)} Bags
-                {Number(formData.additionalKg || 0) > 0 ? ` & ${formData.additionalKg} kg` : ''}
+                {formData.transactionType === 'Return' ? '-' : '+'}{Number(formData.bagsReceived || 0)} {language === 'ta' ? 'பைகள்' : 'Bags'}
+                {Number(formData.additionalKg || 0) > 0 ? (language === 'ta' ? ` & ${formData.additionalKg} கிலோ` : ` & ${formData.additionalKg} kg`) : ''}
                 <span className="ml-1 text-[11px] font-semibold text-slate-500">
-                  ({(Number(formData.bagsReceived || 0) * KG_PER_BAG) + Number(formData.additionalKg || 0)} kg total)
+                  ({(Number(formData.bagsReceived || 0) * KG_PER_BAG) + Number(formData.additionalKg || 0)} {language === 'ta' ? 'கிலோ மொத்தம்' : 'kg total'})
                 </span>
               </span>
             </div>
@@ -532,7 +534,7 @@ export const FeedPage = () => {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Date *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'தேதி *' : 'Date *'}</label>
               <CustomDatePicker
                 value={formData.date}
                 onChange={(dStr) => setFormData({ ...formData, date: dStr })}
@@ -542,35 +544,35 @@ export const FeedPage = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Vehicle Number</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'வாகன எண்' : 'Vehicle Number'}</label>
               <input
                 type="text"
                 value={formData.vehicleNumber}
                 onChange={(e) => setFormData({ ...formData, vehicleNumber: e.target.value })}
-                placeholder="e.g. TN-38-B-9988"
+                placeholder={language === 'ta' ? 'எ.கா. TN-38-B-9988' : 'e.g. TN-38-B-9988'}
                 className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Driver / Collector Name</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'ஓட்டுநர் / சேகரிப்பாளர் பெயர்' : 'Driver / Collector Name'}</label>
             <input
               type="text"
               value={formData.driverName}
               onChange={(e) => setFormData({ ...formData, driverName: e.target.value })}
-              placeholder="e.g. Murugan"
+              placeholder={language === 'ta' ? 'எ.கா. முருகன்' : 'e.g. Murugan'}
               className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Notes / Remarks</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'குறிப்புகள்' : 'Notes / Remarks'}</label>
             <textarea
               rows="2"
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Optional remarks (e.g. Returned 7 bags & 55 kg loose feed)..."
+              placeholder={language === 'ta' ? 'விருப்பக் குறிப்புகள் (எ.கா. 7 பைகள் & 55 கிலோ திரும்பப் பெறப்பட்டது)...' : 'Optional remarks (e.g. Returned 7 bags & 55 kg loose feed)...'}
               className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
             />
           </div>
@@ -594,7 +596,7 @@ export const FeedPage = () => {
               }}
               className="w-1/3 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
             >
-              Cancel
+              {language === 'ta' ? 'ரத்து' : 'Cancel'}
             </button>
             <button
               type="submit"
@@ -604,7 +606,7 @@ export const FeedPage = () => {
               } disabled:opacity-50`}
             >
               <Save className="h-4 w-4" />
-              {saving ? 'Processing...' : editingFeedId ? 'Update Entry' : formData.transactionType === 'Return' ? 'Process Return Feed' : 'Add Feed Stock'}
+              {saving ? (language === 'ta' ? 'செயலாக்கப்படுகிறது...' : 'Processing...') : editingFeedId ? (language === 'ta' ? 'பதிவைப் புதுப்பி' : 'Update Entry') : formData.transactionType === 'Return' ? (language === 'ta' ? 'திரும்பப் பெறுதலைப் பதிவு செய்' : 'Process Return Feed') : (language === 'ta' ? 'தீவனச் சேர்க்கை' : 'Add Feed Stock')}
             </button>
           </div>
         </form>
@@ -612,19 +614,19 @@ export const FeedPage = () => {
 
       {/* Feed Transaction Log History */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm min-w-0">
-        <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3 mb-4 min-w-0">
-          <h2 className="text-xs sm:text-base font-black text-slate-900 truncate">
-            Feed Transaction Log History ({selectedBatch?.batchNumber})
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-2 border-b border-slate-100 pb-3 mb-4 min-w-0">
+          <h2 className="text-sm sm:text-lg font-black text-slate-900 truncate">
+            {t('feedTransactionLogHistory')} ({selectedBatch?.batchNumber})
           </h2>
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-bold shrink-0 whitespace-nowrap">
-            <span>Filter:</span>
+          <div className="flex items-center gap-1.5 text-xs sm:text-sm text-slate-500 font-extrabold shrink-0 whitespace-nowrap">
+            <span>{t('filter')}:</span>
             <CustomSelect
               value={transactionFilter}
               onChange={(e) => setTransactionFilter(e.target.value)}
               options={[
-                { value: 'ALL', label: `All (${feedArrivals.length})` },
-                { value: 'Receive', label: 'Received Only' },
-                { value: 'Return', label: 'Returned Only' },
+                { value: 'ALL', label: `${t('all')} (${feedArrivals.length})` },
+                { value: 'Receive', label: language === 'ta' ? 'வரவு மட்டும்' : 'Received Only' },
+                { value: 'Return', label: language === 'ta' ? 'திருப்புதல் மட்டும்' : 'Returned Only' },
               ]}
             />
           </div>
@@ -632,14 +634,14 @@ export const FeedPage = () => {
 
         {/* DESKTOP VIEW TABLE */}
         <div className="hidden sm:block w-full overflow-x-auto rounded-xl border border-slate-100">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left text-xs sm:text-sm">
             <thead className="bg-slate-50 sticky top-0 border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold whitespace-nowrap">
               <tr>
-                <th className="py-3 px-3">Date</th>
-                <th className="py-3 px-3">Transaction</th>
-                <th className="py-3 px-3">Feed Category</th>
-                <th className="py-3 px-3">Quantity</th>
-                <th className="py-3 px-3 text-right">Actions</th>
+                <th className="py-3 px-3">{t('date')}</th>
+                <th className="py-3 px-3">{t('transactionType')}</th>
+                <th className="py-3 px-3">{t('feedType')}</th>
+                <th className="py-3 px-3">{t('quantity')}</th>
+                <th className="py-3 px-3 text-right">{t('actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium whitespace-nowrap">
@@ -659,11 +661,11 @@ export const FeedPage = () => {
                     >
                       <td className="py-3 px-3 font-bold text-slate-900">{f.date}</td>
                       <td className="py-3 px-3 font-bold">
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-extrabold ${
                           isReturn ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                         }`}>
                           {isReturn ? <RotateCcw className="h-3 w-3 shrink-0" /> : <Plus className="h-3 w-3 shrink-0" />}
-                          <span>{isReturn ? 'Return Feed' : 'Receive Feed'}</span>
+                          <span>{isReturn ? (language === 'ta' ? 'தீவனம் திருப்பு' : 'Return Feed') : (language === 'ta' ? 'தீவனம் வரவு' : 'Receive Feed')}</span>
                         </span>
                       </td>
                       <td className="py-3 px-3 font-bold">
@@ -677,7 +679,7 @@ export const FeedPage = () => {
                         </div>
                       </td>
                       <td className={`py-3 px-3 font-bold ${isReturn ? 'text-amber-700' : 'text-emerald-700'}`}>
-                        {isReturn ? '-' : '+'}{bags} Bags{f.additionalKg ? ` & ${f.additionalKg} kg` : ''}
+                        {isReturn ? '-' : '+'}{bags} {t('bags')}{f.additionalKg ? ` & ${f.additionalKg} kg` : ''}
                       </td>
                       <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
@@ -739,19 +741,19 @@ export const FeedPage = () => {
                       <Calendar className="h-4 w-4 text-emerald-600 shrink-0" />
                       <span className="text-sm font-black text-slate-900">{f.date}</span>
                     </div>
-                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-extrabold ${
                       isReturn ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                     }`}>
                       {isReturn ? <RotateCcw className="h-3 w-3 shrink-0" /> : <Plus className="h-3 w-3 shrink-0" />}
-                      <span>{isReturn ? 'Return Feed' : 'Receive Feed'}</span>
+                      <span>{isReturn ? (language === 'ta' ? 'தீவனம் திருப்பு' : 'Return Feed') : (language === 'ta' ? 'தீவனம் வரவு' : 'Receive Feed')}</span>
                     </span>
                   </div>
 
                   {/* Feed Category & Quantity Details */}
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100 space-y-0.5 min-w-0">
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Feed Type</span>
-                      <div className={`font-black flex items-center gap-1 truncate ${
+                      <span className="text-[11px] sm:text-xs font-extrabold uppercase tracking-wider text-slate-400 block">{t('feedType')}</span>
+                      <div className={`font-black flex items-center gap-1 truncate text-xs sm:text-sm ${
                         f.feedType === 'Pre-Starter' ? 'text-blue-600' :
                         f.feedType === 'Starter' ? 'text-emerald-600' :
                         f.feedType === 'Finisher' ? 'text-orange-600' : 'text-slate-700'
@@ -764,18 +766,18 @@ export const FeedPage = () => {
                     <div className={`rounded-xl p-2.5 border space-y-0.5 min-w-0 ${
                       isReturn ? 'bg-amber-50/80 border-amber-100 text-amber-900' : 'bg-emerald-50/80 border-emerald-100 text-emerald-950'
                     }`}>
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Quantity</span>
-                      <span className="font-black text-xs block truncate">
-                        {isReturn ? '-' : '+'}{bags} Bags{f.additionalKg ? ` & ${f.additionalKg}kg` : ''}
+                      <span className="text-[11px] sm:text-xs font-extrabold uppercase tracking-wider text-slate-400 block">{t('quantity')}</span>
+                      <span className="font-black text-xs sm:text-sm block truncate">
+                        {isReturn ? '-' : '+'}{bags} {t('bags')}{f.additionalKg ? ` & ${f.additionalKg}kg` : ''}
                       </span>
                     </div>
                   </div>
 
                   {/* Card Footer Actions */}
-                  <div className="flex items-center justify-between border-t border-slate-100 pt-2.5 text-xs">
+                  <div className="flex items-center justify-between border-t border-slate-100 pt-2.5 text-xs sm:text-sm">
                     <span className="font-extrabold text-emerald-700 flex items-center gap-1.5 hover:text-emerald-800">
                       <Eye className="h-3.5 w-3.5 text-emerald-600" />
-                      <span>View Details</span>
+                      <span>{t('viewDetails')}</span>
                     </span>
 
                     <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>

@@ -15,33 +15,33 @@ export const DEFAULT_FARM_LOCATION = {
 export function decodeWeatherCode(code) {
   switch (code) {
     case 0:
-      return { label: 'Clear Sky', icon: 'Sun', color: 'text-amber-500' };
+      return { label: 'Clear Sky', labelTa: 'தெளிவான வானம்', icon: 'Sun', color: 'text-amber-500' };
     case 1:
     case 2:
-      return { label: 'Partly Cloudy', icon: 'CloudSun', color: 'text-amber-500' };
+      return { label: 'Partly Cloudy', labelTa: 'பகுதி மேகமூட்டம்', icon: 'CloudSun', color: 'text-amber-500' };
     case 3:
-      return { label: 'Overcast', icon: 'Cloud', color: 'text-slate-500' };
+      return { label: 'Overcast', labelTa: 'முழு மேகமூட்டம்', icon: 'Cloud', color: 'text-slate-500' };
     case 45:
     case 48:
-      return { label: 'Foggy', icon: 'CloudFog', color: 'text-slate-400' };
+      return { label: 'Foggy', labelTa: 'பனிமூட்டம்', icon: 'CloudFog', color: 'text-slate-400' };
     case 51:
     case 53:
     case 55:
-      return { label: 'Drizzle', icon: 'CloudDrizzle', color: 'text-blue-400' };
+      return { label: 'Drizzle', labelTa: 'தூறல்', icon: 'CloudDrizzle', color: 'text-blue-400' };
     case 61:
     case 63:
     case 65:
-      return { label: 'Rain', icon: 'CloudRain', color: 'text-blue-500' };
+      return { label: 'Rain', labelTa: 'மழை', icon: 'CloudRain', color: 'text-blue-500' };
     case 80:
     case 81:
     case 82:
-      return { label: 'Showers', icon: 'CloudRain', color: 'text-blue-600' };
+      return { label: 'Showers', labelTa: 'கனமழை', icon: 'CloudRain', color: 'text-blue-600' };
     case 95:
     case 96:
     case 99:
-      return { label: 'Thunderstorm', icon: 'CloudLightning', color: 'text-purple-600' };
+      return { label: 'Thunderstorm', labelTa: 'இடி மின்னல்', icon: 'CloudLightning', color: 'text-purple-600' };
     default:
-      return { label: 'Partly Cloudy', icon: 'CloudSun', color: 'text-emerald-600' };
+      return { label: 'Partly Cloudy', labelTa: 'பகுதி மேகமூட்டம்', icon: 'CloudSun', color: 'text-emerald-600' };
   }
 }
 
@@ -50,33 +50,41 @@ export function getPoultryWeatherAdvisory(temperatureC) {
   if (temperatureC >= 34) {
     return {
       status: 'Extreme Heat Warning',
+      statusTa: 'அதிக வெப்பம்',
       badgeVariant: 'rose',
       severity: 'high',
       tip: 'Severe Heat Risk! Turn on foggers/sprinklers immediately & add electrolytes in drinking water.',
+      tipTa: 'அதிக வெப்ப அபாயம்! தெளிப்பான்களை (Foggers) இயக்கவும் மற்றும் குடிநீரில் எலக்ட்ரோலைட்களை சேர்க்கவும்.',
       color: 'bg-rose-50 border-rose-200 text-rose-800 shadow-2xs'
     };
   } else if (temperatureC >= 30) {
     return {
       status: 'Heat Stress Caution',
+      statusTa: 'வெப்ப எச்சரிக்கை',
       badgeVariant: 'amber',
       severity: 'medium',
       tip: 'Elevated Temperature. Maintain fan circulation and verify cool water supply.',
+      tipTa: 'அதிகரித்த வெப்பநிலை. காற்றோட்டத்தை பராமரிக்கவும் மற்றும் குளிர்ந்த நீர் விநியோகத்தை உறுதிப்படுத்தவும்.',
       color: 'bg-amber-50 border-amber-200 text-amber-900 shadow-2xs'
     };
   } else if (temperatureC < 18) {
     return {
       status: 'Cold Temperature Warning',
+      statusTa: 'குளிர் எச்சரிக்கை',
       badgeVariant: 'blue',
       severity: 'medium',
       tip: 'Low temperature detected. Check shed side curtains and brooder heating.',
+      tipTa: 'குறைந்த வெப்பநிலை. பண்ணை திரைகள் மற்றும் வெப்பமூட்டியை சரிபார்க்கவும்.',
       color: 'bg-blue-50 border-blue-200 text-blue-900 shadow-2xs'
     };
   } else {
     return {
       status: 'Optimal Shed Climate',
+      statusTa: 'நல்ல காலநிலை',
       badgeVariant: 'emerald',
       severity: 'normal',
       tip: 'Ideal climate condition for flock growth and feed efficiency.',
+      tipTa: 'கோழி வளர்ச்சி மற்றும் தீவன பயன்பாட்டிற்கு ஏற்ற காலநிலை.',
       color: 'bg-emerald-50 border-emerald-200 text-emerald-900 shadow-2xs'
     };
   }
@@ -108,6 +116,7 @@ export async function fetchWeather(lat = DEFAULT_FARM_LOCATION.latitude, lon = D
       tempMax: Math.round(daily.temperature_2m_max?.[0] ?? temp + 3),
       tempMin: Math.round(daily.temperature_2m_min?.[0] ?? temp - 5),
       weatherLabel: weatherInfo.label,
+      weatherLabelTa: weatherInfo.labelTa,
       weatherIconKey: weatherInfo.icon,
       weatherColor: weatherInfo.color,
       advisory,
@@ -124,10 +133,11 @@ export async function fetchWeather(lat = DEFAULT_FARM_LOCATION.latitude, lon = D
       tempMax: 34,
       tempMin: 24,
       weatherLabel: 'Partly Cloudy',
+      weatherLabelTa: 'பகுதி மேகமூட்டம்',
       weatherIconKey: 'CloudSun',
       weatherColor: 'text-amber-500',
       advisory: getPoultryWeatherAdvisory(31),
-      updatedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      updatedAt: 'Live'
     };
   }
 }

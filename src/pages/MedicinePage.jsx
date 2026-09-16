@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { dbGetBatches, dbGetMedicineRecords, dbAddMedicineRecord, dbDeleteMedicineRecord, dbLogAuditEvent } from '../services/dbService';
 import { MEDICINE_UNITS } from '../constants/companyTargets';
 import { Modal } from '../components/common/Modal';
@@ -17,6 +18,7 @@ const formatMedicineUnit = (unit) => {
 
 export const MedicinePage = () => {
   const { userProfile, isFarmer } = useAuth();
+  const { t, language } = useLanguage();
   const [batches, setBatches] = useState([]);
   const [selectedBatchId, setSelectedBatchId] = useState('');
   const [records, setRecords] = useState([]);
@@ -98,6 +100,9 @@ export const MedicinePage = () => {
   const selectedBatch = batches.find(b => b.id === selectedBatchId);
   const isReadOnly = selectedBatch ? (selectedBatch.status || '').toLowerCase() === 'completed' : false;
 
+  const vaccineRecords = records.filter(r => (r.recordType || 'Vaccine') === 'Vaccine');
+  const medicineRecords = records.filter(r => r.recordType === 'Medicine');
+
   const handleOpenNewForm = (type = 'Vaccine') => {
     if (isReadOnly) return;
     setEditingRecordId(null);
@@ -115,35 +120,35 @@ export const MedicinePage = () => {
   const handleEditRecord = (record) => {
     if (isReadOnly) return;
     setEditingRecordId(record.id);
-    setShowForm(true);
     setRecordType(record.recordType || 'Vaccine');
     setDate(record.date || new Date().toISOString().split('T')[0]);
     setReason(record.reason || '');
 
     if (record.recordType === 'Medicine') {
       setMedicineName(record.medicineName || '');
-      setMedicineQty(record.quantity || '');
-      setMedicineUnit(record.unit || 'ml');
+      setMedicineQty(record.medicineQuantity || '');
+      setMedicineUnit(record.medicineUnit || 'ml');
     } else {
       setVaccinesList(record.vaccines && record.vaccines.length > 0 ? record.vaccines : [{ name: '', quantity: '', unit: 'ml' }]);
       setVaccinatorsList(record.vaccinatorNames && record.vaccinatorNames.length > 0 ? record.vaccinatorNames : ['']);
     }
+    setShowForm(true);
   };
 
   const handleDeleteRecord = (recordId) => {
     if (isReadOnly) return;
     setDeleteModal({
       isOpen: true,
-      title: 'Delete Medication / Vaccine Entry?',
-      message: 'Are you sure you want to delete this medication/vaccine log entry? This action cannot be undone.',
+      title: 'Delete Medication/Vaccine Record?',
+      message: 'Are you sure you want to delete this medication log entry?',
       loading: false,
       onConfirm: async () => {
         setDeleteModal(prev => ({ ...prev, loading: true }));
         try {
           await dbDeleteMedicineRecord(selectedBatchId, recordId);
-          await dbLogAuditEvent('MEDICINE_DELETED', `Deleted medicine/vaccine record for ${selectedBatch?.batchNumber}`, userProfile?.name);
+          await dbLogAuditEvent('MEDICINE_RECORD_DELETED', `Deleted medicine/vaccine entry for batch ${selectedBatch?.batchNumber}`, userProfile?.name);
           setSuccessMsg('Record deleted successfully.');
-          loadRecords(selectedBatchId);
+          await loadRecords(selectedBatchId);
           setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false });
         } catch (err) {
           setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false });
@@ -186,11 +191,11 @@ export const MedicinePage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSuccessMsg('');
-    if (!selectedBatch) return;
+    if (!selectedBatch || isReadOnly) return;
 
     setSaving(true);
     try {
-      let recordPayload = {
+      let recordObj = {
         id: editingRecordId || `med-${Date.now()}`,
         recordType,
         date,
@@ -198,59 +203,51 @@ export const MedicinePage = () => {
       };
 
       if (recordType === 'Medicine') {
-        if (!medicineName) throw new Error('Medicine name is required.');
-        recordPayload.medicineName = medicineName;
-        recordPayload.quantity = Number(medicineQty);
-        recordPayload.unit = medicineUnit;
+        if (!medicineName.trim()) {
+          alert('Please enter a medicine name.');
+          setSaving(false);
+          return;
+        }
+        recordObj.medicineName = medicineName.trim();
+        recordObj.medicineQuantity = medicineQty;
+        recordObj.medicineUnit = medicineUnit;
       } else {
-        const validVaccines = vaccinesList.filter(v => v.name.trim() !== '');
-        if (validVaccines.length === 0) throw new Error('At least one vaccine name is required.');
-        recordPayload.vaccines = validVaccines.map(v => ({
-          name: v.name,
-          quantity: Number(v.quantity) || 0,
-          unit: v.unit
-        }));
-        recordPayload.vaccinatorNames = vaccinatorsList.filter(v => v.trim() !== '');
+        const validVaccines = vaccinesList.filter(v => v.name && v.name.trim() !== '');
+        if (validVaccines.length === 0) {
+          alert('Please enter at least one vaccine name.');
+          setSaving(false);
+          return;
+        }
+        recordObj.vaccines = validVaccines;
+        recordObj.vaccinatorNames = vaccinatorsList.filter(v => v && v.trim() !== '');
       }
 
-      await dbAddMedicineRecord(selectedBatch.id, recordPayload);
+      await dbAddMedicineRecord(selectedBatch.id, recordObj);
       await dbLogAuditEvent(
-        editingRecordId ? 'MEDICINE_UPDATED' : 'MEDICINE_LOGGED',
-        `${editingRecordId ? 'Updated' : 'Logged'} ${recordType} for ${selectedBatch.batchNumber} on ${date}`,
+        editingRecordId ? 'MEDICINE_RECORD_UPDATED' : 'MEDICINE_RECORD_ADDED',
+        `${editingRecordId ? 'Updated' : 'Added'} ${recordType} record for batch ${selectedBatch.batchNumber}`,
         userProfile?.name
       );
 
-      setSuccessMsg(`Successfully ${editingRecordId ? 'updated' : 'saved'} ${recordType} record for ${selectedBatch.batchNumber}!`);
+      setSuccessMsg(`Successfully ${editingRecordId ? 'updated' : 'recorded'} ${recordType} log!`);
       setEditingRecordId(null);
       setShowForm(false);
       loadRecords(selectedBatch.id);
-
-      setReason('');
-      setMedicineName('');
-      setMedicineQty('');
-      setMedicineUnit('ml');
-      setVaccinesList([
-        { name: '', quantity: '', unit: 'ml' }
-      ]);
-      setVaccinatorsList(['']);
     } catch (err) {
-      alert('Error: ' + err.message);
+      alert('Failed saving record: ' + err.message);
     } finally {
       setSaving(false);
     }
   };
 
-  const vaccineRecords = records.filter(r => (r.recordType || 'Vaccine') === 'Vaccine');
-  const medicineRecords = records.filter(r => r.recordType === 'Medicine');
-
-  if (loading) return <LoadingSpinner message="Loading Medicine & Vaccine Module..." />;
+  if (loading) return <LoadingSpinner message="Loading Medicine Inventory..." />;
 
   return (
     <div className="space-y-6">
       {/* Page Header with Action Button */}
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-lg sm:text-2xl font-black tracking-tight text-slate-900 shrink-0">
-          Medicine & Vaccination Log
+          {t('medicineAndVaccines')}
         </h1>
         {!isReadOnly && (
           <button
@@ -258,7 +255,7 @@ export const MedicinePage = () => {
             className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs font-bold text-white shadow-sm transition-all active:scale-95 shrink-0 whitespace-nowrap cursor-pointer"
           >
             <Plus className="h-4 w-4 shrink-0" />
-            <span>Log Medicine</span>
+            <span>{t('logMedicine')}</span>
           </button>
         )}
       </div>
@@ -292,7 +289,7 @@ export const MedicinePage = () => {
           setShowForm(false);
           setEditingRecordId(null);
         }}
-        title={editingRecordId ? "Edit Record" : "New Medication / Vaccine Record"}
+        title={editingRecordId ? (language === 'ta' ? "பதிவைத் திருத்தவும்" : "Edit Record") : (language === 'ta' ? "புதிய மருந்து / தடுப்பூசிப் பதிவு" : "New Medication / Vaccine Record")}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
@@ -303,7 +300,7 @@ export const MedicinePage = () => {
                 recordType === 'Vaccine' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Vaccine Mode
+              {language === 'ta' ? 'தடுப்பூசி முறை' : 'Vaccine Mode'}
             </button>
             <button
               type="button"
@@ -312,12 +309,12 @@ export const MedicinePage = () => {
                 recordType === 'Medicine' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Medicine Mode
+              {language === 'ta' ? 'மருந்து முறை' : 'Medicine Mode'}
             </button>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Date *</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'தேதி *' : 'Date *'}</label>
             <CustomDatePicker
               value={date}
               onChange={(dStr) => setDate(dStr)}
@@ -329,19 +326,19 @@ export const MedicinePage = () => {
           {recordType === 'Medicine' && (
             <div className="space-y-3 rounded-xl border border-slate-200 p-3 bg-slate-50">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Medicine Name *</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'மருந்தின் பெயர் *' : 'Medicine Name *'}</label>
                 <input
                   type="text"
                   required
                   value={medicineName}
                   onChange={(e) => setMedicineName(e.target.value)}
-                  placeholder="e.g. Enrofloxacin 10%"
+                  placeholder={language === 'ta' ? 'எ.கா. என்ரோஃப்ளோக்சாசின் 10%' : 'e.g. Enrofloxacin 10%'}
                   className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
                 />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Quantity *</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'அளவு *' : 'Quantity *'}</label>
                   <input
                     type="number"
                     required
@@ -349,12 +346,12 @@ export const MedicinePage = () => {
                     step="0.1"
                     value={medicineQty}
                     onChange={(e) => setMedicineQty(e.target.value)}
-                    placeholder="e.g. 500"
+                    placeholder={language === 'ta' ? 'எ.கா. 500' : 'e.g. 500'}
                     className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Unit *</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'அலகு *' : 'Unit *'}</label>
                   <CustomSelect
                     value={medicineUnit}
                     onChange={(e) => setMedicineUnit(e.target.value)}
@@ -369,21 +366,21 @@ export const MedicinePage = () => {
           {recordType === 'Vaccine' && (
             <div className="space-y-4">
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-slate-700">Vaccine(s) Administered *</label>
+                <div className="flex flex-wrap items-center justify-between gap-1 mb-1">
+                  <label className="block text-xs font-bold text-slate-700">{language === 'ta' ? 'தடுப்பூசி(கள்) *' : 'Vaccine(s) Administered *'}</label>
                   <button
                     type="button"
                     onClick={handleAddVaccineField}
-                    className="text-[11px] font-bold text-emerald-600 hover:underline flex items-center gap-1"
+                    className="text-[11px] font-bold text-emerald-600 hover:underline flex items-center gap-1 shrink-0 ml-auto"
                   >
-                    <Plus className="h-3 w-3" /> Add Vaccine
+                    <Plus className="h-3 w-3" /> {language === 'ta' ? 'தடுப்பூசி சேர்க்க' : 'Add Vaccine'}
                   </button>
                 </div>
 
                 {vaccinesList.map((vac, idx) => (
                   <div key={idx} className="rounded-xl border border-emerald-100 p-3 bg-emerald-50/50 space-y-2">
                     <div className="flex items-center justify-between text-xs font-bold text-emerald-900">
-                      <span>Vaccine {idx + 1}</span>
+                      <span>{language === 'ta' ? `தடுப்பூசி ${idx + 1}` : `Vaccine ${idx + 1}`}</span>
                       {vaccinesList.length > 1 && (
                         <button type="button" onClick={() => handleRemoveVaccineField(idx)} className="text-rose-500 hover:text-rose-700">
                           <Trash2 className="h-3.5 w-3.5" />
@@ -392,7 +389,7 @@ export const MedicinePage = () => {
                     </div>
                     <input
                       type="text"
-                      placeholder={`Vaccine ${idx + 1} Name (e.g. Ranikhet / IBD)`}
+                      placeholder={language === 'ta' ? `தடுப்பூசி ${idx + 1} பெயர் (எ.கா. ராணிக்கெட்)` : `Vaccine ${idx + 1} Name (e.g. Ranikhet)`}
                       value={vac.name}
                       onChange={(e) => handleVaccineChange(idx, 'name', e.target.value)}
                       className="w-full rounded-lg border border-slate-200 bg-white py-1.5 px-3 text-xs font-medium"
@@ -400,7 +397,7 @@ export const MedicinePage = () => {
                     <div className="grid grid-cols-2 gap-2">
                       <input
                         type="number"
-                        placeholder="Quantity"
+                        placeholder={language === 'ta' ? 'அளவு' : 'Quantity'}
                         value={vac.quantity}
                         onChange={(e) => handleVaccineChange(idx, 'quantity', e.target.value)}
                         className="w-full rounded-lg border border-slate-200 bg-white py-1.5 px-3 text-xs font-medium"
@@ -417,21 +414,21 @@ export const MedicinePage = () => {
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-slate-700">Vaccinator Name(s)</label>
+                <div className="flex flex-wrap items-center justify-between gap-1 mb-1">
+                  <label className="block text-xs font-bold text-slate-700">{language === 'ta' ? 'செலுத்துபவர் பெயர்(கள்)' : 'Vaccinator Name(s)'}</label>
                   <button
                     type="button"
                     onClick={handleAddVaccinatorField}
-                    className="text-[11px] font-bold text-emerald-600 hover:underline flex items-center gap-1"
+                    className="text-[11px] font-bold text-emerald-600 hover:underline flex items-center gap-1 shrink-0 ml-auto"
                   >
-                    <Plus className="h-3 w-3" /> Add Vaccinator
+                    <Plus className="h-3 w-3" /> {language === 'ta' ? 'நபரைச் சேர்க்க' : 'Add Vaccinator'}
                   </button>
                 </div>
                 {vaccinatorsList.map((vName, idx) => (
                   <div key={idx} className="flex items-center gap-2">
                     <input
                       type="text"
-                      placeholder={`Vaccinator ${idx + 1} Name`}
+                      placeholder={language === 'ta' ? `செலுத்துபவர் ${idx + 1} பெயர்` : `Vaccinator ${idx + 1} Name`}
                       value={vName}
                       onChange={(e) => handleVaccinatorChange(idx, e.target.value)}
                       className="w-full rounded-xl border border-slate-200 py-1.5 px-3 text-xs font-medium"
@@ -448,13 +445,13 @@ export const MedicinePage = () => {
           )}
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Reason / Notes *</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'காரணம் / குறிப்புகள் *' : 'Reason / Notes *'}</label>
             <textarea
               rows="2"
               required
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="e.g. Day 7 Booster / Preventive treatment"
+              placeholder={language === 'ta' ? 'எ.கா. 7-ம் நாள் பூஸ்டர் / தடுப்பு சிகிச்சை' : 'e.g. Day 7 Booster / Preventive treatment'}
               className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
             />
           </div>
@@ -471,7 +468,7 @@ export const MedicinePage = () => {
               }}
               className="w-1/3 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
             >
-              Cancel
+              {language === 'ta' ? 'ரத்து' : 'Cancel'}
             </button>
             <button
               type="submit"
@@ -479,7 +476,7 @@ export const MedicinePage = () => {
               className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
             >
               <Save className="h-4 w-4" />
-              {saving ? 'Saving...' : editingRecordId ? 'Update Record' : `Save ${recordType} Record`}
+              {saving ? (language === 'ta' ? 'சேமிக்கிறது...' : 'Saving...') : editingRecordId ? (language === 'ta' ? 'பதிவைப் புதுப்பி' : 'Update Record') : (language === 'ta' ? 'பதிவைச் சேமி' : `Save ${recordType} Record`)}
             </button>
           </div>
         </form>
@@ -489,8 +486,13 @@ export const MedicinePage = () => {
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4 mb-4 gap-3">
           <div>
-            <h2 className="text-base font-bold text-slate-900">
-              Medicine & Vaccination History ({selectedBatch?.batchNumber})
+            <h2 className="text-xs sm:text-base font-black tracking-tight text-slate-900 flex items-center gap-1.5 flex-wrap whitespace-nowrap">
+              <span>{language === 'ta' ? 'பதிவு வரலாறு' : 'Log History'}</span>
+              {selectedBatch?.batchNumber && (
+                <span className="text-emerald-700 font-black bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md text-xs">
+                  ({selectedBatch.batchNumber})
+                </span>
+              )}
             </h2>
           </div>
 
@@ -506,7 +508,7 @@ export const MedicinePage = () => {
               }`}
             >
               <Syringe className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
-              <span>Vaccines ({vaccineRecords.length})</span>
+              <span>{t('vaccineMode')} ({vaccineRecords.length})</span>
             </button>
             <button
               type="button"
@@ -518,7 +520,7 @@ export const MedicinePage = () => {
               }`}
             >
               <Pill className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
-              <span>Medicines ({medicineRecords.length})</span>
+              <span>{t('medicineMode')} ({medicineRecords.length})</span>
             </button>
           </div>
         </div>
@@ -530,83 +532,100 @@ export const MedicinePage = () => {
             <div className="sm:hidden space-y-3">
               {vaccineRecords.length === 0 ? (
                 <div className="py-8 text-center text-xs text-slate-400">
-                  No vaccination records logged for this batch yet. Click "+ Log Medicine / Vaccine" to add one.
+                  {language === 'ta' ? 'இத்தொகுதிக்கு தடுப்பூசிப் பதிவுகள் எதுவும் இல்லை.' : 'No vaccination records logged for this batch yet.'}
                 </div>
               ) : (
-                vaccineRecords.map((r) => (
-                  <div
-                    key={r.id}
-                    onClick={() => setViewingRecordDetail(r)}
-                    className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-3 shadow-2xs hover:border-emerald-300 hover:shadow-md transition-all cursor-pointer"
-                  >
-                    <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
-                      <span className="text-xs font-bold text-slate-900">{r.date}</span>
-                      {!isReadOnly && (
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditRecord(r);
-                            }}
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-200/60"
-                            title="Edit Record"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteRecord(r.id);
-                            }}
-                            className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-100/60"
-                            title="Delete Record"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                vaccineRecords.map((r) => {
+                  const vaccineList = (r.vaccines && r.vaccines.length > 0)
+                    ? r.vaccines
+                    : (r.medicineName ? [{ name: r.medicineName, quantity: r.dosage || r.medicineQuantity, unit: r.medicineUnit || '' }] : []);
+                  const notesText = r.reason || r.notes || '';
+
+                  return (
+                    <div
+                      key={r.id}
+                      onClick={() => setViewingRecordDetail(r)}
+                      className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-3 shadow-2xs hover:border-emerald-300 hover:shadow-md transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+                        <span className="text-xs font-bold text-slate-900">{r.date}</span>
+                        {!isReadOnly && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditRecord(r);
+                              }}
+                              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-200/60"
+                              title={language === 'ta' ? 'பதிவைத் திருத்து' : 'Edit Record'}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteRecord(r.id);
+                              }}
+                              className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-100/60"
+                              title={language === 'ta' ? 'பதிவை நீக்கு' : 'Delete Record'}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">
+                          {language === 'ta' ? 'தடுப்பூசி & அளவு' : 'Vaccine(s) & Quantity'}
+                        </span>
+                        <div className="space-y-1.5">
+                          {vaccineList.length > 0 ? (
+                            vaccineList.map((v, i) => (
+                              <div key={i} className="text-xs font-bold text-emerald-900 flex items-center justify-between bg-white rounded-lg p-2 border border-emerald-100">
+                                <span className="flex items-center gap-1.5">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                                  {v.name}
+                                </span>
+                                {v.quantity ? (
+                                  <span className="text-xs font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+                                    {v.quantity} {formatMedicineUnit(v.unit)}
+                                  </span>
+                                ) : null}
+                              </div>
+                            ))
+                          ) : (
+                            <span className="text-xs text-slate-400 italic">{language === 'ta' ? 'விவரங்கள் இல்லை' : 'No details specified'}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {r.vaccinatorNames && r.vaccinatorNames.length > 0 && (
+                        <div>
+                          <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">
+                            {language === 'ta' ? 'செலுத்துபவர் பெயர்(கள்)' : 'Vaccinator Name(s)'}
+                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            {r.vaccinatorNames.map((vn, i) => (
+                              <span key={i} className="inline-flex items-center rounded-md bg-white border border-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
+                                {vn}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {notesText && (
+                        <div>
+                          <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-0.5">
+                            {language === 'ta' ? 'காரணம் / குறிப்புகள்' : 'Reason / Notes'}
+                          </span>
+                          <p className="text-xs text-slate-600 bg-white rounded-lg p-2 border border-slate-100">{notesText}</p>
                         </div>
                       )}
                     </div>
-
-                    <div>
-                      <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Vaccine(s) & Quantity</span>
-                      <div className="space-y-1.5">
-                        {r.vaccines && r.vaccines.map((v, i) => (
-                          <div key={i} className="text-xs font-bold text-emerald-900 flex items-center justify-between bg-white rounded-lg p-2 border border-emerald-100">
-                            <span className="flex items-center gap-1.5">
-                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-                              {v.name}
-                            </span>
-                            {v.quantity ? (
-                              <span className="text-xs font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                                {v.quantity} {formatMedicineUnit(v.unit)}
-                              </span>
-                            ) : null}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {r.vaccinatorNames && r.vaccinatorNames.length > 0 && (
-                      <div>
-                        <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Vaccinator Name(s)</span>
-                        <div className="flex flex-wrap gap-1">
-                          {r.vaccinatorNames.map((vn, i) => (
-                            <span key={i} className="inline-flex items-center rounded-md bg-white border border-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
-                              {vn}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {r.reason && (
-                      <div>
-                        <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-0.5">Reason / Notes</span>
-                        <p className="text-xs text-slate-600 bg-white rounded-lg p-2 border border-slate-100">{r.reason}</p>
-                      </div>
-                    )}
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
@@ -615,83 +634,90 @@ export const MedicinePage = () => {
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
-                    <th className="pb-3 px-2">Date</th>
-                    <th className="pb-3 px-2">Vaccine(s) Administered & Dosage</th>
-                    <th className="pb-3 px-2">Vaccinator Name(s)</th>
-                    <th className="pb-3 px-2">Reason / Notes</th>
-                    <th className="pb-3 px-2 text-right">Actions</th>
+                    <th className="pb-3 px-2">{language === 'ta' ? 'தேதி' : 'Date'}</th>
+                    <th className="pb-3 px-2">{language === 'ta' ? 'தடுப்பூசி & அளவு' : 'Vaccine(s) Administered & Dosage'}</th>
+                    <th className="pb-3 px-2">{language === 'ta' ? 'செலுத்துபவர் பெயர்(கள்)' : 'Vaccinator Name(s)'}</th>
+                    <th className="pb-3 px-2">{language === 'ta' ? 'காரணம் / குறிப்புகள்' : 'Reason / Notes'}</th>
+                    <th className="pb-3 px-2 text-right">{language === 'ta' ? 'செயல்கள்' : 'Actions'}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {vaccineRecords.length === 0 ? (
                     <tr>
                       <td colSpan="5" className="py-8 text-center text-slate-400">
-                        No vaccination records logged for this batch yet. Click "+ Log Medicine / Vaccine" to add one.
+                        {language === 'ta' ? 'இத்தொகுதிக்கு தடுப்பூசிப் பதிவுகள் எதுவும் இல்லை.' : 'No vaccination records logged for this batch yet.'}
                       </td>
                     </tr>
                   ) : (
-                    vaccineRecords.map((r) => (
-                      <tr
-                        key={r.id}
-                        onClick={() => setViewingRecordDetail(r)}
-                        className="hover:bg-emerald-50/60 cursor-pointer transition-colors"
-                      >
-                        <td className="py-3 px-2 font-bold text-slate-900">{r.date}</td>
-                        <td className="py-3 px-2">
-                          <div className="space-y-1">
-                            {r.vaccines && r.vaccines.map((v, i) => (
-                              <div key={i} className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                                <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-                                <span>{v.name}</span>
-                                {v.quantity ? <span className="text-slate-500 font-normal">({v.quantity} {formatMedicineUnit(v.unit)})</span> : null}
-                              </div>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="py-3 px-2 text-slate-700 font-semibold">
-                          {r.vaccinatorNames && r.vaccinatorNames.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {r.vaccinatorNames.map((vn, i) => (
-                                <span key={i} className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
-                                  {vn}
-                                </span>
+                    vaccineRecords.map((r) => {
+                      const vaccineList = (r.vaccines && r.vaccines.length > 0)
+                        ? r.vaccines
+                        : (r.medicineName ? [{ name: r.medicineName, quantity: r.dosage || r.medicineQuantity, unit: r.medicineUnit || '' }] : []);
+                      const notesText = r.reason || r.notes || '';
+
+                      return (
+                        <tr
+                          key={r.id}
+                          onClick={() => setViewingRecordDetail(r)}
+                          className="hover:bg-emerald-50/60 cursor-pointer transition-colors"
+                        >
+                          <td className="py-3 px-2 font-bold text-slate-900">{r.date}</td>
+                          <td className="py-3 px-2">
+                            <div className="space-y-1">
+                              {vaccineList.map((v, i) => (
+                                <div key={i} className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                                  <span>{v.name}</span>
+                                  {v.quantity ? <span className="text-slate-500 font-normal">({v.quantity} {formatMedicineUnit(v.unit)})</span> : null}
+                                </div>
                               ))}
                             </div>
-                          ) : (
-                            <span className="text-slate-400 font-normal">—</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-2 text-slate-600">{r.reason}</td>
-                        <td className="py-3 px-2 text-right">
-                          {!isReadOnly ? (
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditRecord(r);
-                                }}
-                                className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                                title="Edit Record"
-                              >
-                                <Edit className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteRecord(r.id);
-                                }}
-                                className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
-                                title="Delete Record"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-[10px] text-slate-400 font-semibold italic">Locked</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))
+                          </td>
+                          <td className="py-3 px-2 text-slate-700 font-semibold">
+                            {r.vaccinatorNames && r.vaccinatorNames.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {r.vaccinatorNames.map((vn, i) => (
+                                  <span key={i} className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                                    {vn}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 font-normal">—</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-2 text-slate-600">{notesText}</td>
+                          <td className="py-3 px-2 text-right">
+                            {!isReadOnly ? (
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditRecord(r);
+                                  }}
+                                  className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                                  title={language === 'ta' ? 'பதிவைத் திருத்து' : 'Edit Record'}
+                                >
+                                  <Edit className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteRecord(r.id);
+                                  }}
+                                  className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
+                                  title={language === 'ta' ? 'பதிவை நீக்கு' : 'Delete Record'}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 font-semibold italic">{language === 'ta' ? 'பூட்டப்பட்டது' : 'Locked'}</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -704,7 +730,7 @@ export const MedicinePage = () => {
             <div className="sm:hidden space-y-3">
               {medicineRecords.length === 0 ? (
                 <div className="py-8 text-center text-xs text-slate-400">
-                  No medication records logged for this batch yet. Click "+ Log Medicine / Vaccine" to add one.
+                  {language === 'ta' ? 'இத்தொகுதிக்கு மருந்துப் பதிவுகள் எதுவும் இல்லை.' : 'No medication records logged for this batch yet.'}
                 </div>
               ) : (
                 medicineRecords.map((r) => (
@@ -723,7 +749,7 @@ export const MedicinePage = () => {
                               handleEditRecord(r);
                             }}
                             className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-200/60"
-                            title="Edit Record"
+                            title={language === 'ta' ? 'பதிவைத் திருத்து' : 'Edit Record'}
                           >
                             <Edit className="h-4 w-4" />
                           </button>
@@ -733,7 +759,7 @@ export const MedicinePage = () => {
                               handleDeleteRecord(r.id);
                             }}
                             className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-100/60"
-                            title="Delete Record"
+                            title={language === 'ta' ? 'பதிவை நீக்கு' : 'Delete Record'}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -743,11 +769,15 @@ export const MedicinePage = () => {
 
                     <div className="flex items-center justify-between bg-white rounded-lg p-2.5 border border-slate-200">
                       <div>
-                        <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">Medicine Name</span>
+                        <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">
+                          {language === 'ta' ? 'மருந்தின் பெயர்' : 'Medicine Name'}
+                        </span>
                         <span className="text-xs font-bold text-teal-900">{r.medicineName}</span>
                       </div>
                       <div className="text-right">
-                        <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">Quantity</span>
+                        <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">
+                          {language === 'ta' ? 'அளவு' : 'Quantity'}
+                        </span>
                         <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200/60 inline-block">
                           {r.quantity} {formatMedicineUnit(r.unit)}
                         </span>
@@ -756,7 +786,9 @@ export const MedicinePage = () => {
 
                     {r.reason && (
                       <div>
-                        <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-0.5">Reason / Notes</span>
+                        <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-0.5">
+                          {language === 'ta' ? 'காரணம் / குறிப்புகள்' : 'Reason / Notes'}
+                        </span>
                         <p className="text-xs text-slate-600 bg-white rounded-lg p-2 border border-slate-100">{r.reason}</p>
                       </div>
                     )}
@@ -770,18 +802,18 @@ export const MedicinePage = () => {
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
-                    <th className="pb-3 px-2">Date</th>
-                    <th className="pb-3 px-2">Medicine Name</th>
-                    <th className="pb-3 px-2">Dosage / Quantity</th>
-                    <th className="pb-3 px-2">Reason / Notes</th>
-                    <th className="pb-3 px-2 text-right">Actions</th>
+                    <th className="pb-3 px-2">{language === 'ta' ? 'தேதி' : 'Date'}</th>
+                    <th className="pb-3 px-2">{language === 'ta' ? 'மருந்தின் பெயர்' : 'Medicine Name'}</th>
+                    <th className="pb-3 px-2">{language === 'ta' ? 'அளவு' : 'Dosage / Quantity'}</th>
+                    <th className="pb-3 px-2">{language === 'ta' ? 'காரணம் / குறிப்புகள்' : 'Reason / Notes'}</th>
+                    <th className="pb-3 px-2 text-right">{language === 'ta' ? 'செயல்கள்' : 'Actions'}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {medicineRecords.length === 0 ? (
                     <tr>
                       <td colSpan="5" className="py-8 text-center text-slate-400">
-                        No medication records logged for this batch yet. Click "+ Log Medicine / Vaccine" to add one.
+                        {language === 'ta' ? 'இத்தொகுதிக்கு மருந்துப் பதிவுகள் எதுவும் இல்லை.' : 'No medication records logged for this batch yet.'}
                       </td>
                     </tr>
                   ) : (
@@ -806,7 +838,7 @@ export const MedicinePage = () => {
                                   handleEditRecord(r);
                                 }}
                                 className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                                title="Edit Record"
+                                title={language === 'ta' ? 'பதிவைத் திருத்து' : 'Edit Record'}
                               >
                                 <Edit className="h-3.5 w-3.5" />
                               </button>
@@ -816,13 +848,13 @@ export const MedicinePage = () => {
                                   handleDeleteRecord(r.id);
                                 }}
                                 className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
-                                title="Delete Record"
+                                title={language === 'ta' ? 'பதிவை நீக்கு' : 'Delete Record'}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             </div>
                           ) : (
-                            <span className="text-[10px] text-slate-400 font-semibold italic">Locked</span>
+                            <span className="text-[10px] text-slate-400 font-semibold italic">{language === 'ta' ? 'பூட்டப்பட்டது' : 'Locked'}</span>
                           )}
                         </td>
                       </tr>
@@ -841,9 +873,9 @@ export const MedicinePage = () => {
           isOpen={!!viewingRecordDetail}
           onClose={() => setViewingRecordDetail(null)}
           title={
-            viewingRecordDetail.recordType === 'Vaccine'
-              ? 'Vaccination Log Details'
-              : 'Medication Log Details'
+            language === 'ta'
+              ? (viewingRecordDetail.recordType === 'Vaccine' ? 'தடுப்பூசி விபரம்' : 'மருந்து விபரம்')
+              : (viewingRecordDetail.recordType === 'Vaccine' ? 'Vaccination Log Details' : 'Medication Log Details')
           }
           maxWidth="max-w-md"
         >
@@ -852,11 +884,11 @@ export const MedicinePage = () => {
             <div className="flex items-center justify-between bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
               <div>
                 <span className="text-[10px] uppercase font-extrabold text-slate-400 tracking-wider block">
-                  Batch & Date
+                  {language === 'ta' ? 'தொகுதி & தேதி' : 'Batch & Date'}
                 </span>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-xs font-black text-slate-900">
-                    {selectedBatch ? `Batch #${selectedBatch.batchNumber}` : 'Batch Record'}
+                    {selectedBatch ? (language === 'ta' ? `தொகுதி #${selectedBatch.batchNumber}` : `Batch #${selectedBatch.batchNumber}`) : 'Batch Record'}
                   </span>
                   <span className="text-slate-300">•</span>
                   <span className="text-xs font-bold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-md">
@@ -871,7 +903,7 @@ export const MedicinePage = () => {
                     : 'bg-teal-600 text-white shadow-xs'
                 }`}
               >
-                {viewingRecordDetail.recordType || 'Vaccine'}
+                {language === 'ta' ? (viewingRecordDetail.recordType === 'Vaccine' ? 'தடுப்பூசி' : 'மருந்து') : (viewingRecordDetail.recordType || 'Vaccine')}
               </span>
             </div>
 
@@ -880,7 +912,7 @@ export const MedicinePage = () => {
               <div className="space-y-3">
                 <div>
                   <span className="text-xs font-bold text-slate-500 block mb-1.5">
-                    Vaccine(s) Administered & Dosage:
+                    {language === 'ta' ? 'தடுப்பூசி விவரம்:' : 'Vaccine(s) Administered & Dosage:'}
                   </span>
                   <div className="space-y-2">
                     {viewingRecordDetail.vaccines && viewingRecordDetail.vaccines.length > 0 ? (
@@ -898,12 +930,12 @@ export const MedicinePage = () => {
                               {v.quantity} {formatMedicineUnit(v.unit)}
                             </span>
                           ) : (
-                            <span className="text-xs text-slate-400 font-medium">No dosage specified</span>
+                            <span className="text-xs text-slate-400 font-medium">{language === 'ta' ? 'அளவு குறிப்பிடப்படவில்லை' : 'No dosage specified'}</span>
                           )}
                         </div>
                       ))
                     ) : (
-                      <div className="text-xs text-slate-400 italic">No vaccine details logged</div>
+                      <div className="text-xs text-slate-400 italic">{language === 'ta' ? 'விவரங்கள் இல்லை' : 'No vaccine details logged'}</div>
                     )}
                   </div>
                 </div>
@@ -911,7 +943,7 @@ export const MedicinePage = () => {
                 {/* Vaccinator Names */}
                 <div>
                   <span className="text-xs font-bold text-slate-500 block mb-1.5">
-                    Vaccinator Name(s):
+                    {language === 'ta' ? 'செலுத்துபவர் பெயர்(கள்):' : 'Vaccinator Name(s):'}
                   </span>
                   {viewingRecordDetail.vaccinatorNames && viewingRecordDetail.vaccinatorNames.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
@@ -926,7 +958,7 @@ export const MedicinePage = () => {
                       ))}
                     </div>
                   ) : (
-                    <span className="text-xs text-slate-400 italic">None specified</span>
+                    <span className="text-xs text-slate-400 italic">{language === 'ta' ? 'குறிப்பிடப்படவில்லை' : 'None specified'}</span>
                   )}
                 </div>
               </div>
@@ -936,7 +968,7 @@ export const MedicinePage = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-teal-50/70 border border-teal-200/80 p-3 rounded-xl">
                     <span className="text-[10px] uppercase font-extrabold text-teal-600 tracking-wider block mb-0.5">
-                      Medicine Name
+                      {language === 'ta' ? 'மருந்தின் பெயர்' : 'Medicine Name'}
                     </span>
                     <span className="text-sm font-black text-teal-950">
                       {viewingRecordDetail.medicineName || '—'}
@@ -944,7 +976,7 @@ export const MedicinePage = () => {
                   </div>
                   <div className="bg-emerald-50/70 border border-emerald-200/80 p-3 rounded-xl">
                     <span className="text-[10px] uppercase font-extrabold text-emerald-600 tracking-wider block mb-0.5">
-                      Dosage / Quantity
+                      {language === 'ta' ? 'அளவு' : 'Dosage / Quantity'}
                     </span>
                     <span className="text-sm font-black text-emerald-950">
                       {viewingRecordDetail.quantity} {formatMedicineUnit(viewingRecordDetail.unit)}
@@ -957,10 +989,10 @@ export const MedicinePage = () => {
             {/* Reason / Notes */}
             <div>
               <span className="text-xs font-bold text-slate-500 block mb-1.5">
-                Reason / Clinical Notes:
+                {language === 'ta' ? 'காரணம் / குறிப்புகள்:' : 'Reason / Clinical Notes:'}
               </span>
               <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl text-xs text-slate-700 font-medium min-h-[60px] whitespace-pre-wrap">
-                {viewingRecordDetail.reason || 'No clinical notes or reason provided for this entry.'}
+                {viewingRecordDetail.reason || (language === 'ta' ? 'குறிப்புகள் எதுவும் குறிப்பிடப்படவில்லை.' : 'No clinical notes or reason provided for this entry.')}
               </div>
             </div>
 
@@ -975,7 +1007,7 @@ export const MedicinePage = () => {
                 }}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer"
               >
-                <Edit className="h-3.5 w-3.5" /> Edit
+                <Edit className="h-3.5 w-3.5" /> {language === 'ta' ? 'திருத்து' : 'Edit'}
               </button>
               <button
                 type="button"
@@ -986,14 +1018,14 @@ export const MedicinePage = () => {
                 }}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all cursor-pointer"
               >
-                <Trash2 className="h-3.5 w-3.5" /> Delete
+                <Trash2 className="h-3.5 w-3.5" /> {language === 'ta' ? 'நீக்கு' : 'Delete'}
               </button>
               <button
                 type="button"
                 onClick={() => setViewingRecordDetail(null)}
                 className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
               >
-                Close
+                {language === 'ta' ? 'மூடு' : 'Close'}
               </button>
             </div>
           </div>

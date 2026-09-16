@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { dbGetInvoices, dbGetBoxSets } from '../services/dbService';
+import { useLanguage } from '../context/LanguageContext';
 import { TraderInvoiceModal } from '../components/invoice/TraderInvoiceModal';
 import { Search } from 'lucide-react';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
 export const InvoicesPage = () => {
+  const { language } = useLanguage();
   const [invoices, setInvoices] = useState([]);
   const [search, setSearch] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -42,13 +44,15 @@ export const InvoicesPage = () => {
     (inv.vehicleNumber && inv.vehicleNumber.toLowerCase().includes(search.toLowerCase()))
   );
 
-  if (loading) return <LoadingSpinner message="Loading Invoice History..." />;
+  if (loading) return <LoadingSpinner message={language === 'ta' ? 'ரசீது வரலாறு ஏற்றப்படுகிறது...' : 'Loading Invoice History...'} />;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-2 min-w-0">
         <div className="min-w-0">
-          <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900 truncate">Dispatch Invoice History</h1>
+          <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900 truncate">
+            {language === 'ta' ? 'அனுப்பல் ரசீது வரலாறு' : 'Dispatch Invoice History'}
+          </h1>
         </div>
       </div>
 
@@ -60,7 +64,7 @@ export const InvoicesPage = () => {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search invoice by INV number, customer, or vehicle number..."
+            placeholder={language === 'ta' ? 'ரசீது எண், வாடிக்கையாளர் அல்லது வாகன எண் மூலம் தேடுக...' : 'Search invoice by INV number, customer, or vehicle number...'}
             className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-4 text-xs font-medium text-slate-900 focus:border-emerald-600"
           />
         </div>
@@ -72,20 +76,22 @@ export const InvoicesPage = () => {
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold">
-                <th className="pb-3 px-2">Invoice #</th>
-                <th className="pb-3 px-2">Date</th>
-                <th className="pb-3 px-2">Customer / Trader</th>
-                <th className="pb-3 px-2">Vehicle #</th>
-                <th className="pb-3 px-2">Weight (kg)</th>
-                <th className="pb-3 px-2">Rate / kg</th>
-                <th className="pb-3 px-2">Total Amount</th>
-                <th className="pb-3 px-2 text-right">Actions</th>
+                <th className="pb-3 px-2">{language === 'ta' ? 'ரசீது எண்' : 'Invoice #'}</th>
+                <th className="pb-3 px-2">{language === 'ta' ? 'தேதி' : 'Date'}</th>
+                <th className="pb-3 px-2">{language === 'ta' ? 'வாடிக்கையாளர்' : 'Customer / Trader'}</th>
+                <th className="pb-3 px-2">{language === 'ta' ? 'வாகன எண்' : 'Vehicle #'}</th>
+                <th className="pb-3 px-2">{language === 'ta' ? 'எடை (கிலோ)' : 'Weight (kg)'}</th>
+                <th className="pb-3 px-2">{language === 'ta' ? 'விலை / கிலோ' : 'Rate / kg'}</th>
+                <th className="pb-3 px-2">{language === 'ta' ? 'மொத்த தொகை' : 'Total Amount'}</th>
+                <th className="pb-3 px-2 text-right">{language === 'ta' ? 'செயல்கள்' : 'Actions'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {filteredInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="py-8 text-center text-slate-400">No dispatch invoices found.</td>
+                  <td colSpan="8" className="py-8 text-center text-slate-400">
+                    {language === 'ta' ? 'ரசீதுகள் எதுவும் கிடைக்கவில்லை.' : 'No dispatch invoices found.'}
+                  </td>
                 </tr>
               ) : (
                 filteredInvoices.map((inv) => (
@@ -93,7 +99,7 @@ export const InvoicesPage = () => {
                     <td className="py-3 px-2 font-bold text-slate-900">{inv.id}</td>
                     <td className="py-3 px-2 text-slate-600">{inv.invoiceDate}</td>
                     <td className="py-3 px-2">
-                      <div className="font-bold text-slate-800">{inv.customerName || 'Wholesale Buyer'}</div>
+                      <div className="font-bold text-slate-800">{inv.customerName || (language === 'ta' ? 'மொத்த வியாபாரி' : 'Wholesale Buyer')}</div>
                       <div className="text-[10px] text-slate-400">{inv.customerPhone}</div>
                     </td>
                     <td className="py-3 px-2 text-slate-600">{inv.vehicleNumber}</td>
@@ -105,7 +111,7 @@ export const InvoicesPage = () => {
                         onClick={() => setSelectedInvoice(inv)}
                         className="rounded-lg bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition-colors"
                       >
-                        View Invoice PDF & Share
+                        {language === 'ta' ? 'ரசீது பார்க்க & பகிர' : 'View Invoice PDF & Share'}
                       </button>
                     </td>
                   </tr>

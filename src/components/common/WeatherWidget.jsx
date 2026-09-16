@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLanguage } from '../../context/LanguageContext';
 import { 
   Sun, 
   CloudSun, 
@@ -42,6 +43,7 @@ const INITIAL_FALLBACK_WEATHER = {
   tempMax: 34,
   tempMin: 24,
   weatherLabel: 'Partly Cloudy',
+  weatherLabelTa: 'பகுதி மேகமூட்டம்',
   weatherIconKey: 'CloudSun',
   weatherColor: 'text-amber-500',
   advisory: getPoultryWeatherAdvisory(31),
@@ -49,6 +51,7 @@ const INITIAL_FALLBACK_WEATHER = {
 };
 
 export const WeatherWidget = () => {
+  const { language, t } = useLanguage();
   const [location, setLocation] = useState(() => {
     try {
       const saved = localStorage.getItem(LOCATION_STORAGE_KEY);
@@ -174,7 +177,7 @@ export const WeatherWidget = () => {
               onClick={() => setShowSearchModal(true)}
               className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 underline underline-offset-2 ml-0.5 shrink-0"
             >
-              Change
+              {t('changeLocation')}
             </button>
           </div>
 
@@ -200,16 +203,16 @@ export const WeatherWidget = () => {
               <WeatherIcon className="h-7 w-7 text-emerald-600" />
             </div>
             <div>
-              <div className="flex items-baseline gap-2">
+              <div className="flex items-baseline gap-2 flex-wrap">
                 <span className="text-3xl font-black tracking-tight text-slate-900">
                   {weather?.temperature}°C
                 </span>
-                <span className="text-xs font-semibold text-slate-500">
-                  Feels like {weather?.feelsLike}°C
+                <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
+                  {t('feelsLike')} {weather?.feelsLike}°C
                 </span>
               </div>
               <p className="text-xs font-bold text-slate-600">
-                {weather?.weatherLabel} • H: {weather?.tempMax}°C L: {weather?.tempMin}°C
+                {language === 'ta' && (weather?.weatherLabelTa || weatherInfo?.labelTa) ? (weather.weatherLabelTa || weatherInfo?.labelTa) : weather?.weatherLabel} • H: {weather?.tempMax}°C L: {weather?.tempMin}°C
               </p>
             </div>
           </div>
@@ -219,7 +222,7 @@ export const WeatherWidget = () => {
             <div className="flex items-center gap-1.5">
               <Droplets className="h-4 w-4 text-blue-500" />
               <div>
-                <p className="text-[10px] uppercase font-bold text-slate-400">Humidity</p>
+                <p className="text-[10px] uppercase font-bold text-slate-400">{t('humidity')}</p>
                 <p className="text-xs font-bold text-slate-800">{weather?.humidity}%</p>
               </div>
             </div>
@@ -227,7 +230,7 @@ export const WeatherWidget = () => {
             <div className="flex items-center gap-1.5">
               <Wind className="h-4 w-4 text-teal-600" />
               <div>
-                <p className="text-[10px] uppercase font-bold text-slate-400">Wind</p>
+                <p className="text-[10px] uppercase font-bold text-slate-400">{t('wind')}</p>
                 <p className="text-xs font-bold text-slate-800">{weather?.windSpeed} km/h</p>
               </div>
             </div>
@@ -242,12 +245,12 @@ export const WeatherWidget = () => {
             ) : (
               <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600" />
             )}
-            <div className="text-xs">
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold">{advisory.status}</span>
-                <Badge variant={advisory.badgeVariant}>Live Advisory</Badge>
+            <div className="text-xs flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2 flex-wrap min-w-0">
+                <span className="font-extrabold">{language === 'ta' && advisory.statusTa ? advisory.statusTa : advisory.status}</span>
+                <Badge variant={advisory.badgeVariant}>{t('liveAdvisory')}</Badge>
               </div>
-              <p className="mt-0.5 font-medium leading-relaxed opacity-90">{advisory.tip}</p>
+              <p className="mt-1 font-medium leading-relaxed opacity-90">{language === 'ta' && advisory.tipTa ? advisory.tipTa : advisory.tip}</p>
             </div>
           </div>
         )}

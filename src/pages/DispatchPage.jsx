@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import {
   dbGetBatches,
   dbGetDispatches,
@@ -44,6 +45,7 @@ import {
 
 export const DispatchPage = () => {
   const { userProfile, isFarmer } = useAuth();
+  const { t, language } = useLanguage();
   const [batches, setBatches] = useState([]);
   const [selectedBatchId, setSelectedBatchId] = useState('');
   const [dispatches, setDispatches] = useState([]);
@@ -715,7 +717,7 @@ export const DispatchPage = () => {
           {/* Page Header */}
           <div className="flex items-center justify-between gap-2">
             <h1 className="text-lg sm:text-2xl font-black tracking-tight text-slate-900 shrink-0">
-              Dispatch & Weighing
+              {t('dispatchAndBoxSets')}
             </h1>
             
             <div className="flex items-center gap-2 shrink-0">
@@ -770,7 +772,7 @@ export const DispatchPage = () => {
             <div className="space-y-3">
               <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
                 {/* Top Row: Title on Left, Sort Dropdown on Right */}
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-2">
                   <div className="flex items-center gap-2">
                     <Truck className="h-4 w-4 text-emerald-600 shrink-0" />
                     <h2 className="text-xs sm:text-sm font-extrabold text-slate-800">
@@ -797,33 +799,33 @@ export const DispatchPage = () => {
                 <div className="grid grid-cols-3 gap-1 bg-slate-100/80 p-1 rounded-2xl w-full">
                   <button
                     onClick={() => setGridFilter('all')}
-                    className={`py-1.5 px-3 text-xs font-extrabold rounded-xl transition-all text-center whitespace-nowrap ${
+                    className={`py-2 px-1 sm:px-3 ${language === 'ta' ? 'text-[11px] sm:text-xs' : 'text-xs sm:text-sm'} font-extrabold rounded-xl transition-all text-center whitespace-nowrap overflow-hidden ${
                       gridFilter === 'all'
                         ? 'bg-white text-slate-900 shadow-2xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    All ({dispatches.length})
+                    {t('all')} ({dispatches.length})
                   </button>
                   <button
                     onClick={() => setGridFilter('in_progress')}
-                    className={`py-1.5 px-3 text-xs font-extrabold rounded-xl transition-all text-center whitespace-nowrap ${
+                    className={`py-2 px-1 sm:px-3 ${language === 'ta' ? 'text-[11px] sm:text-xs' : 'text-xs sm:text-sm'} font-extrabold rounded-xl transition-all text-center whitespace-nowrap overflow-hidden ${
                       gridFilter === 'in_progress'
                         ? 'bg-white text-amber-800 shadow-2xs'
                         : 'text-amber-800 hover:text-amber-900'
                     }`}
                   >
-                    In Progress ({dispatches.filter(d => !checkIsDispatchCompleted(d)).length})
+                    {t('inProgress')} ({dispatches.filter(d => !checkIsDispatchCompleted(d)).length})
                   </button>
                   <button
                     onClick={() => setGridFilter('completed')}
-                    className={`py-1.5 px-3 text-xs font-extrabold rounded-xl transition-all text-center whitespace-nowrap ${
+                    className={`py-2 px-1 sm:px-3 ${language === 'ta' ? 'text-[11px] sm:text-xs' : 'text-xs sm:text-sm'} font-extrabold rounded-xl transition-all text-center whitespace-nowrap overflow-hidden ${
                       gridFilter === 'completed'
                         ? 'bg-white text-emerald-800 shadow-2xs'
                         : 'text-emerald-800 hover:text-emerald-900'
                     }`}
                   >
-                    Completed ({dispatches.filter(d => checkIsDispatchCompleted(d)).length})
+                    {t('completed')} ({dispatches.filter(d => checkIsDispatchCompleted(d)).length})
                   </button>
                 </div>
               </div>
@@ -865,7 +867,7 @@ export const DispatchPage = () => {
                                 <Truck className="h-4 w-4" />
                               </div>
                               <Badge variant={isCompleted ? 'Completed' : 'In Progress'}>
-                                {isCompleted ? 'Completed' : 'In Progress'}
+                                {isCompleted ? t('completed') : t('inProgress')}
                               </Badge>
                             </div>
 
@@ -906,7 +908,7 @@ export const DispatchPage = () => {
                             <h3 className="font-black text-base text-slate-900 group-hover:text-emerald-700 transition-colors break-words leading-tight" title={d.vehicleName || d.vehicleNumber || 'Trader'}>
                               {d.vehicleName || d.vehicleNumber || 'Trader'}
                             </h3>
-                            <p className="text-xs font-semibold text-slate-500 mt-0.5">Vehicle: <span className="text-slate-700 font-bold">{d.vehicleNumber}</span></p>
+                            <p className="text-xs font-semibold text-slate-500 mt-0.5">{t('vehicle')}: <span className="text-slate-700 font-bold">{d.vehicleNumber}</span></p>
                           </div>
                         </div>
 
@@ -914,19 +916,19 @@ export const DispatchPage = () => {
                         <div className="py-2.5 space-y-1 text-xs text-slate-600">
                           <div className="flex items-center justify-between">
                             <span className="text-slate-400 font-medium flex items-center gap-1">
-                              <UserCheck className="h-3.5 w-3.5" /> Driver:
+                              <UserCheck className="h-3.5 w-3.5" /> {t('driver')}:
                             </span>
                             <span className="font-bold text-slate-800">{d.driverName || '—'}</span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-slate-400 font-medium flex items-center gap-1">
-                              <Phone className="h-3.5 w-3.5" /> Phone:
+                              <Phone className="h-3.5 w-3.5" /> {t('phone')}:
                             </span>
                             <span className="font-semibold text-slate-700">{d.driverMobileNumber || '—'}</span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-slate-400 font-medium flex items-center gap-1">
-                              <Calendar className="h-3.5 w-3.5" /> Date:
+                              <Calendar className="h-3.5 w-3.5" /> {t('date')}:
                             </span>
                             <span className="font-medium text-slate-700">{d.dispatchDate}</span>
                           </div>
@@ -939,9 +941,9 @@ export const DispatchPage = () => {
                             <div className="flex justify-between text-xs font-bold">
                               <span className="text-slate-600 flex items-center gap-1.5">
                                 <span className="h-2 w-2 rounded-full bg-amber-500"></span>
-                                <span>Empty Weight</span>
+                                <span>{t('emptyWeight')}</span>
                               </span>
-                              <span className="text-amber-700">{emptyBoxes} / {d.totalBoxCount} Boxes ({emptyPct}%)</span>
+                              <span className="text-amber-700">{emptyBoxes} / {d.totalBoxCount} {t('boxes')} ({emptyPct}%)</span>
                             </div>
                             <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
                               <div
@@ -956,9 +958,9 @@ export const DispatchPage = () => {
                             <div className="flex justify-between text-xs font-bold">
                               <span className="text-slate-600 flex items-center gap-1.5">
                                 <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-                                <span>Loaded Weight</span>
+                                <span>{t('loadedWeight')}</span>
                               </span>
-                              <span className="text-emerald-700">{loadedBoxes} / {d.totalBoxCount} Boxes ({loadedPct}%)</span>
+                              <span className="text-emerald-700">{loadedBoxes} / {d.totalBoxCount} {t('boxes')} ({loadedPct}%)</span>
                             </div>
                             <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
                               <div
@@ -972,16 +974,16 @@ export const DispatchPage = () => {
                         {/* Key Metrics Grid */}
                         <div className="grid grid-cols-3 gap-2 text-center py-2 border-t border-slate-100">
                           <div className="bg-slate-50 p-1.5 rounded-xl border border-slate-100">
-                            <span className="text-[9px] uppercase font-extrabold text-slate-400 block">Net Wt</span>
-                            <span className="text-xs font-black text-slate-900">{totalWeight.toFixed(2)} kg</span>
+                            <span className="text-[10px] sm:text-[9px] uppercase font-extrabold text-slate-500 block">{t('netWeight')}</span>
+                            <span className="text-sm sm:text-xs font-black text-slate-900">{totalWeight.toFixed(2)} kg</span>
                           </div>
                           <div className="bg-emerald-50 p-1.5 rounded-xl border border-emerald-100">
-                            <span className="text-[9px] uppercase font-extrabold text-emerald-700 block">Birds</span>
-                            <span className="text-xs font-black text-emerald-900">{totalBirds}</span>
+                            <span className="text-[10px] sm:text-[9px] uppercase font-extrabold text-emerald-700 block">{t('birds')}</span>
+                            <span className="text-sm sm:text-xs font-black text-emerald-900">{totalBirds}</span>
                           </div>
                           <div className="bg-teal-50 p-1.5 rounded-xl border border-teal-100">
-                            <span className="text-[9px] uppercase font-extrabold text-teal-700 block">Avg Wt</span>
-                            <span className="text-xs font-black text-teal-900">{avgWeight} kg</span>
+                            <span className="text-[10px] sm:text-[9px] uppercase font-extrabold text-teal-700 block">{t('avgWeight')}</span>
+                            <span className="text-sm sm:text-xs font-black text-teal-900">{avgWeight} kg</span>
                           </div>
                         </div>
                       </div>
@@ -992,10 +994,10 @@ export const DispatchPage = () => {
                           e.stopPropagation();
                           handleOpenVehicleDetailPage(d);
                         }}
-                        className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-all cursor-pointer"
+                        className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-2.5 text-sm sm:text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-all cursor-pointer"
                       >
                         <Scale className="h-4 w-4" />
-                        <span>Open Set Weighing ({dSets.length} Sets)</span>
+                        <span>{t('openSetWeighing')} ({dSets.length} {t('sets')})</span>
                         <ChevronRight className="h-4 w-4" />
                       </button>
                     </div>
@@ -1017,16 +1019,16 @@ export const DispatchPage = () => {
             <div className="flex items-center justify-between">
               <button
                 onClick={handleBackToGrid}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm sm:text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition-colors"
               >
                 <ArrowLeft className="h-4 w-4 text-slate-500" />
-                <span>Back to Vehicles</span>
+                <span>{t('backToVehicles')}</span>
               </button>
               {(() => {
                 const isDetailCompleted = checkIsDispatchCompleted(activeDispatch);
                 return (
                   <Badge variant={isDetailCompleted ? 'Completed' : 'In Progress'}>
-                    {isDetailCompleted ? 'Completed' : 'In Progress'}
+                    {isDetailCompleted ? t('completed') : t('inProgress')}
                   </Badge>
                 );
               })()}
@@ -1038,13 +1040,13 @@ export const DispatchPage = () => {
                 <h1 className="text-base sm:text-xl font-black tracking-tight text-slate-900 break-words hidden sm:block">
                   {activeDispatch.vehicleName || `Trader (${activeDispatch.vehicleNumber})`}
                 </h1>
-                <p className="text-xs font-semibold text-slate-600">
+                <p className="text-sm sm:text-xs font-semibold text-slate-600">
                   Vehicle #: <strong className="text-slate-900">{activeDispatch.vehicleNumber}</strong> • Driver: <strong className="text-slate-900">{activeDispatch.driverName}</strong> {activeDispatch.driverMobileNumber ? `(${activeDispatch.driverMobileNumber})` : ''}
                 </p>
               </div>
 
               {/* Action Buttons Row */}
-              <div className="grid grid-cols-3 gap-2 pt-1 sm:pt-0 sm:flex sm:items-center sm:gap-2">
+              <div className="grid grid-cols-3 gap-1.5 w-full sm:w-auto sm:flex sm:items-center sm:gap-2 pt-1 sm:pt-0">
                 <button
                   onClick={() => {
                     setDispatchHeader({
@@ -1058,26 +1060,26 @@ export const DispatchPage = () => {
                     });
                     setShowHeaderForm(true);
                   }}
-                  className="flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white py-2 px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
+                  className="w-full flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white py-2 px-1.5 sm:px-2.5 text-xs sm:text-sm font-black text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs whitespace-nowrap"
                 >
-                  <Edit className="h-3.5 w-3.5 text-slate-500" />
-                  <span>Edit Setup</span>
+                  <Edit className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                  <span>{t('editSetup')}</span>
                 </button>
 
                 <button
                   onClick={() => setShowInvoiceModal(true)}
-                  className="flex items-center justify-center gap-1 rounded-xl bg-slate-900 py-2 px-2.5 text-xs font-bold text-white shadow-sm hover:bg-slate-800 transition-colors"
+                  className="w-full flex items-center justify-center gap-1 rounded-xl bg-slate-900 py-2 px-1.5 sm:px-2.5 text-xs sm:text-sm font-black text-white shadow-sm hover:bg-slate-800 transition-colors whitespace-nowrap"
                 >
-                  <FileText className="h-3.5 w-3.5 text-emerald-400" />
-                  <span>Invoice</span>
+                  <FileText className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>{t('invoice')}</span>
                 </button>
 
                 <button
                   onClick={handleOpenCreateSetForm}
-                  className="flex items-center justify-center gap-1 rounded-xl bg-emerald-600 py-2 px-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-all active:scale-95"
+                  className="w-full flex items-center justify-center gap-1 rounded-xl bg-emerald-600 py-2 px-1.5 sm:px-2.5 text-xs sm:text-sm font-black text-white shadow-sm hover:bg-emerald-700 transition-all active:scale-95 whitespace-nowrap"
                 >
-                  <Plus className="h-4 w-4" />
-                  <span>Create Set</span>
+                  <Plus className="h-3.5 w-3.5 shrink-0" />
+                  <span>{t('createSet')}</span>
                 </button>
               </div>
             </div>
@@ -1086,21 +1088,20 @@ export const DispatchPage = () => {
           {/* Dispatched KPI Summary Cards */}
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             <div className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-2xs">
-              <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Total Net Weight</span>
-              <span className="text-lg sm:text-xl font-black text-slate-900">{totalNetWeight.toFixed(2)} <span className="text-xs font-medium text-slate-500">kg</span></span>
+              <span className="text-xs uppercase tracking-wider text-slate-500 font-extrabold block mb-1">{t('totalNetWeight')}</span>
+              <span className="text-xl sm:text-xl font-black text-slate-900">{totalNetWeight.toFixed(2)} <span className="text-sm sm:text-xs font-medium text-slate-500">kg</span></span>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-2xs">
-              <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Birds Dispatched</span>
-              <span className="text-lg sm:text-xl font-black text-emerald-700">{totalDispatchedBirds} <span className="text-xs font-medium text-slate-500">birds</span></span>
+              <span className="text-xs uppercase tracking-wider text-slate-500 font-extrabold block mb-1">{t('birdsDispatched')}</span>
+              <span className="text-xl sm:text-xl font-black text-emerald-700">{totalDispatchedBirds} <span className="text-sm sm:text-xs font-medium text-slate-500">{t('birds')}</span></span>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-2xs">
-              <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Average Bird Weight</span>
-              <span className="text-lg sm:text-xl font-black text-teal-700">{avgBirdWeight} <span className="text-xs font-medium text-slate-500">kg/bird</span></span>
+              <span className="text-xs uppercase tracking-wider text-slate-500 font-extrabold block mb-1">{t('averageBirdWeight')}</span>
+              <span className="text-xl sm:text-xl font-black text-teal-700">{avgBirdWeight} <span className="text-sm sm:text-xs font-medium text-slate-500">kg/{language === 'ta' ? 'கோழி' : 'bird'}</span></span>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 shadow-2xs">
-              <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 font-bold block mb-1">Weighed Boxes</span>
-              <span className="text-lg sm:text-xl font-black text-slate-900">{totalWeighedBoxes} <span className="text-xs font-medium text-slate-500">/ {activeDispatch.totalBoxCount} boxes</span></span>
-              <span className="text-[11px] text-slate-500 font-medium block mt-0.5">{loadedBoxesCount} loaded</span>
+              <span className="text-xs uppercase tracking-wider text-slate-500 font-extrabold block mb-1">{t('weighedBoxes')}</span>
+              <span className="text-xl sm:text-xl font-black text-slate-900">{totalWeighedBoxes} <span className="text-sm sm:text-xs font-medium text-slate-500">/ {activeDispatch.totalBoxCount} {t('boxes')}</span></span>
             </div>
           </div>
 
@@ -1108,11 +1109,11 @@ export const DispatchPage = () => {
           <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm space-y-4">
             <div className="space-y-3 border-b border-slate-100 pb-3">
               {/* Top Row: Title & Subtitle on Left, Sort Dropdown on Right */}
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
-                    <Layers className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 shrink-0" />
-                    <span>Box Sets History</span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-2">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 shrink-0" />
+                  <h3 className="text-base sm:text-lg font-black tracking-tight text-slate-900 whitespace-nowrap">
+                    {t('boxSetsHistory')}
                   </h3>
                 </div>
 
@@ -1123,12 +1124,12 @@ export const DispatchPage = () => {
                     onChange={(e) => setSetSortBy(e.target.value)}
                     icon={ArrowUpDown}
                     options={[
-                      { value: 'pending_first', label: 'Sort: Pending First' },
-                      { value: 'last_updated', label: 'Sort: Last Updated' },
-                      { value: 'box_asc', label: 'Sort: Set # (1 → N)' },
-                      { value: 'box_desc', label: 'Sort: Set # (N → 1)' },
-                      { value: 'boxes_count', label: 'Sort: Box Count (High → Low)' },
-                      { value: 'weight_desc', label: 'Sort: Net Wt (High → Low)' },
+                      { value: 'pending_first', label: language === 'ta' ? 'வரிசை: நிலுவையில்' : 'Sort: Pending First' },
+                      { value: 'last_updated', label: language === 'ta' ? 'வரிசை: புதுப்பிக்கப்பட்டவை' : 'Sort: Last Updated' },
+                      { value: 'box_asc', label: language === 'ta' ? 'வரிசை: தொகுதி # (1 → N)' : 'Sort: Set # (1 → N)' },
+                      { value: 'box_desc', label: language === 'ta' ? 'வரிசை: தொகுதி # (N → 1)' : 'Sort: Set # (N → 1)' },
+                      { value: 'boxes_count', label: language === 'ta' ? 'வரிசை: பெட்டி எண்ணிக்கை' : 'Sort: Box Count' },
+                      { value: 'weight_desc', label: language === 'ta' ? 'வரிசை: நிகர எடை' : 'Sort: Net Wt' },
                     ]}
                   />
                 </div>
@@ -1138,33 +1139,33 @@ export const DispatchPage = () => {
               <div className="grid grid-cols-3 gap-1 bg-slate-100/80 p-1 rounded-2xl w-full">
                 <button
                   onClick={() => setSetFilter('all')}
-                  className={`py-1.5 px-3 text-xs font-extrabold rounded-xl transition-all text-center whitespace-nowrap ${
+                  className={`py-2 px-1 sm:px-3 text-xs sm:text-sm font-black rounded-xl transition-all text-center whitespace-nowrap overflow-hidden ${
                     setFilter === 'all'
                       ? 'bg-white text-slate-900 shadow-2xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  All ({boxSets.length})
+                  {t('all')} ({boxSets.length})
                 </button>
                 <button
                   onClick={() => setSetFilter('pending')}
-                  className={`py-1.5 px-3 text-xs font-extrabold rounded-xl transition-all text-center whitespace-nowrap ${
+                  className={`py-2 px-1 sm:px-3 text-xs sm:text-sm font-black rounded-xl transition-all text-center whitespace-nowrap overflow-hidden ${
                     setFilter === 'pending'
                       ? 'bg-white text-amber-800 shadow-2xs'
                       : 'text-amber-800 hover:text-amber-900'
                   }`}
                 >
-                  Pending ({pendingBoxSets.length})
+                  {t('pending')} ({pendingBoxSets.length})
                 </button>
                 <button
                   onClick={() => setSetFilter('loaded')}
-                  className={`py-1.5 px-3 text-xs font-extrabold rounded-xl transition-all text-center whitespace-nowrap ${
+                  className={`py-2 px-1 sm:px-3 text-xs sm:text-sm font-black rounded-xl transition-all text-center whitespace-nowrap overflow-hidden ${
                     setFilter === 'loaded'
                       ? 'bg-white text-emerald-800 shadow-2xs'
                       : 'text-emerald-800 hover:text-emerald-900'
                   }`}
                 >
-                  Loaded ({loadedBoxSets.length})
+                  {t('loaded')} ({loadedBoxSets.length})
                 </button>
               </div>
             </div>
@@ -1175,16 +1176,16 @@ export const DispatchPage = () => {
                 <div className="py-8 text-center text-xs text-slate-400 space-y-2 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
                   <p>
                     {setFilter === 'pending'
-                      ? 'No pending sets! All recorded box sets have loaded weight entered.'
+                      ? (language === 'ta' ? 'நிலுவையில் உள்ள பெட்டிகள் இல்லை!' : 'No pending sets! All recorded box sets have loaded weight entered.')
                       : setFilter === 'loaded'
-                      ? 'No loaded sets recorded yet. Enter gross weight on pending sets.'
-                      : 'No box sets recorded for this vehicle yet.'}
+                      ? (language === 'ta' ? 'நிறைந்த பெட்டிகள் இன்னும் இல்லை.' : 'No loaded sets recorded yet. Enter gross weight on pending sets.')
+                      : (language === 'ta' ? 'தொகுதிகள் ஏதும் இல்லை.' : 'No box sets recorded for this vehicle yet.')}
                   </p>
                   <button
                     onClick={handleOpenCreateSetForm}
                     className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-all"
                   >
-                    <Plus className="h-4 w-4" /> Create First Set (Tare Wt)
+                    <Plus className="h-4 w-4" /> {t('createSet')}
                   </button>
                 </div>
               ) : (
@@ -1195,14 +1196,14 @@ export const DispatchPage = () => {
                     <div key={s.id} className="rounded-2xl border border-slate-200/90 bg-white p-4 space-y-3 shadow-2xs hover:shadow-xs transition-all">
                       <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-black text-slate-900">Box Set #{s.boxSetNumber}</span>
+                          <span className="text-sm font-black text-slate-900">{t('boxSetNumber')} #{s.boxSetNumber}</span>
                           <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg">
-                            {s.boxesInSet || 5} Boxes
+                            {s.boxesInSet || 5} {t('boxes')}
                           </span>
                           <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
                             isPending ? 'bg-amber-50 text-amber-800 border-amber-200/80' : 'bg-emerald-50 text-emerald-800 border-emerald-200/80'
                           }`}>
-                            {isPending ? 'Pending Load Wt' : 'Loaded ✓'}
+                            {isPending ? t('pending') : `${t('loaded')} ✓`}
                           </span>
                         </div>
                         {!isReadOnly && (
@@ -1226,18 +1227,18 @@ export const DispatchPage = () => {
                       </div>
 
                       <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-100/90">
-                          <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider mb-0.5">Tare / Loaded Wt</span>
-                          <span className="font-extrabold text-slate-900 text-xs block">
-                            {s.emptyBoxWeight} kg / {isPending ? <em className="text-amber-600 font-normal italic">Pending</em> : `${s.loadedWeight} kg`}
+                        <div className="bg-slate-50 p-2.5 sm:p-3 rounded-xl border border-slate-100/90 overflow-hidden">
+                          <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider mb-0.5 whitespace-nowrap overflow-hidden text-ellipsis">{t('tareLoadedWt')}</span>
+                          <span className="font-extrabold text-slate-900 text-xs block whitespace-nowrap overflow-hidden text-ellipsis">
+                            {s.emptyBoxWeight} kg / {isPending ? <em className="text-amber-600 font-bold not-italic">{t('pending')}</em> : `${s.loadedWeight} kg`}
                           </span>
                         </div>
-                        <div className={`p-3 rounded-xl border ${isPending ? 'bg-amber-50/80 border-amber-200/60' : 'bg-emerald-50/80 border-emerald-200/60'}`}>
-                          <span className={`text-[10px] font-bold block uppercase tracking-wider mb-0.5 ${isPending ? 'text-amber-700' : 'text-emerald-700'}`}>
-                            Net Chicken Wt
+                        <div className={`p-2.5 sm:p-3 rounded-xl border overflow-hidden ${isPending ? 'bg-amber-50/80 border-amber-200/60' : 'bg-emerald-50/80 border-emerald-200/60'}`}>
+                          <span className={`text-[10px] font-bold block uppercase tracking-wider mb-0.5 whitespace-nowrap overflow-hidden text-ellipsis ${isPending ? 'text-amber-700' : 'text-emerald-700'}`}>
+                            {t('netChickenWt')}
                           </span>
-                          <span className={`font-black block ${isPending ? 'text-amber-900 text-xs' : 'text-emerald-900 text-sm'}`}>
-                            {isPending ? 'Click button below' : `${s.totalChickenWeight} kg`}
+                          <span className={`font-black block whitespace-nowrap overflow-hidden text-ellipsis ${isPending ? 'text-amber-700 text-xs font-bold' : 'text-emerald-900 text-sm'}`}>
+                            {isPending ? t('pending') : `${s.totalChickenWeight} kg`}
                           </span>
                         </div>
                       </div>
@@ -1248,12 +1249,12 @@ export const DispatchPage = () => {
                           className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 py-2.5 text-xs font-bold text-white shadow-2xs hover:from-amber-700 hover:to-orange-700 transition-all active:scale-98 cursor-pointer"
                         >
                           <Scale className="h-3.5 w-3.5" />
-                          <span>+ Enter Loaded Weight (Popup)</span>
+                          <span>+ {t('enterLoadedWeight')}</span>
                         </button>
                       ) : (
                         <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-100 text-slate-600 font-semibold">
-                          <span>Birds: <strong className="text-slate-900 font-bold">{s.chickenCount}</strong></span>
-                          <span>Avg: <strong className="text-slate-900 font-bold">{s.averageChickenWeight} kg/bird</strong></span>
+                          <span>{t('birds')}: <strong className="text-slate-900 font-bold">{s.chickenCount}</strong></span>
+                          <span>{t('avg')}: <strong className="text-slate-900 font-bold">{s.averageChickenWeight} kg/bird</strong></span>
                         </div>
                       )}
                     </div>
@@ -1267,15 +1268,15 @@ export const DispatchPage = () => {
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50/90 text-slate-600 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200/80">
                   <tr>
-                    <th className="py-3.5 px-4">Set #</th>
-                    <th className="py-3.5 px-4">Status</th>
-                    <th className="py-3.5 px-4">Boxes in Set</th>
-                    <th className="py-3.5 px-4">Empty Box Wt</th>
-                    <th className="py-3.5 px-4">Loaded Wt</th>
-                    <th className="py-3.5 px-4">Birds Count</th>
-                    <th className="py-3.5 px-4">Total Net Wt</th>
-                    <th className="py-3.5 px-4">Avg Weight</th>
-                    <th className="py-3.5 px-4 text-right">Actions</th>
+                    <th className="py-3.5 px-4">{t('boxSetNumber')} #</th>
+                    <th className="py-3.5 px-4">{t('status')}</th>
+                    <th className="py-3.5 px-4">{t('boxes')}</th>
+                    <th className="py-3.5 px-4">{t('emptyWeight')}</th>
+                    <th className="py-3.5 px-4">{t('loadedWeight')}</th>
+                    <th className="py-3.5 px-4">{t('birds')}</th>
+                    <th className="py-3.5 px-4">{t('totalNetWeight')}</th>
+                    <th className="py-3.5 px-4">{t('avgWeight')}</th>
+                    <th className="py-3.5 px-4 text-right">{t('actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium bg-white">
@@ -1283,10 +1284,10 @@ export const DispatchPage = () => {
                     <tr>
                       <td colSpan="9" className="py-8 text-center text-slate-400">
                         {setFilter === 'pending'
-                          ? 'No pending sets! All recorded box sets have loaded weight entered.'
+                          ? (language === 'ta' ? 'நிலுவையில் உள்ள பெட்டிகள் இல்லை!' : 'No pending sets! All recorded box sets have loaded weight entered.')
                           : setFilter === 'loaded'
-                          ? 'No loaded sets recorded yet. Enter gross weight on pending sets.'
-                          : 'No box sets recorded for this vehicle yet. Click + Create Set above.'}
+                          ? (language === 'ta' ? 'நிறைந்த பெட்டிகள் இன்னும் இல்லை.' : 'No loaded sets recorded yet. Enter gross weight on pending sets.')
+                          : (language === 'ta' ? 'தொகுதிகள் ஏதும் இல்லை.' : 'No box sets recorded for this vehicle yet.')}
                       </td>
                     </tr>
                   ) : (
@@ -1295,15 +1296,15 @@ export const DispatchPage = () => {
 
                       return (
                         <tr key={s.id} className="hover:bg-slate-50/70 transition-colors">
-                          <td className="py-3.5 px-4 font-bold text-slate-900">Box Set #{s.boxSetNumber}</td>
+                          <td className="py-3.5 px-4 font-bold text-slate-900">{t('boxSetNumber')} #{s.boxSetNumber}</td>
                           <td className="py-3.5 px-4">
                             <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
                               isPending ? 'bg-amber-50 text-amber-800 border-amber-200/80' : 'bg-emerald-50 text-emerald-800 border-emerald-200/80'
                             }`}>
-                              {isPending ? 'Pending Load Wt' : 'Loaded ✓'}
+                              {isPending ? t('pending') : `${t('loaded')} ✓`}
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 text-slate-700 font-bold">{s.boxesInSet || 5} Boxes</td>
+                          <td className="py-3.5 px-4 text-slate-700 font-bold">{s.boxesInSet || 5} {t('boxes')}</td>
                           <td className="py-3.5 px-4 text-slate-600">{s.emptyBoxWeight} kg</td>
                           <td className="py-3.5 px-4">
                             {isPending ? (
@@ -1311,7 +1312,7 @@ export const DispatchPage = () => {
                                 onClick={() => handleEnterLoadWeight(s)}
                                 className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer"
                               >
-                                <Plus className="h-3 w-3" /> Add Load Wt (Popup)
+                                <Plus className="h-3 w-3" /> + {t('enterLoadedWeight')}
                               </button>
                             ) : (
                               <span className="font-bold text-slate-900">{s.loadedWeight} kg</span>
@@ -1368,13 +1369,13 @@ export const DispatchPage = () => {
           setShowSetForm(false);
           setEditingBoxSetId(null);
         }}
-        title={editingBoxSetId ? `Edit Box Set #${setForm.boxSetNumber}` : `Create Box Set #${setForm.boxSetNumber}`}
+        title={editingBoxSetId ? (language === 'ta' ? `பெட்டித் தொகுதி #${setForm.boxSetNumber} ஐத் திருத்து` : `Edit Box Set #${setForm.boxSetNumber}`) : (language === 'ta' ? `பெட்டித் தொகுதி #${setForm.boxSetNumber} உருவாக்கு` : `Create Box Set #${setForm.boxSetNumber}`)}
         maxWidth="max-w-lg"
       >
         <form onSubmit={handleSaveBoxSet} className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Set Number *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'தொகுதி எண் *' : 'Set Number *'}</label>
               <input
                 type="number"
                 required
@@ -1386,7 +1387,7 @@ export const DispatchPage = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Boxes in Set (Default 5) *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'தொகுதியில் பெட்டிகள் *' : 'Boxes in Set (Default 5) *'}</label>
               <input
                 type="number"
                 required
@@ -1398,7 +1399,7 @@ export const DispatchPage = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Chickens in Set *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'தொகுதியில் எண்ணிக்கை *' : 'Chickens in Set *'}</label>
               <input
                 type="number"
                 required
@@ -1407,37 +1408,37 @@ export const DispatchPage = () => {
                 onChange={(e) => setSetForm({ ...setForm, chickenCount: Number(e.target.value) })}
                 className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-emerald-700 focus:border-emerald-600"
               />
-              <span className="text-[10px] text-slate-400 font-medium block mt-0.5">Auto: {activeDispatch?.chickenCountPerBox || 12} birds/box × {setForm.boxesInSet}</span>
+              <span className="text-[10px] text-slate-400 font-medium block mt-0.5">{language === 'ta' ? `தானியங்கி: ${activeDispatch?.chickenCountPerBox || 12} /பெட்டி × ${setForm.boxesInSet}` : `Auto: ${activeDispatch?.chickenCountPerBox || 12} birds/box × ${setForm.boxesInSet}`}</span>
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Empty Box Tare Weight (kg) *
+                {language === 'ta' ? 'வெற்றுப் பெட்டி எடை (கிலோ) *' : 'Empty Box Tare Weight (kg) *'}
               </label>
               <input
                 type="number"
                 required
                 min="0"
                 step="0.1"
-                placeholder="e.g. 25.0 kg"
+                placeholder={language === 'ta' ? 'எ.கா. 25.0 கிலோ' : 'e.g. 25.0 kg'}
                 value={setForm.emptyBoxWeight}
                 onChange={(e) => setSetForm({ ...setForm, emptyBoxWeight: e.target.value })}
                 className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
               />
-              <span className="text-[10px] text-slate-400 font-medium block mt-0.5">Auto: 5kg × {setForm.boxesInSet} boxes</span>
+              <span className="text-[10px] text-slate-400 font-medium block mt-0.5">{language === 'ta' ? `தானியங்கி: 5கிலோ × ${setForm.boxesInSet} பெட்டிகள்` : `Auto: 5kg × ${setForm.boxesInSet} boxes`}</span>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Loaded Gross Weight (kg) <span className="text-amber-600 font-medium">(Optional)</span>
+                {language === 'ta' ? 'மொத்த எடை (கிலோ)' : 'Loaded Gross Weight (kg)'} <span className="text-amber-600 font-medium">{language === 'ta' ? '(விருப்பத்தேர்வு)' : '(Optional)'}</span>
               </label>
               <input
                 type="number"
                 min="0.1"
                 step="0.1"
-                placeholder="e.g. 145.0 kg (blank for Tare only)"
+                placeholder={language === 'ta' ? 'எ.கா. 145.0 கிலோ' : 'e.g. 145.0 kg (blank for Tare only)'}
                 value={setForm.loadedWeight}
                 onChange={(e) => setSetForm({ ...setForm, loadedWeight: e.target.value })}
                 className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-black text-slate-900 focus:border-emerald-600"
@@ -1453,8 +1454,8 @@ export const DispatchPage = () => {
                 <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 flex items-start gap-2.5 text-xs text-amber-900">
                   <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold block">Stage 1: Saving Tare Weight Only ({setForm.emptyBoxWeight || 25} kg)</span>
-                    <span className="text-[11px] text-amber-700">Save empty set now and update Loaded Gross Weight later when birds are loaded.</span>
+                    <span className="font-bold block">{language === 'ta' ? `நிலை 1: வெற்று எடை மட்டும் சேமிக்கப்படுகிறது (${setForm.emptyBoxWeight || 25} கிலோ)` : `Stage 1: Saving Tare Weight Only (${setForm.emptyBoxWeight || 25} kg)`}</span>
+                    <span className="text-[11px] text-amber-700">{language === 'ta' ? 'இப்போது வெற்றுப் பெட்டிகளைச் சேமித்து, கோழிகள் ஏற்றிய பின் மொத்த எடையைப் புதுப்பிக்கலாம்.' : 'Save empty set now and update Loaded Gross Weight later when birds are loaded.'}</span>
                   </div>
                 </div>
               );
@@ -1463,11 +1464,11 @@ export const DispatchPage = () => {
             return (
               <div className="rounded-xl bg-emerald-50/70 border border-emerald-100 p-3 grid grid-cols-2 gap-3 text-xs">
                 <div>
-                  <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-700 block">Net Chicken Weight</span>
+                  <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-700 block">{language === 'ta' ? 'நிகர எடை' : 'Net Chicken Weight'}</span>
                   <span className="text-base font-black text-emerald-900">{preview.totalChickenWeight} kg</span>
                 </div>
                 <div>
-                  <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-700 block">Average Weight / Bird</span>
+                  <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-700 block">{language === 'ta' ? 'சராசரி எடை / கோழி' : 'Average Weight / Bird'}</span>
                   <span className="text-base font-black text-emerald-900">{preview.averageChickenWeight} kg</span>
                 </div>
               </div>
@@ -1483,7 +1484,7 @@ export const DispatchPage = () => {
               }}
               className="w-1/3 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
             >
-              Cancel
+              {language === 'ta' ? 'ரத்து' : 'Cancel'}
             </button>
             <button
               type="submit"
@@ -1492,12 +1493,12 @@ export const DispatchPage = () => {
             >
               <Save className="h-4 w-4" />
               {saving
-                ? 'Saving Set...'
+                ? (language === 'ta' ? 'சேமிக்கிறது...' : 'Saving Set...')
                 : editingBoxSetId
-                ? 'Update Box Set (Instantly)'
+                ? (language === 'ta' ? 'தொகுதியைப் புதுப்பி' : 'Update Box Set (Instantly)')
                 : setForm.loadedWeight
-                ? `Save Set #${setForm.boxSetNumber} (Tare + Load)`
-                : `Save Set #${setForm.boxSetNumber} (Tare Only)`}
+                ? (language === 'ta' ? `தொகுதி #${setForm.boxSetNumber} சேமி` : `Save Set #${setForm.boxSetNumber} (Tare + Load)`)
+                : (language === 'ta' ? `தொகுதி #${setForm.boxSetNumber} சேமி (வெற்று மட்டும்)` : `Save Set #${setForm.boxSetNumber} (Tare Only)`)}
             </button>
           </div>
         </form>
@@ -1511,30 +1512,30 @@ export const DispatchPage = () => {
             setShowLoadWeightModal(false);
             setLoadWeightSet(null);
           }}
-          title={`Enter Loaded Weight: Box Set #${loadWeightSet.boxSetNumber}`}
+          title={language === 'ta' ? `மொத்த எடையை உள்ளிடவும்: பெட்டித் தொகுதி #${loadWeightSet.boxSetNumber}` : `Enter Loaded Weight: Box Set #${loadWeightSet.boxSetNumber}`}
           maxWidth="max-w-md"
         >
           <form onSubmit={handleSaveQuickLoadWeight} className="space-y-4">
             {/* Set Context Pill */}
             <div className="rounded-xl bg-slate-50 p-3 border border-slate-200 grid grid-cols-3 gap-2 text-center text-xs">
               <div>
-                <span className="text-[10px] uppercase font-extrabold text-slate-400 block">Boxes</span>
-                <span className="font-bold text-slate-800">{loadWeightSet.boxesInSet || 5} Boxes</span>
+                <span className="text-[10px] uppercase font-extrabold text-slate-400 block">{language === 'ta' ? 'பெட்டிகள்' : 'Boxes'}</span>
+                <span className="font-bold text-slate-800">{loadWeightSet.boxesInSet || 5} {language === 'ta' ? 'பெட்டிகள்' : 'Boxes'}</span>
               </div>
               <div>
-                <span className="text-[10px] uppercase font-extrabold text-slate-400 block">Tare Weight</span>
+                <span className="text-[10px] uppercase font-extrabold text-slate-400 block">{language === 'ta' ? 'வெற்று எடை' : 'Tare Weight'}</span>
                 <span className="font-bold text-slate-800">{loadWeightSet.emptyBoxWeight} kg</span>
               </div>
               <div>
-                <span className="text-[10px] uppercase font-extrabold text-slate-400 block">Chickens</span>
-                <span className="font-bold text-emerald-700">{loadWeightSet.chickenCount} Birds</span>
+                <span className="text-[10px] uppercase font-extrabold text-slate-400 block">{language === 'ta' ? 'எண்ணிக்கை' : 'Chickens'}</span>
+                <span className="font-bold text-emerald-700">{loadWeightSet.chickenCount}</span>
               </div>
             </div>
 
             {/* Main Loaded Gross Weight Input */}
             <div>
               <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                Loaded Gross Weight (kg) *
+                {language === 'ta' ? 'மொத்த எடை (கிலோ) *' : 'Loaded Gross Weight (kg) *'}
               </label>
               <div className="relative">
                 <input
@@ -1543,7 +1544,7 @@ export const DispatchPage = () => {
                   autoFocus
                   min={(Number(loadWeightSet.emptyBoxWeight) + 0.1).toString()}
                   step="0.1"
-                  placeholder="e.g. 145.0 kg"
+                  placeholder={language === 'ta' ? 'எ.கா. 145.0 கிலோ' : 'e.g. 145.0 kg'}
                   value={quickLoadedWeight}
                   onChange={(e) => setQuickLoadedWeight(e.target.value)}
                   className="w-full rounded-xl border-2 border-emerald-500 bg-white py-3 px-3.5 text-base font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
@@ -1558,7 +1559,7 @@ export const DispatchPage = () => {
               if (preview.isPendingLoad) {
                 return (
                   <div className="rounded-xl bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-800 font-medium text-center">
-                    Enter the gross scale weight when all {loadWeightSet.boxesInSet || 5} boxes are loaded.
+                    {language === 'ta' ? `அனைத்து ${loadWeightSet.boxesInSet || 5} பெட்டிகளும் ஏற்றிய பின் எடையை உள்ளிடவும்.` : `Enter the gross scale weight when all ${loadWeightSet.boxesInSet || 5} boxes are loaded.`}
                   </div>
                 );
               }
@@ -1566,11 +1567,11 @@ export const DispatchPage = () => {
               return (
                 <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 grid grid-cols-2 gap-3 text-xs">
                   <div>
-                    <span className="text-[10px] uppercase font-bold text-emerald-700 block">Net Chicken Weight</span>
+                    <span className="text-[10px] uppercase font-bold text-emerald-700 block">{language === 'ta' ? 'நிகர எடை' : 'Net Chicken Weight'}</span>
                     <span className="text-base sm:text-lg font-black text-emerald-950">{preview.totalChickenWeight} kg</span>
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase font-bold text-emerald-700 block">Avg Weight / Bird</span>
+                    <span className="text-[10px] uppercase font-bold text-emerald-700 block">{language === 'ta' ? 'சராசரி எடை / கோழி' : 'Avg Weight / Bird'}</span>
                     <span className="text-base sm:text-lg font-black text-emerald-950">{preview.averageChickenWeight} kg</span>
                   </div>
                 </div>
@@ -1586,7 +1587,7 @@ export const DispatchPage = () => {
                 }}
                 className="w-1/3 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
               >
-                Cancel
+                {language === 'ta' ? 'ரத்து' : 'Cancel'}
               </button>
               <button
                 type="submit"
@@ -1594,7 +1595,7 @@ export const DispatchPage = () => {
                 className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-700 disabled:opacity-50 transition-colors"
               >
                 <Save className="h-4 w-4" />
-                <span>{saving ? 'Saving...' : 'Save Loaded Weight (Instantly)'}</span>
+                <span>{saving ? (language === 'ta' ? 'சேமிக்கிறது...' : 'Saving...') : (language === 'ta' ? 'எடையைச் சேமி' : 'Save Loaded Weight (Instantly)')}</span>
               </button>
             </div>
           </form>
@@ -1606,7 +1607,7 @@ export const DispatchPage = () => {
         <Modal
           isOpen={showExtraSetPromptModal}
           onClose={() => setShowExtraSetPromptModal(false)}
-          title={`Target Box Count Reached (${activeDispatch.totalBoxCount} / ${activeDispatch.totalBoxCount} Boxes)`}
+          title={language === 'ta' ? `இலக்கு பெட்டி எண்ணிக்கை அடைந்தது (${activeDispatch.totalBoxCount} / ${activeDispatch.totalBoxCount} பெட்டிகள்)` : `Target Box Count Reached (${activeDispatch.totalBoxCount} / ${activeDispatch.totalBoxCount} Boxes)`}
           maxWidth="max-w-md"
         >
           <div className="space-y-4 text-center">
@@ -1616,15 +1617,15 @@ export const DispatchPage = () => {
 
             <div className="space-y-1.5">
               <h3 className="text-base font-bold text-slate-900">
-                All {activeDispatch.totalBoxCount} Target Boxes Weighed
+                {language === 'ta' ? `அனைத்து ${activeDispatch.totalBoxCount} பெட்டிகளும் அளவிடப்பட்டன` : `All ${activeDispatch.totalBoxCount} Target Boxes Weighed`}
               </h3>
               <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                You have reached the setup target of <strong>{activeDispatch.totalBoxCount} boxes</strong> for vehicle <strong>{activeDispatch.vehicleNumber}</strong>. To add an extra set of boxes, please update the vehicle total box count.
+                {language === 'ta' ? `வாகனம் ${activeDispatch.vehicleNumber}-க்கான ${activeDispatch.totalBoxCount} பெட்டிகள் இலக்கை அடைந்துவிட்டீர்கள்.` : `You have reached the setup target of ${activeDispatch.totalBoxCount} boxes for vehicle ${activeDispatch.vehicleNumber}. To add an extra set of boxes, please update the vehicle total box count.`}
               </p>
             </div>
 
             <div className="rounded-xl bg-slate-50 p-3 border border-slate-200 text-xs text-slate-700 font-medium">
-              Current Target: <strong className="text-slate-900">{activeDispatch.totalBoxCount} Boxes</strong> → New Suggested: <strong className="text-emerald-700">{activeDispatch.totalBoxCount + 5} Boxes</strong> (+5 boxes)
+              {language === 'ta' ? 'தற்போதைய இலக்கு:' : 'Current Target:'} <strong className="text-slate-900">{activeDispatch.totalBoxCount} {language === 'ta' ? 'பெட்டிகள்' : 'Boxes'}</strong> → {language === 'ta' ? 'புதிய பரிந்துரை:' : 'New Suggested:'} <strong className="text-emerald-700">{activeDispatch.totalBoxCount + 5} {language === 'ta' ? 'பெட்டிகள்' : 'Boxes'}</strong> (+5)
             </div>
 
             <div className="flex gap-2 pt-2">
@@ -1633,7 +1634,7 @@ export const DispatchPage = () => {
                 onClick={() => setShowExtraSetPromptModal(false)}
                 className="w-1/3 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
               >
-                Cancel
+                {language === 'ta' ? 'ரத்து' : 'Cancel'}
               </button>
               <button
                 type="button"
@@ -1641,7 +1642,7 @@ export const DispatchPage = () => {
                 className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-700 transition-colors"
               >
                 <Edit className="h-4 w-4" />
-                <span>Update Setup (+5 Boxes)</span>
+                <span>{language === 'ta' ? 'புதுப்பி (+5 பெட்டிகள்)' : 'Update Setup (+5 Boxes)'}</span>
               </button>
             </div>
           </div>
@@ -1652,29 +1653,29 @@ export const DispatchPage = () => {
       <Modal
         isOpen={showHeaderForm}
         onClose={() => setShowHeaderForm(false)}
-        title={activeDispatch ? `Edit Dispatch: ${activeDispatch.vehicleName || activeDispatch.vehicleNumber}` : "Setup New Dispatch Card"}
+        title={activeDispatch ? (language === 'ta' ? `அனுப்புதலைத் திருத்து: ${activeDispatch.vehicleName || activeDispatch.vehicleNumber}` : `Edit Dispatch: ${activeDispatch.vehicleName || activeDispatch.vehicleNumber}`) : (language === 'ta' ? "புதிய வாகன அனுப்புதல் அமைவு" : "Setup New Dispatch Card")}
       >
         <form onSubmit={handleSaveDispatchHeader} className="space-y-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Trader Name *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'வியாபாரி பெயர் *' : 'Trader Name *'}</label>
               <input
                 type="text"
                 required
                 value={dispatchHeader.vehicleName}
                 onChange={(e) => setDispatchHeader({ ...dispatchHeader, vehicleName: e.target.value })}
-                placeholder="e.g. Sri Amman Poultry Traders"
+                placeholder={language === 'ta' ? 'எ.கா. ஸ்ரீ அம்மன் கோழிப் பண்ணை' : 'e.g. Sri Amman Poultry Traders'}
                 className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Vehicle Number *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'வாகன எண் *' : 'Vehicle Number *'}</label>
               <input
                 type="text"
                 required
                 value={dispatchHeader.vehicleNumber}
                 onChange={(e) => setDispatchHeader({ ...dispatchHeader, vehicleNumber: e.target.value })}
-                placeholder="e.g. TN-38-C-5544"
+                placeholder={language === 'ta' ? 'எ.கா. TN-38-C-5544' : 'e.g. TN-38-C-5544'}
                 className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
               />
             </div>
@@ -1682,24 +1683,24 @@ export const DispatchPage = () => {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Driver Name *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'ஓட்டுநர் பெயர் *' : 'Driver Name *'}</label>
               <input
                 type="text"
                 required
                 value={dispatchHeader.driverName}
                 onChange={(e) => setDispatchHeader({ ...dispatchHeader, driverName: e.target.value })}
-                placeholder="e.g. Karthik"
+                placeholder={language === 'ta' ? 'எ.கா. கார்த்திக்' : 'e.g. Karthik'}
                 className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Driver Mobile Number *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'ஓட்டுநர் கைபேசி எண் *' : 'Driver Mobile Number *'}</label>
               <input
                 type="tel"
                 required
                 value={dispatchHeader.driverMobileNumber}
                 onChange={(e) => setDispatchHeader({ ...dispatchHeader, driverMobileNumber: e.target.value })}
-                placeholder="e.g. 9842101234"
+                placeholder={language === 'ta' ? 'எ.கா. 9842101234' : 'e.g. 9842101234'}
                 className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
               />
             </div>
@@ -1707,7 +1708,7 @@ export const DispatchPage = () => {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Dispatch Date *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'அனுப்பிய தேதி *' : 'Dispatch Date *'}</label>
               <CustomDatePicker
                 value={dispatchHeader.dispatchDate}
                 onChange={(dStr) => setDispatchHeader({ ...dispatchHeader, dispatchDate: dStr })}
@@ -1716,7 +1717,7 @@ export const DispatchPage = () => {
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Total Box Count *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'மொத்த பெட்டி எண்ணிக்கை *' : 'Total Box Count *'}</label>
               <input
                 type="number"
                 required
@@ -1725,10 +1726,10 @@ export const DispatchPage = () => {
                 onChange={(e) => setDispatchHeader({ ...dispatchHeader, totalBoxCount: Number(e.target.value) })}
                 className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
               />
-              <span className="text-[10px] text-emerald-700 font-medium block mt-0.5">Increase count here to add extra box sets</span>
+              <span className="text-[10px] text-emerald-700 font-medium block mt-0.5">{language === 'ta' ? 'கூடுதல் பெட்டிகளைச் சேர்க்க எண்ணிக்கையை அதிகரிக்கவும்' : 'Increase count here to add extra box sets'}</span>
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Birds Per Box *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'ஒரு பெட்டிக்கு எண்ணிக்கை *' : 'Birds Per Box *'}</label>
               <input
                 type="number"
                 required
@@ -1746,7 +1747,7 @@ export const DispatchPage = () => {
               onClick={() => setShowHeaderForm(false)}
               className="w-1/3 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
             >
-              Cancel
+              {language === 'ta' ? 'ரத்து' : 'Cancel'}
             </button>
             <button
               type="submit"
@@ -1754,7 +1755,7 @@ export const DispatchPage = () => {
               className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
             >
               <Save className="h-4 w-4" />
-              {saving ? 'Saving Setup...' : activeDispatch ? 'Update Setup & Create Extra Set' : 'Save & Open Vehicle Page'}
+              {saving ? (language === 'ta' ? 'சேமிக்கிறது...' : 'Saving Setup...') : activeDispatch ? (language === 'ta' ? 'அமைப்பைப் புதுப்பி' : 'Update Setup & Create Extra Set') : (language === 'ta' ? 'சேமித்து வாகனப் பக்கத்தைத் திறக்க' : 'Save & Open Vehicle Page')}
             </button>
           </div>
         </form>

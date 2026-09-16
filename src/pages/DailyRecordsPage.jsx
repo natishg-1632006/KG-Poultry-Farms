@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { dbGetBatches, dbGetDailyRecords, dbSaveDailyRecord, dbDeleteDailyRecord, dbUpdateBatchFeedStockPool, dbLogAuditEvent } from '../services/dbService';
 import { calculateRemainingChickens, validateRecordDate, deductFeedStock, bagsToKg, kgToBags } from '../utils/calculations';
 import { KG_PER_BAG, FEED_CONSUMPTION_TARGETS, AVERAGE_WEIGHT_TARGETS } from '../constants/companyTargets';
@@ -13,6 +14,7 @@ import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
 export const DailyRecordsPage = () => {
   const { userProfile, isFarmer } = useAuth();
+  const { t, language } = useLanguage();
   const historySectionRef = useRef(null);
   const [batches, setBatches] = useState([]);
   const [selectedBatchId, setSelectedBatchId] = useState('');
@@ -407,7 +409,7 @@ export const DailyRecordsPage = () => {
       {/* Page Header with Action Button */}
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900 shrink-0">
-          Daily Farm Records
+          {t('dailyFarmRecords')}
         </h1>
         <div className="flex items-center gap-2 shrink-0">
           <button
@@ -415,7 +417,7 @@ export const DailyRecordsPage = () => {
             className="hidden sm:inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-2xs cursor-pointer"
           >
             <Target className="h-4 w-4 text-emerald-600 shrink-0" />
-            <span>{showTargetsTable ? 'Hide Targets' : 'Target Standards'}</span>
+            <span>{showTargetsTable ? 'Hide Targets' : t('targetStandards')}</span>
           </button>
 
           {!isReadOnly && (
@@ -424,7 +426,7 @@ export const DailyRecordsPage = () => {
               className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs font-bold text-white shadow-sm transition-all active:scale-95 shrink-0 whitespace-nowrap cursor-pointer"
             >
               <Plus className="h-4 w-4 shrink-0" />
-              <span>Record Daily Log</span>
+              <span>{t('recordDailyLog')}</span>
             </button>
           )}
         </div>
@@ -501,27 +503,27 @@ export const DailyRecordsPage = () => {
       {/* Last Updated Record KPI Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Last Entry Date"
+          title={t('lastEntryDate')}
           value={lastRecord ? lastRecord.recordDate : 'No Entries'}
-          subtext={lastRecord ? 'Most recent record date' : 'No daily records logged yet'}
+          subtext={lastRecord ? t('mostRecentRecordDate') : 'No daily records logged yet'}
           icon={Calendar}
           color="emerald"
         />
         <StatCard
-          title="Last Daily Mortality"
+          title={t('lastDailyMortality')}
           value={lastRecord ? `${lastRecord.mortalityCount}` : '0'}
           subtext={lastRecord ? `Logged on ${lastRecord.recordDate}` : 'No mortality logged'}
           icon={AlertCircle}
           color="amber"
         />
         <StatCard
-          title="Last Feed Consumed"
+          title={t('lastFeedConsumed')}
           statsBreakdown={
             lastRecord
               ? [
-                  { label: 'CONSUMED', value: `${lastRecordBags} Bags${lastRecordLooseKg > 0 ? ` & ${lastRecordLooseKg} kg` : ''}`, labelColor: 'text-emerald-600', valueColor: 'text-slate-900' },
-                  { label: 'EAT / BIRD', value: `${lastRecordPerBirdGram} g`, labelColor: 'text-orange-600', valueColor: 'text-orange-600' },
-                  { label: 'TARGET', value: `${lastRecordTargetGram} g`, labelColor: 'text-blue-600', valueColor: 'text-blue-600' }
+                  { label: t('consumed'), value: `${lastRecordBags} Bags${lastRecordLooseKg > 0 ? ` + ${lastRecordLooseKg}kg` : ''}`, labelColor: 'text-emerald-600', valueColor: 'text-slate-900' },
+                  { label: t('eatBird'), value: `${lastRecordPerBirdGram} g`, labelColor: 'text-orange-600', valueColor: 'text-orange-600' },
+                  { label: t('target'), value: `${lastRecordTargetGram} g`, labelColor: 'text-blue-600', valueColor: 'text-blue-600' }
                 ]
               : null
           }
@@ -531,13 +533,13 @@ export const DailyRecordsPage = () => {
           color="blue"
         />
         <StatCard
-          title="Last Avg Weight"
+          title={t('lastAvgWeight')}
           statsBreakdown={
             lastRecord
               ? [
-                  { label: 'ACTUAL', value: `${lastRecord.averageWeight} g`, labelColor: 'text-slate-600', valueColor: 'text-slate-900' },
-                  { label: 'TARGET', value: `${lastRecordTargetWeightGram} g`, labelColor: 'text-blue-600', valueColor: 'text-blue-600' },
-                  { label: 'DIFF', value: `${lastRecordWeightDiff > 0 ? '+' : ''}${lastRecordWeightDiff} g`, labelColor: lastRecordWeightDiff < 0 ? 'text-rose-600' : 'text-emerald-600', valueColor: lastRecordWeightDiff < 0 ? 'text-rose-600' : 'text-emerald-600' }
+                  { label: t('actual'), value: `${lastRecord.averageWeight} g`, labelColor: 'text-slate-600', valueColor: 'text-slate-900' },
+                  { label: t('target'), value: `${lastRecordTargetWeightGram} g`, labelColor: 'text-blue-600', valueColor: 'text-blue-600' },
+                  { label: t('diff'), value: `${lastRecordWeightDiff > 0 ? '+' : ''}${lastRecordWeightDiff} g`, labelColor: lastRecordWeightDiff < 0 ? 'text-rose-600' : 'text-emerald-600', valueColor: lastRecordWeightDiff < 0 ? 'text-rose-600' : 'text-emerald-600' }
                 ]
               : null
           }
@@ -570,7 +572,7 @@ export const DailyRecordsPage = () => {
       <Modal
         isOpen={showForm}
         onClose={() => setShowForm(false)}
-        title={recordsMap[formData.recordDate] ? "Update Daily Record" : "New Daily Farm Entry"}
+        title={recordsMap[formData.recordDate] ? (language === 'ta' ? "தினசரி பதிவைப் புதுப்பிக்கவும்" : "Update Daily Record") : (language === 'ta' ? "புதிய தினசரி பண்ணைப் பதிவு" : "New Daily Farm Entry")}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           {errorMsg && (
@@ -581,7 +583,7 @@ export const DailyRecordsPage = () => {
           )}
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Record Date *</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'பதிவு தேதி *' : 'Record Date *'}</label>
             <CustomDatePicker
               value={formData.recordDate}
               min={selectedBatch?.chickArrivalDate}
@@ -594,7 +596,7 @@ export const DailyRecordsPage = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Mortality Count *</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'இறப்பு எண்ணிக்கை *' : 'Mortality Count *'}</label>
             <input
               type="number"
               required
@@ -602,22 +604,22 @@ export const DailyRecordsPage = () => {
               disabled={isReadOnly}
               value={formData.mortalityCount}
               onChange={(e) => setFormData({ ...formData, mortalityCount: e.target.value })}
-              placeholder="e.g. 0"
+              placeholder={language === 'ta' ? 'எ.கா. 0' : 'e.g. 0'}
               className="w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
             />
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-1 gap-2">
-              <label className="block text-xs font-bold text-slate-700">Feed Consumption *</label>
-              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 whitespace-nowrap shrink-0">
-                Target: ~{recommendedBags} Bags ({targetGramPerBird}g/bird)
+            <div className="flex flex-wrap items-center justify-between mb-1 gap-1.5">
+              <label className="block text-xs font-bold text-slate-700">{language === 'ta' ? 'தீவனப் பயன்பாடு *' : 'Feed Consumption *'}</label>
+              <span className="text-[10px] sm:text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 whitespace-nowrap">
+                {language === 'ta' ? `இலக்கு: ~${recommendedBags} பைகள் (${targetGramPerBird}g)` : `Target: ~${recommendedBags} Bags (${targetGramPerBird}g/bird)`}
               </span>
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Feed Bags Used (Whole Bags) *</label>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">{language === 'ta' ? 'பயன்படுத்திய தீவனப் பைகள் *' : 'Feed Bags Used (Whole Bags) *'}</label>
                 <input
                   type="number"
                   min="0"
@@ -625,13 +627,13 @@ export const DailyRecordsPage = () => {
                   disabled={isReadOnly}
                   value={formData.feedConsumptionBags}
                   onChange={(e) => setFormData({ ...formData, feedConsumptionBags: e.target.value })}
-                  placeholder="e.g. 2"
+                  placeholder={language === 'ta' ? 'எ.கா. 2' : 'e.g. 2'}
                   className="w-full rounded-xl border border-slate-200 py-2 px-3 text-sm font-bold text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Loose Feed (Kg) (Optional)</label>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">{language === 'ta' ? 'கூடுதல் தீவனம் (கிலோ) (விருப்பத்தேர்வு)' : 'Loose Feed (Kg) (Optional)'}</label>
                 <input
                   type="number"
                   min="0"
@@ -640,29 +642,29 @@ export const DailyRecordsPage = () => {
                   disabled={isReadOnly}
                   value={formData.additionalLooseKg}
                   onChange={(e) => setFormData({ ...formData, additionalLooseKg: e.target.value })}
-                  placeholder="e.g. 15"
+                  placeholder={language === 'ta' ? 'எ.கா. 15' : 'e.g. 15'}
                   className="w-full rounded-xl border border-slate-200 py-2 px-3 text-sm font-bold text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
                 />
               </div>
             </div>
 
-            <div className="mt-2 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 border border-slate-200 text-xs">
-              <span className="text-slate-500 font-bold">Total Feed Consumed:</span>
+            <div className="mt-2 flex flex-wrap items-center justify-between rounded-xl bg-slate-50 px-3 py-2 border border-slate-200 text-xs gap-1">
+              <span className="text-slate-500 font-bold">{language === 'ta' ? 'மொத்த தீவனம்:' : 'Total Feed Consumed:'}</span>
               <span className="font-black text-emerald-700">
-                {Number(formData.feedConsumptionBags || 0)} Bags
-                {Number(formData.additionalLooseKg || 0) > 0 ? ` & ${formData.additionalLooseKg} kg` : ''}
+                {Number(formData.feedConsumptionBags || 0)} {language === 'ta' ? 'பைகள்' : 'Bags'}
+                {Number(formData.additionalLooseKg || 0) > 0 ? (language === 'ta' ? ` & ${formData.additionalLooseKg} கிலோ` : ` & ${formData.additionalLooseKg} kg`) : ''}
                 <span className="ml-1 text-[11px] font-semibold text-slate-500">
-                  ({(Number(formData.feedConsumptionBags || 0) * KG_PER_BAG) + Number(formData.additionalLooseKg || 0)} kg total)
+                  ({(Number(formData.feedConsumptionBags || 0) * KG_PER_BAG) + Number(formData.additionalLooseKg || 0)} {language === 'ta' ? 'கிலோ மொத்தம்' : 'kg total'})
                 </span>
               </span>
             </div>
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-1 gap-2">
-              <label className="block text-xs font-bold text-slate-700">Average Chicken Weight (grams) *</label>
-              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 whitespace-nowrap shrink-0">
-                Target: ~{targetWeightGram} g
+            <div className="flex flex-wrap items-center justify-between mb-1 gap-1.5">
+              <label className="block text-xs font-bold text-slate-700">{language === 'ta' ? 'சராசரி எடை (கிராம்) *' : 'Average Chicken Weight (grams) *'}</label>
+              <span className="text-[10px] sm:text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 whitespace-nowrap">
+                {language === 'ta' ? `இலக்கு: ~${targetWeightGram} கி` : `Target: ~${targetWeightGram} g`}
               </span>
             </div>
             <input
@@ -673,7 +675,7 @@ export const DailyRecordsPage = () => {
               disabled={isReadOnly}
               value={formData.averageWeight}
               onChange={(e) => setFormData({ ...formData, averageWeight: e.target.value })}
-              placeholder="e.g. 58"
+              placeholder={language === 'ta' ? 'எ.கா. 58' : 'e.g. 58'}
               className="w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
             />
           </div>
@@ -685,7 +687,7 @@ export const DailyRecordsPage = () => {
                 onClick={() => setShowForm(false)}
                 className="w-1/3 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100"
               >
-                Cancel
+                {language === 'ta' ? 'ரத்து' : 'Cancel'}
               </button>
               <button
                 type="submit"
@@ -693,7 +695,7 @@ export const DailyRecordsPage = () => {
                 className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
               >
                 <Save className="h-4 w-4" />
-                {saving ? 'Saving...' : 'Save Record'}
+                {saving ? (language === 'ta' ? 'சேமிக்கிறது...' : 'Saving...') : (language === 'ta' ? 'பதிவைச் சேமி' : 'Save Record')}
               </button>
             </div>
           )}
@@ -704,64 +706,65 @@ export const DailyRecordsPage = () => {
       <Modal
         isOpen={!!viewingRecord}
         onClose={() => setViewingRecord(null)}
-        title={`Daily Farm Record (${viewingRecord?.recordDate})`}
+        title={language === 'ta' ? `தினசரி பண்ணைப் பதிவு (${viewingRecord?.recordDate})` : `Daily Farm Record (${viewingRecord?.recordDate})`}
       >
         {viewingRecord && (
           <div className="space-y-4 text-xs">
             {/* Header Badge Row */}
             <div className="flex items-center justify-between rounded-xl bg-slate-50 p-3 border border-slate-100">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Batch Number</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">{language === 'ta' ? 'தொகுதி எண்' : 'Batch Number'}</span>
                 <span className="text-sm font-black text-slate-900">{selectedBatch?.batchNumber} ({selectedBatch?.batchName})</span>
               </div>
               <div className="text-right">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Flock Age</span>
-                <span className="inline-block rounded-full bg-emerald-600 px-2.5 py-0.5 text-xs font-black text-white shadow-2xs">Day {viewingAgeDay}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">{language === 'ta' ? 'கோழி வயது' : 'Flock Age'}</span>
+                <span className="inline-block rounded-full bg-emerald-600 px-2.5 py-0.5 text-xs font-black text-white shadow-2xs">{language === 'ta' ? 'நாள்' : 'Day'} {viewingAgeDay}</span>
               </div>
             </div>
 
             {/* 3 Main Stat Summary Blocks */}
             <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-xl bg-amber-50/70 p-3 border border-amber-200/60 text-center">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-700 block mb-0.5">Mortality</span>
-                <span className="text-base sm:text-lg font-black text-amber-900 block">{viewingRecord.mortalityCount} birds</span>
-                <span className="text-[10px] font-medium text-amber-700 block mt-0.5">Remaining: {viewingChicks.toLocaleString()}</span>
+              <div className="rounded-xl bg-amber-50/70 p-2.5 sm:p-3 border border-amber-200/60 text-center min-w-0 overflow-hidden">
+                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-amber-700 block mb-0.5 whitespace-nowrap truncate">{language === 'ta' ? 'இறப்பு' : 'Mortality'}</span>
+                <span className="text-sm sm:text-lg font-black text-amber-900 block whitespace-nowrap truncate">{viewingRecord.mortalityCount}</span>
+                <span className="text-[10px] font-extrabold text-amber-700 block mt-0.5 whitespace-nowrap truncate">{language === 'ta' ? 'மீதி:' : 'Remaining:'} {viewingChicks.toLocaleString()}</span>
               </div>
 
-              <div className="rounded-xl bg-blue-50/70 p-3 border border-blue-200/60 text-center">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 block mb-0.5">Feed Consumed</span>
-                <span className="text-base sm:text-lg font-black text-blue-900 block">
-                  {viewingBags} Bags{viewingLooseKg > 0 ? ` & ${viewingLooseKg} kg` : ''}
+              <div className="rounded-xl bg-blue-50/70 p-2.5 sm:p-3 border border-blue-200/60 text-center min-w-0 overflow-hidden">
+                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-blue-700 block mb-0.5 whitespace-nowrap truncate">{language === 'ta' ? 'தீவனம்' : 'Feed Consumed'}</span>
+                <span className="text-sm sm:text-lg font-black text-blue-900 block whitespace-nowrap truncate">
+                  {viewingTotalKg} kg
                 </span>
-                <span className="text-[10px] font-medium text-blue-700 block mt-0.5">({viewingTotalKg} kg total)</span>
+                <span className="text-[10px] font-extrabold text-blue-700 block mt-0.5 whitespace-nowrap truncate">
+                  ({viewingBags} {language === 'ta' ? 'பைகள்' : 'Bags'})
+                </span>
               </div>
 
-              <div className="rounded-xl bg-emerald-50/70 p-3 border border-emerald-200/60 text-center">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 block mb-0.5">Avg Weight</span>
-                <span className="text-base sm:text-lg font-black text-emerald-900 block">{viewingRecord.averageWeight} g</span>
-                <span className="text-[10px] font-medium text-emerald-700 block mt-0.5">({viewingWeightDiff > 0 ? '+' : ''}{viewingWeightDiff}g vs target)</span>
+              <div className="rounded-xl bg-emerald-50/70 p-2.5 sm:p-3 border border-emerald-200/60 text-center min-w-0 overflow-hidden flex flex-col justify-center">
+                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-emerald-700 block mb-0.5 whitespace-nowrap truncate">{language === 'ta' ? 'சராசரி எடை' : 'Avg Weight'}</span>
+                <span className="text-sm sm:text-lg font-black text-emerald-900 block whitespace-nowrap truncate">{viewingRecord.averageWeight} g</span>
               </div>
             </div>
 
             {/* Target Comparison Breakdown */}
             <div className="rounded-xl border border-slate-200/80 p-3.5 bg-white space-y-2.5">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block border-b border-slate-100 pb-1.5">
-                Target vs Actual Analysis
+                {language === 'ta' ? 'இலக்கு ஒப்பீடு பகுப்பாய்வு' : 'Target vs Actual Analysis'}
               </span>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 space-y-1">
-                  <span className="font-bold text-slate-700 block">Feed Intake / Bird</span>
+                  <span className="font-bold text-slate-700 block">{language === 'ta' ? 'ஒரு கோழிக்கான தீவனம்' : 'Feed Intake / Bird'}</span>
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Actual:</span>
-                    <span className="font-black text-slate-900">{viewingPerBirdEat} g/bird</span>
+                    <span className="text-slate-500">{language === 'ta' ? 'உண்மை:' : 'Actual:'}</span>
+                    <span className="font-black text-slate-900">{viewingPerBirdEat} g/{language === 'ta' ? 'கோழி' : 'bird'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Target (Day {viewingAgeDay}):</span>
-                    <span className="font-bold text-blue-600">{viewingTargetIntake} g/bird</span>
+                    <span className="text-slate-500">{language === 'ta' ? 'இலக்கு (நாள்' : 'Target (Day'} {viewingAgeDay}):</span>
+                    <span className="font-bold text-blue-600">{viewingTargetIntake} g/{language === 'ta' ? 'கோழி' : 'bird'}</span>
                   </div>
                   <div className="flex justify-between border-t border-slate-200 pt-1">
-                    <span className="text-slate-500">Difference:</span>
+                    <span className="text-slate-500">{language === 'ta' ? 'வித்தியாசம்:' : 'Difference:'}</span>
                     <span className={`font-black ${viewingEatDiff >= 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
                       {viewingEatDiff > 0 ? '+' : ''}{viewingEatDiff} g
                     </span>
@@ -769,17 +772,17 @@ export const DailyRecordsPage = () => {
                 </div>
 
                 <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 space-y-1">
-                  <span className="font-bold text-slate-700 block">Body Weight</span>
+                  <span className="font-bold text-slate-700 block">{language === 'ta' ? 'உடல் எடை' : 'Body Weight'}</span>
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Actual:</span>
+                    <span className="text-slate-500">{language === 'ta' ? 'உண்மை:' : 'Actual:'}</span>
                     <span className="font-black text-slate-900">{viewingRecord.averageWeight} g</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Target (Day {viewingAgeDay}):</span>
+                    <span className="text-slate-500">{language === 'ta' ? 'இலக்கு (நாள்' : 'Target (Day'} {viewingAgeDay}):</span>
                     <span className="font-bold text-blue-600">{viewingTargetWeight} g</span>
                   </div>
                   <div className="flex justify-between border-t border-slate-200 pt-1">
-                    <span className="text-slate-500">Difference:</span>
+                    <span className="text-slate-500">{language === 'ta' ? 'வித்தியாசம்:' : 'Difference:'}</span>
                     <span className={`font-black ${viewingWeightDiff >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                       {viewingWeightDiff > 0 ? '+' : ''}{viewingWeightDiff} g
                     </span>
@@ -790,7 +793,7 @@ export const DailyRecordsPage = () => {
 
             {/* Additional Info Footer */}
             <div className="flex items-center justify-between text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-              <span>Recorded By: <strong className="text-slate-700">{viewingRecord.recordedBy || 'Farmer'}</strong></span>
+              <span>{language === 'ta' ? 'பதிவு செய்தவர்:' : 'Recorded By:'} <strong className="text-slate-700">{viewingRecord.recordedBy || 'Farmer'}</strong></span>
             </div>
 
             {/* Modal Actions */}
@@ -800,7 +803,7 @@ export const DailyRecordsPage = () => {
                 onClick={() => setViewingRecord(null)}
                 className="flex-1 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
               >
-                Close
+                {language === 'ta' ? 'மூடு' : 'Close'}
               </button>
               {!isReadOnly && (
                 <button
@@ -813,7 +816,7 @@ export const DailyRecordsPage = () => {
                   className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 transition-colors shadow-sm"
                 >
                   <Edit className="h-4 w-4" />
-                  <span>Edit Record</span>
+                  <span>{language === 'ta' ? 'பதிவைத் திருத்து' : 'Edit Record'}</span>
                 </button>
               )}
             </div>
@@ -826,15 +829,15 @@ export const DailyRecordsPage = () => {
         <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3 mb-4 min-w-0">
           <div className="flex items-center gap-1.5 min-w-0">
             <h2 className="text-xs sm:text-base font-black text-slate-900 truncate">
-              Daily Record Log History ({selectedBatch?.batchNumber})
+              {t('dailyRecordLogHistory')} ({selectedBatch?.batchNumber})
             </h2>
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] sm:text-xs font-bold text-slate-600 shrink-0 whitespace-nowrap">
-              {totalRecords} Entries
+              {totalRecords} {t('records')}
             </span>
           </div>
 
           <div className="flex items-center gap-1 text-[11px] sm:text-xs text-slate-500 font-bold shrink-0 whitespace-nowrap">
-            <span>View:</span>
+            <span>{t('view')}:</span>
             <CustomSelect
               value={pageSize}
               onChange={(e) => {
@@ -844,7 +847,7 @@ export const DailyRecordsPage = () => {
               }}
               options={[10, 20, 30, 40, 50].map((num) => ({ value: num, label: String(num) }))}
             />
-            <span className="hidden sm:inline">records</span>
+            <span className="hidden sm:inline">{t('records')}</span>
           </div>
         </div>
 
@@ -853,11 +856,11 @@ export const DailyRecordsPage = () => {
           <table className="w-full min-w-[500px] text-left text-xs">
             <thead className="bg-slate-50 sticky top-0 border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold whitespace-nowrap z-10 shadow-2xs">
               <tr>
-                <th className="p-3" title="Date">Date</th>
-                <th className="p-3" title="Mortality">Mortality</th>
-                <th className="p-3" title="Bags Consumed">Bags Consumed</th>
-                <th className="p-3" title="Avg Weight (g)">Avg Weight</th>
-                <th className="p-3 text-right" title="Actions">Actions</th>
+                <th className="p-3" title="Date">{t('date')}</th>
+                <th className="p-3" title="Mortality">{t('mortality')}</th>
+                <th className="p-3" title="Bags Consumed">{t('bagsConsumed')}</th>
+                <th className="p-3" title="Avg Weight (g)">{t('averageBirdWeight')}</th>
+                <th className="p-3 text-right" title="Actions">{t('actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium whitespace-nowrap">
@@ -961,7 +964,7 @@ export const DailyRecordsPage = () => {
                       <span className="text-sm font-black text-slate-900">{r.recordDate}</span>
                     </div>
                     <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
-                      Live: {chickCount.toLocaleString()}
+                      {t('liveFlock')}: {chickCount.toLocaleString()}
                     </span>
                   </div>
 
@@ -970,7 +973,7 @@ export const DailyRecordsPage = () => {
                     {/* Mortality */}
                     <div className="rounded-xl bg-rose-50/80 p-2 border border-rose-100/90 min-w-0">
                       <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-tight text-rose-500 block mb-0.5 whitespace-nowrap truncate">
-                        MORTALITY
+                        {t('mortality')}
                       </span>
                       <span className="text-base font-black text-rose-700 block">
                         {r.mortalityCount || 0}
@@ -980,7 +983,7 @@ export const DailyRecordsPage = () => {
                     {/* Feed (Kg) */}
                     <div className="rounded-xl bg-amber-50/80 p-2 border border-amber-100/90 min-w-0">
                       <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-tight text-amber-600 block mb-0.5 whitespace-nowrap truncate">
-                        FEED (KG)
+                        {t('feedConsumption')} (KG)
                       </span>
                       <span className="text-base font-black text-amber-800 block">
                         {totalKg} kg
@@ -990,7 +993,7 @@ export const DailyRecordsPage = () => {
                     {/* Avg Weight */}
                     <div className="rounded-xl bg-purple-50/80 p-2 border border-purple-100/90 min-w-0">
                       <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-tight text-purple-600 block mb-0.5 whitespace-nowrap truncate">
-                        AVG WEIGHT
+                        {t('avgWeight')}
                       </span>
                       <span className="text-base font-black text-purple-800 block">
                         {r.averageWeight || 0} g
@@ -1002,7 +1005,7 @@ export const DailyRecordsPage = () => {
                   <div className="flex items-center justify-between border-t border-slate-100 pt-2.5 text-xs">
                     <span className="font-extrabold text-emerald-700 flex items-center gap-1.5 hover:text-emerald-800">
                       <Eye className="h-3.5 w-3.5 text-emerald-600" />
-                      <span>View Details</span>
+                      <span>{t('viewDetails')}</span>
                     </span>
 
                     {!isReadOnly && (

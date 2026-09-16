@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   LayoutDashboard,
   Users,
@@ -14,23 +15,25 @@ import {
   FileText,
   ShieldCheck,
   History,
-  X
+  X,
+  Globe
 } from 'lucide-react';
 
 export const Sidebar = ({ isOpen, onClose }) => {
-  const { isAdmin, isFarmer } = useAuth();
+  const { isAdmin } = useAuth();
+  const { language, setLanguage, t } = useLanguage();
 
   const farmNav = [
-    { name: 'Dashboard', path: isAdmin ? '/admin/dashboard' : '/farmer/dashboard', icon: LayoutDashboard },
-    { name: 'Daily Farm Records', path: '/daily-records', icon: ClipboardList },
-    { name: 'Feed Management', path: '/feed', icon: Wheat },
-    { name: 'Medicine & Vaccines', path: '/medicine', icon: Syringe },
-    { name: 'Dispatch & Box Sets', path: '/dispatch', icon: Truck },
-    { name: 'Reports & Analytics', path: '/reports', icon: BarChart3 },
-    ...(isAdmin ? [{ name: 'User Management', path: '/admin/users', icon: Users }] : []),
-    ...(isAdmin ? [{ name: 'Audit Logs', path: '/admin/audit-logs', icon: ShieldCheck }] : []),
-    { name: 'Batch Management', path: '/admin/batches', icon: Layers },
-    { name: 'Batch History', path: '/batch-history', icon: History }
+    { name: t('dashboard'), path: isAdmin ? '/admin/dashboard' : '/farmer/dashboard', icon: LayoutDashboard },
+    { name: t('dailyFarmRecords'), path: '/daily-records', icon: ClipboardList },
+    { name: t('feedManagement'), path: '/feed', icon: Wheat },
+    { name: t('medicineAndVaccines'), path: '/medicine', icon: Syringe },
+    { name: t('dispatchAndBoxSets'), path: '/dispatch', icon: Truck },
+    { name: t('reportsAndAnalytics'), path: '/reports', icon: BarChart3 },
+    ...(isAdmin ? [{ name: t('userManagement'), path: '/admin/users', icon: Users }] : []),
+    ...(isAdmin ? [{ name: t('auditLogs'), path: '/admin/audit-logs', icon: ShieldCheck }] : []),
+    { name: t('batchManagement'), path: '/admin/batches', icon: Layers },
+    { name: t('batchHistory'), path: '/batch-history', icon: History }
   ];
 
   const navItems = farmNav;
@@ -51,7 +54,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
         }`}
       >
         <div className="flex h-16 items-center justify-between border-b border-slate-200 px-6 lg:hidden">
-          <span className="font-bold text-slate-900">Navigation Menu</span>
+          <span className="font-bold text-slate-900">{t('navigationMenu')}</span>
           <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
             <X className="h-5 w-5" />
           </button>
@@ -59,7 +62,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
 
         <div className="flex-1 overflow-y-auto px-4 py-6">
           <div className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
-            Farm Management
+            {t('farmManagement')}
           </div>
           <nav className="space-y-1">
             {navItems.map((item) => {
@@ -85,6 +88,38 @@ export const Sidebar = ({ isOpen, onClose }) => {
               );
             })}
           </nav>
+
+          {/* Language Switcher Control in Side Menu */}
+          <div className="mt-6 pt-4 border-t border-slate-100 space-y-2">
+            <div className="px-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <Globe className="h-3.5 w-3.5 text-emerald-600" />
+              <span>{t('language')}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 border border-slate-200/80">
+              <button
+                type="button"
+                onClick={() => setLanguage('en')}
+                className={`rounded-lg py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                  language === 'en'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                English
+              </button>
+              <button
+                type="button"
+                onClick={() => setLanguage('ta')}
+                className={`rounded-lg py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                  language === 'ta'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                தமிழ்
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="border-t border-slate-200/80 p-4">
