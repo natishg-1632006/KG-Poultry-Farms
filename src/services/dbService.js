@@ -2956,6 +2956,23 @@ export async function dbSaveUser(userData) {
   return record;
 }
 
+export async function dbDeleteUser(uid) {
+  if (!uid) return false;
+  try {
+    await withTimeout(remove(ref(db, `users/${uid}`)));
+  } catch (_err) {
+    // fallback
+  }
+
+  const local = getLocalDB();
+  if (local.users && local.users[uid]) {
+    delete local.users[uid];
+    saveLocalDB(local);
+  }
+  return true;
+}
+
+
 // BATCH MANAGEMENT
 export async function dbGetBatches() {
   const local = getLocalDB();

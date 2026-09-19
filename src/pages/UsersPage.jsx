@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { dbGetUsers, dbSaveUser, dbGetBatches, dbLogAuditEvent } from '../services/dbService';
+import { dbGetUsers, dbSaveUser, dbDeleteUser, dbGetBatches, dbLogAuditEvent } from '../services/dbService';
 import { Modal } from '../components/common/Modal';
 import { Badge } from '../components/common/Badge';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { UserPlus, Search, Edit, ToggleLeft, ToggleRight } from 'lucide-react';
+import { UserPlus, Search, Edit, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react';
 import CustomSelect from '../components/common/CustomSelect';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
@@ -117,6 +117,26 @@ export const UsersPage = () => {
       loadData();
     } catch (err) {
       alert('Failed updating user status.');
+    }
+  };
+
+  const handleDeleteUser = async (user) => {
+    if (user.uid === currentUserProfile?.uid) {
+      alert('You cannot delete your own active account.');
+      return;
+    }
+    if (window.confirm(`Are you sure you want to delete user "${user.name}" (${user.email})?`)) {
+      try {
+        await dbDeleteUser(user.uid);
+        await dbLogAuditEvent(
+          'USER_DELETED',
+          `Deleted user ${user.name} (${user.email})`,
+          currentUserProfile?.name
+        );
+        loadData();
+      } catch (err) {
+        alert('Failed deleting user: ' + err.message);
+      }
     }
   };
 
@@ -268,6 +288,13 @@ export const UsersPage = () => {
                           title={u.active ? 'Deactivate User' : 'Activate User'}
                         >
                           {u.active ? <ToggleRight className="h-5 w-5" /> : <ToggleLeft className="h-5 w-5" />}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(u)}
+                          className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                          title="Delete User"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     </td>
