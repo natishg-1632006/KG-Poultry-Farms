@@ -1,0 +1,16 @@
+{
+  "appId": "com.kgpoultry.app",
+  "appName": "KG Poultry Farms",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "GoogleAuth": {
+      "scopes": ["profile", "email"],
+      "serverClientId": "951648043399-gcuds69dffohrmsinjb7qm58c3smuns8.apps.googleusercontent.com",
+      "forceCodeForRefreshToken": true
+    }
+  }
+}

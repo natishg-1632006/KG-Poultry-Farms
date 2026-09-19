@@ -2,11 +2,13 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
   signInWithEmailAndPassword, 
   signInWithPopup,
+  signInWithCredential,
   GoogleAuthProvider,
   signOut as firebaseSignOut, 
-  onAuthStateChanged,
-  createUserWithEmailAndPassword
+  onAuthStateChanged
 } from 'firebase/auth';
+import { Capacitor } from '@capacitor/core';
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { auth } from '../services/firebase';
 import { dbGetUsers, dbSaveUser, dbLogAuditEvent } from '../services/dbService';
 
@@ -19,6 +21,20 @@ export const AuthProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        GoogleAuth.initialize({
+          clientId: '951648043399-gcuds69dffohrmsinjb7qm58c3smuns8.apps.googleusercontent.com',
+          scopes: ['profile', 'email'],
+          grantOfflineAccess: true,
+        });
+      } catch (err) {
+        console.warn('GoogleAuth initialize failed:', err);
+      }
+    }
+  }, []);
 
   // Sync auth state and load user profile
   useEffect(() => {
@@ -122,46 +138,88 @@ export const AuthProvider = ({ children }) => {
     return matched;
   };
 
+  const processGoogleUser = async (user) => {
+    const googleEmail = (user.email || '').toLowerCase().trim();
+
+    // Look up user dynamically in the database
+    const users = await dbGetUsers();
+    let matched = users.find(u => (u.email || '').toLowerCase().trim() === googleEmail);
+
+    if (!matched) {
+      try { await firebaseSignOut(auth); } catch (_e) {}
+      const deniedMsg = 'Access Denied: Account not authorized in farm database.';
+      setError(deniedMsg);
+      throw new Error(deniedMsg);
+    }
+
+    if (!matched.active) {
+      try { await firebaseSignOut(auth); } catch (_e) {}
+      const inactiveMsg = 'Your account is inactive. Please contact Administrator.';
+      setError(inactiveMsg);
+      throw new Error(inactiveMsg);
+    }
+
+    if (!matched.uid || matched.uid !== user.uid) {
+      matched.uid = user.uid;
+      await dbSaveUser(matched);
+    }
+
+    setUserProfile(matched);
+    localStorage.setItem('kg_poultry_active_session', JSON.stringify(matched));
+    dbLogAuditEvent('GOOGLE_LOGIN', `User ${user.email} logged in via Google`, matched.name || user.email);
+    return matched;
+  };
+
   const loginWithGoogle = async () => {
     setError(null);
     try {
+      if (Capacitor.isNativePlatform()) {
+        try {
+          // Clear previous native session to force Google to show account chooser list every time
+          try {
+            await GoogleAuth.signOut();
+          } catch (_sErr) {
+            // ignore
+          }
+
+          const googleUser = await GoogleAuth.signIn();
+          const idToken = googleUser?.authentication?.idToken;
+          if (idToken) {
+            const credential = GoogleAuthProvider.credential(idToken);
+            const res = await signInWithCredential(auth, credential);
+            if (res && res.user) {
+              return await processGoogleUser(res.user);
+            }
+          }
+          if (googleUser && googleUser.email) {
+            return await processGoogleUser({ uid: googleUser.id || googleUser.email, email: googleUser.email });
+          }
+        } catch (nativeErr) {
+          console.warn('Native Google Auth error:', nativeErr);
+          if (nativeErr?.message?.includes('closed') || nativeErr?.message?.includes('canceled') || nativeErr?.message?.includes('12501')) {
+            const cancelMsg = 'Sign-in canceled.';
+            setError(cancelMsg);
+            throw new Error(cancelMsg);
+          }
+          const nativeMsg = nativeErr?.message || 'Native Google Sign-In failed. Please sign in with Email & Password.';
+          setError(nativeMsg);
+          throw new Error(nativeMsg);
+        }
+      }
+
       const res = await signInWithPopup(auth, googleProvider);
-      const googleEmail = (res.user.email || '').toLowerCase().trim();
-
-      // Look up user dynamically in the database
-      const users = await dbGetUsers();
-      let matched = users.find(u => (u.email || '').toLowerCase().trim() === googleEmail);
-
-      if (!matched) {
-        try { await firebaseSignOut(auth); } catch (_e) {}
-        const deniedMsg = 'Access Denied: Account not authorized in farm database.';
-        setError(deniedMsg);
-        throw new Error(deniedMsg);
+      if (res && res.user) {
+        return await processGoogleUser(res.user);
       }
-
-      if (!matched.active) {
-        try { await firebaseSignOut(auth); } catch (_e) {}
-        const inactiveMsg = 'Your account is inactive. Please contact Administrator.';
-        setError(inactiveMsg);
-        throw new Error(inactiveMsg);
-      }
-
-      if (!matched.uid || matched.uid !== res.user.uid) {
-        matched.uid = res.user.uid;
-        await dbSaveUser(matched);
-      }
-
-      setUserProfile(matched);
-      localStorage.setItem('kg_poultry_active_session', JSON.stringify(matched));
-      dbLogAuditEvent('GOOGLE_LOGIN', `User ${res.user.email} logged in via Google`, matched.name || res.user.email);
-      return matched;
     } catch (err) {
       console.error('Google login error:', err);
       let msg = err.message || 'Google Sign-In failed.';
       if (err.code === 'auth/popup-closed-by-user') {
         msg = 'Sign-in window closed before completion.';
+      } else if (err.code === 'auth/popup-blocked') {
+        msg = 'Sign-in popup was blocked. Please allow popups or use Email Sign-In.';
       } else if (err.code === 'auth/unauthorized-domain') {
-        msg = 'Unauthorized Domain: Please add kg-poultry-farms.vercel.app to Authorized Domains in Firebase Console (Authentication > Settings > Authorized domains).';
+        msg = 'Unauthorized Domain: Please sign in with Email & Password on the mobile app.';
       }
       setError(msg);
       throw new Error(msg);
@@ -170,6 +228,13 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
+      if (Capacitor.isNativePlatform()) {
+        try {
+          await GoogleAuth.signOut();
+        } catch (_gErr) {
+          // ignore
+        }
+      }
       await firebaseSignOut(auth);
     } catch (err) {
       // ignore

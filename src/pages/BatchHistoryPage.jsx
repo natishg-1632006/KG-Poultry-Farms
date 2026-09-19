@@ -34,6 +34,7 @@ import { Modal } from '../components/common/Modal';
 import CustomSelect from '../components/common/CustomSelect';
 import { TraderInvoiceModal } from '../components/invoice/TraderInvoiceModal';
 import { BatchReportModal, generateBatchReportPDF } from '../components/invoice/BatchReportModal';
+import { Capacitor } from '@capacitor/core';
 import { FEED_CONSUMPTION_TARGETS, AVERAGE_WEIGHT_TARGETS } from '../constants/companyTargets';
 import { scrollToTop } from '../utils/scroll';
 
@@ -703,14 +704,16 @@ export const BatchHistoryPage = () => {
               <span>Back to Batches</span>
             </button>
 
-            <button
-              onClick={handleDirectBatchPDFDownload}
-              disabled={downloadingBatchPDF || !historyData}
-              className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 py-2.5 px-3.5 text-xs font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-50 cursor-pointer w-full sm:w-auto"
-            >
-              <Download className="h-3.5 w-3.5" />
-              <span>{downloadingBatchPDF ? 'Downloading...' : 'Download Report'}</span>
-            </button>
+            {!Capacitor.isNativePlatform() && (
+              <button
+                onClick={handleDirectBatchPDFDownload}
+                disabled={downloadingBatchPDF || !historyData}
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 py-2.5 px-3.5 text-xs font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-50 cursor-pointer w-full sm:w-auto"
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span>{downloadingBatchPDF ? 'Downloading...' : 'Download Report'}</span>
+              </button>
+            )}
           </div>
         )}
       </div>

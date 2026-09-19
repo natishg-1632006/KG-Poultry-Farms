@@ -96,16 +96,16 @@ export const DispatchPage = () => {
     driverName: '',
     driverMobileNumber: '',
     dispatchDate: new Date().toISOString().split('T')[0],
-    totalBoxCount: 5,
-    chickenCountPerBox: 12
+    totalBoxCount: '',
+    chickenCountPerBox: ''
   });
 
   const [setForm, setSetForm] = useState({
     boxSetNumber: 1,
-    boxesInSet: 5,
-    emptyBoxWeight: 25,
+    boxesInSet: '',
+    emptyBoxWeight: '',
     loadedWeight: '',
-    chickenCount: 60
+    chickenCount: ''
   });
 
   useEffect(() => {
@@ -185,7 +185,7 @@ export const DispatchPage = () => {
       setSetForm({
         boxSetNumber: currentSets.length + 1,
         boxesInSet: defaultBoxesInSet,
-        emptyBoxWeight: defaultBoxesInSet * 5,
+        emptyBoxWeight: '',
         loadedWeight: '',
         chickenCount: defaultBoxesInSet * perBoxCount
       });
@@ -206,8 +206,8 @@ export const DispatchPage = () => {
       driverName: '',
       driverMobileNumber: '',
       dispatchDate: new Date().toISOString().split('T')[0],
-      totalBoxCount: 5,
-      chickenCountPerBox: 12
+      totalBoxCount: '',
+      chickenCountPerBox: ''
     });
     setShowHeaderForm(true);
   };
@@ -279,16 +279,22 @@ export const DispatchPage = () => {
 
     setSaving(true);
     try {
+      const newTotalBoxes = Number(dispatchHeader.totalBoxCount);
+      const dSets = (activeDispatch?.id ? allBoxSetsMap[activeDispatch.id] : null) || boxSets || [];
+      const loadedSets = dSets.filter(s => Number(s.loadedWeight) > 0);
+      const combinedLoadedBoxes = loadedSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
+      const calculatedStatus = (newTotalBoxes > 0 && combinedLoadedBoxes >= newTotalBoxes && loadedSets.length > 0) ? 'Completed' : 'In Progress';
+
       const payload = {
         id: activeDispatch?.id || `disp-${Date.now()}`,
         ...dispatchHeader,
         batchId: selectedBatch.id,
-        totalBoxCount: Number(dispatchHeader.totalBoxCount),
+        totalBoxCount: newTotalBoxes,
         chickenCountPerBox: Number(dispatchHeader.chickenCountPerBox),
-        totalChickenCount: Number(dispatchHeader.totalBoxCount) * Number(dispatchHeader.chickenCountPerBox),
+        totalChickenCount: newTotalBoxes * Number(dispatchHeader.chickenCountPerBox),
         totalWeight: activeDispatch?.totalWeight || 0,
         averageWeight: activeDispatch?.averageWeight || 0,
-        status: activeDispatch?.status || 'In Progress'
+        status: calculatedStatus
       };
 
       const saved = await dbSaveDispatch(payload);
@@ -316,13 +322,12 @@ export const DispatchPage = () => {
   };
 
   const handleBoxesInSetChange = (val) => {
-    const bSet = Math.max(1, Number(val) || 1);
-    const perBox = activeDispatch?.chickenCountPerBox || dispatchHeader.chickenCountPerBox || 12;
+    const bSet = val === '' ? '' : Math.max(1, Number(val) || 1);
+    const perBox = Number(activeDispatch?.chickenCountPerBox || dispatchHeader.chickenCountPerBox || 12);
     setSetForm(prev => ({
       ...prev,
       boxesInSet: bSet,
-      chickenCount: bSet * perBox,
-      emptyBoxWeight: bSet * 5
+      chickenCount: bSet !== '' ? bSet * perBox : ''
     }));
   };
 
@@ -344,7 +349,7 @@ export const DispatchPage = () => {
     setSetForm({
       boxSetNumber: boxSets.length + 1,
       boxesInSet: defaultBoxesInSet,
-      emptyBoxWeight: defaultBoxesInSet * 5,
+      emptyBoxWeight: '',
       loadedWeight: '',
       chickenCount: defaultBoxesInSet * perBoxCount
     });
@@ -600,7 +605,7 @@ export const DispatchPage = () => {
     setSetForm({
       boxSetNumber: s.boxSetNumber,
       boxesInSet: s.boxesInSet || 5,
-      emptyBoxWeight: s.emptyBoxWeight || 25,
+      emptyBoxWeight: s.emptyBoxWeight !== undefined && s.emptyBoxWeight !== null ? s.emptyBoxWeight : '',
       loadedWeight: s.loadedWeight || '',
       chickenCount: s.chickenCount || 60
     });
@@ -659,12 +664,9 @@ export const DispatchPage = () => {
     const dSets = allBoxSetsMap[d.id] || (activeDispatch?.id === d.id ? boxSets : []);
     const loadedSets = dSets.filter(s => Number(s.loadedWeight) > 0);
     const weighedBoxes = loadedSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
+    const targetBoxCount = Number(d.totalBoxCount) || 0;
 
-    if (d.status === 'Completed') return true;
-    if (d.totalBoxCount > 0 && weighedBoxes >= d.totalBoxCount && loadedSets.length > 0) {
-      return true;
-    }
-    return false;
+    return targetBoxCount > 0 && weighedBoxes >= targetBoxCount && loadedSets.length > 0;
   };
 
   // VEHICLE CARDS GRID FILTERING & SORTING ENGINE
@@ -727,7 +729,7 @@ export const DispatchPage = () => {
                   className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-all active:scale-95 shrink-0 whitespace-nowrap cursor-pointer"
                 >
                   <Plus className="h-4 w-4 shrink-0" />
-                  <span>Add Vehicle</span>
+                  <span>{language === 'ta' ? 'வாகனம் சேர்' : 'Add Vehicle'}</span>
                 </button>
               )}
             </div>
@@ -1387,11 +1389,12 @@ export const DispatchPage = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'தொகுதியில் பெட்டிகள் *' : 'Boxes in Set (Default 5) *'}</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'மொத்த பெட்டிகள் *' : 'Total Boxes in Set *'}</label>
               <input
                 type="number"
                 required
                 min="1"
+                placeholder={language === 'ta' ? 'எ.கா. 5' : 'e.g. 5'}
                 value={setForm.boxesInSet}
                 onChange={(e) => handleBoxesInSetChange(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-slate-900 focus:border-emerald-600"
@@ -1399,23 +1402,24 @@ export const DispatchPage = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'தொகுதியில் எண்ணிக்கை *' : 'Chickens in Set *'}</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'மொத்த கோழிகள் *' : 'Total Birds Count *'}</label>
               <input
                 type="number"
                 required
                 min="1"
+                placeholder={language === 'ta' ? 'எ.கா. 60' : 'e.g. 60'}
                 value={setForm.chickenCount}
-                onChange={(e) => setSetForm({ ...setForm, chickenCount: Number(e.target.value) })}
+                onChange={(e) => setSetForm({ ...setForm, chickenCount: e.target.value === '' ? '' : Number(e.target.value) })}
                 className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-bold text-emerald-700 focus:border-emerald-600"
               />
-              <span className="text-[10px] text-slate-400 font-medium block mt-0.5">{language === 'ta' ? `தானியங்கி: ${activeDispatch?.chickenCountPerBox || 12} /பெட்டி × ${setForm.boxesInSet}` : `Auto: ${activeDispatch?.chickenCountPerBox || 12} birds/box × ${setForm.boxesInSet}`}</span>
+              <span className="text-[10px] text-slate-400 font-medium block mt-0.5">{language === 'ta' ? `தானியங்கி: ${activeDispatch?.chickenCountPerBox || 12} கோழிகள்/பெட்டி × ${setForm.boxesInSet || 0}` : `Auto: ${activeDispatch?.chickenCountPerBox || 12} birds/box × ${setForm.boxesInSet || 0}`}</span>
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                {language === 'ta' ? 'வெற்றுப் பெட்டி எடை (கிலோ) *' : 'Empty Box Tare Weight (kg) *'}
+                {language === 'ta' ? 'வெற்று எடை (கிலோ) *' : 'Empty Box Tare Weight (kg) *'}
               </label>
               <input
                 type="number"
@@ -1427,7 +1431,6 @@ export const DispatchPage = () => {
                 onChange={(e) => setSetForm({ ...setForm, emptyBoxWeight: e.target.value })}
                 className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
               />
-              <span className="text-[10px] text-slate-400 font-medium block mt-0.5">{language === 'ta' ? `தானியங்கி: 5கிலோ × ${setForm.boxesInSet} பெட்டிகள்` : `Auto: 5kg × ${setForm.boxesInSet} boxes`}</span>
             </div>
 
             <div>
@@ -1454,7 +1457,7 @@ export const DispatchPage = () => {
                 <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 flex items-start gap-2.5 text-xs text-amber-900">
                   <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold block">{language === 'ta' ? `நிலை 1: வெற்று எடை மட்டும் சேமிக்கப்படுகிறது (${setForm.emptyBoxWeight || 25} கிலோ)` : `Stage 1: Saving Tare Weight Only (${setForm.emptyBoxWeight || 25} kg)`}</span>
+                    <span className="font-bold block">{language === 'ta' ? `நிலை 1: வெற்று எடை மட்டும் சேமிக்கப்படுகிறது (${setForm.emptyBoxWeight || 0} கிலோ)` : `Stage 1: Saving Tare Weight Only (${setForm.emptyBoxWeight || 0} kg)`}</span>
                     <span className="text-[11px] text-amber-700">{language === 'ta' ? 'இப்போது வெற்றுப் பெட்டிகளைச் சேமித்து, கோழிகள் ஏற்றிய பின் மொத்த எடையைப் புதுப்பிக்கலாம்.' : 'Save empty set now and update Loaded Gross Weight later when birds are loaded.'}</span>
                   </div>
                 </div>
@@ -1495,10 +1498,8 @@ export const DispatchPage = () => {
               {saving
                 ? (language === 'ta' ? 'சேமிக்கிறது...' : 'Saving Set...')
                 : editingBoxSetId
-                ? (language === 'ta' ? 'தொகுதியைப் புதுப்பி' : 'Update Box Set (Instantly)')
-                : setForm.loadedWeight
-                ? (language === 'ta' ? `தொகுதி #${setForm.boxSetNumber} சேமி` : `Save Set #${setForm.boxSetNumber} (Tare + Load)`)
-                : (language === 'ta' ? `தொகுதி #${setForm.boxSetNumber} சேமி (வெற்று மட்டும்)` : `Save Set #${setForm.boxSetNumber} (Tare Only)`)}
+                ? (language === 'ta' ? 'தொகுதியைப் புதுப்பி' : 'Update Box Set')
+                : (language === 'ta' ? `தொகுதி #${setForm.boxSetNumber} சேமி` : `Save Set #${setForm.boxSetNumber}`)}
             </button>
           </div>
         </form>
@@ -1717,25 +1718,26 @@ export const DispatchPage = () => {
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'மொத்த பெட்டி எண்ணிக்கை *' : 'Total Box Count *'}</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'மொத்த பெட்டிகள் *' : 'Total Box Count *'}</label>
               <input
                 type="number"
                 required
                 min="1"
+                placeholder={language === 'ta' ? 'எ.கா. 20 பெட்டிகள்' : 'e.g. 20 boxes'}
                 value={dispatchHeader.totalBoxCount}
-                onChange={(e) => setDispatchHeader({ ...dispatchHeader, totalBoxCount: Number(e.target.value) })}
+                onChange={(e) => setDispatchHeader({ ...dispatchHeader, totalBoxCount: e.target.value === '' ? '' : Number(e.target.value) })}
                 className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
               />
-              <span className="text-[10px] text-emerald-700 font-medium block mt-0.5">{language === 'ta' ? 'கூடுதல் பெட்டிகளைச் சேர்க்க எண்ணிக்கையை அதிகரிக்கவும்' : 'Increase count here to add extra box sets'}</span>
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'ஒரு பெட்டிக்கு எண்ணிக்கை *' : 'Birds Per Box *'}</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'பெட்டிக்கு கோழிகள் *' : 'Birds Per Box *'}</label>
               <input
                 type="number"
                 required
                 min="1"
+                placeholder={language === 'ta' ? 'எ.கா. 12 கோழிகள்' : 'e.g. 12 birds'}
                 value={dispatchHeader.chickenCountPerBox}
-                onChange={(e) => setDispatchHeader({ ...dispatchHeader, chickenCountPerBox: Number(e.target.value) })}
+                onChange={(e) => setDispatchHeader({ ...dispatchHeader, chickenCountPerBox: e.target.value === '' ? '' : Number(e.target.value) })}
                 className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
               />
             </div>
@@ -1755,7 +1757,7 @@ export const DispatchPage = () => {
               className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
             >
               <Save className="h-4 w-4" />
-              {saving ? (language === 'ta' ? 'சேமிக்கிறது...' : 'Saving Setup...') : activeDispatch ? (language === 'ta' ? 'அமைப்பைப் புதுப்பி' : 'Update Setup & Create Extra Set') : (language === 'ta' ? 'சேமித்து வாகனப் பக்கத்தைத் திறக்க' : 'Save & Open Vehicle Page')}
+              {saving ? (language === 'ta' ? 'சேமிக்கிறது...' : 'Saving Setup...') : activeDispatch ? (language === 'ta' ? 'அமைப்பைப் புதுப்பி' : 'Update Setup & Create Extra Set') : (language === 'ta' ? 'வாகனம் சேமி' : 'Save & Open Vehicle Page')}
             </button>
           </div>
         </form>

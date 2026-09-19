@@ -1,10 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
+import { 
+  initNotificationChannels, 
+  syncDailyDataEntryReminders, 
+  syncFarmWeatherAndLightingAlerts 
+} from '../../services/notificationService';
 
 export const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    initNotificationChannels();
+    syncDailyDataEntryReminders();
+    syncFarmWeatherAndLightingAlerts();
+
+    // Re-sync weather and data entry reminders every 30 minutes
+    const timer = setInterval(() => {
+      syncDailyDataEntryReminders();
+      syncFarmWeatherAndLightingAlerts();
+    }, 30 * 60 * 1000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">

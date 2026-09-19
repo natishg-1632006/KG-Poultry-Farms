@@ -9,11 +9,21 @@ import {
   Truck,
   User,
   Calendar,
-  Layers
+  Layers,
+  Share2
 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { captureSafeCanvas } from '../../utils/pdfGenerator';
+import { captureSafeCanvas, saveAndOpenPdf, downloadPdfFile } from '../../utils/pdfGenerator';
+import { KG_LOGO_BASE64 } from '../../assets/logo';
+import { useLanguage } from '../../context/LanguageContext';
+
+const WhatsAppIcon = ({ className = "h-4 w-4" }) => (
+  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.105 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+  </svg>
+);
 
 export const TraderInvoiceModal = ({
   isOpen,
@@ -24,7 +34,11 @@ export const TraderInvoiceModal = ({
   ratePerKg = 135,
   onRateChange
 }) => {
-  const [downloading, setDownloading] = useState(false);
+  const { t, language } = useLanguage();
+  const [shareStatusText, setShareStatusText] = useState('');
+  const [downloadStatusText, setDownloadStatusText] = useState('');
+  const [waStatusText, setWaStatusText] = useState('');
+  const [waSupervisorStatusText, setWaSupervisorStatusText] = useState('');
 
   if (!isOpen) return null;
 
@@ -32,97 +46,222 @@ export const TraderInvoiceModal = ({
   const invNumber = invoiceData?.id || `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`;
   const invDate = invoiceData?.invoiceDate || invoiceData?.dispatchDate || dispatch?.dispatchDate || dispatch?.date || new Date().toISOString().split('T')[0];
   const customerName = invoiceData?.customerName || dispatch?.vehicleName || dispatch?.traderName || dispatch?.customerName || 'General Trader';
-  const customerPhone = invoiceData?.customerPhone || dispatch?.customerPhone || dispatch?.driverMobileNumber || '';
+  const customerPhone = invoiceData?.customerPhone || dispatch?.customerPhone || dispatch?.traderPhone || dispatch?.driverMobileNumber || dispatch?.mobileNumber || dispatch?.phone || '';
   const vehicleNo = invoiceData?.vehicleNumber || dispatch?.vehicleNumber || 'TN-38-AX-1234';
   const driverName = invoiceData?.driverName || dispatch?.driverName || 'Suresh';
 
-  // Calculate totals from boxSets or invoiceData
+  // Calculate totals from boxSets or invoiceData/dispatch
   const loadedSets = boxSets.filter(s => Number(s.loadedWeight) > 0);
-  const totalBoxes = boxSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
+  const totalBoxes = (boxSets && boxSets.length > 0)
+    ? boxSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0)
+    : (invoiceData?.totalBoxes || dispatch?.totalBoxCount || dispatch?.totalCrates || 0);
+
   const totalTareWeight = boxSets.reduce((acc, s) => acc + (Number(s.emptyBoxWeight) || 0), 0);
   const totalGrossWeight = boxSets.reduce((acc, s) => acc + (Number(s.loadedWeight) || 0), 0);
   
-  const totalNetWeight = (boxSets && boxSets.length > 0)
-    ? parseFloat(boxSets.reduce((sum, s) => sum + (Number(s.totalChickenWeight) || 0), 0).toFixed(2))
+  // Calculate net weight from loaded sets or fallback to dispatch / invoice totals
+  const calculatedNetFromSets = loadedSets.reduce((sum, s) => {
+    const gross = Number(s.loadedWeight) || 0;
+    const tare = Number(s.emptyBoxWeight) || 0;
+    const net = Number(s.totalChickenWeight) > 0 ? Number(s.totalChickenWeight) : Math.max(0, gross - tare);
+    return sum + net;
+  }, 0);
+
+  const totalNetWeight = calculatedNetFromSets > 0
+    ? parseFloat(calculatedNetFromSets.toFixed(2))
     : parseFloat(Number(invoiceData?.totalWeightKg || dispatch?.totalWeight || dispatch?.netWeight || 0).toFixed(2));
 
-  const totalBirds = (boxSets && boxSets.length > 0)
-    ? boxSets.reduce((sum, s) => sum + (Number(s.chickenCount) || 0), 0)
-    : (invoiceData?.totalChickens || dispatch?.totalBirds || dispatch?.birdsCount || 0);
+  const calculatedBirdsFromSets = loadedSets.reduce((sum, s) => sum + (Number(s.chickenCount) || 0), 0);
+  const totalBirds = calculatedBirdsFromSets > 0
+    ? calculatedBirdsFromSets
+    : (invoiceData?.totalChickens || dispatch?.totalBirds || dispatch?.birdsCount || ((dispatch?.totalBoxCount || 0) * (dispatch?.chickenCountPerBox || 12)) || 0);
 
   const currentRate = invoiceData?.ratePerKg || ratePerKg || 135;
   const avgWeight = totalBirds > 0 ? (totalNetWeight / totalBirds).toFixed(3) : (dispatch?.averageWeight || 0);
 
-  // PDF Generation Function - using captureSafeCanvas to sanitize host document oklch styles
-  const handleDownloadPDF = async () => {
+  // Helper to generate jsPDF document from rendered element
+  const generatePdfInstance = async () => {
     const el = document.getElementById('trader-invoice-document');
-    if (!el) return;
-    setDownloading(true);
-    try {
-      const canvas = await captureSafeCanvas(el);
-      const imgData = canvas.toDataURL('image/jpeg', 0.85);
-      const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4', compress: true });
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
-      const subPageTopMargin = 12; // Top margin space on Page 2 and below only
+    if (!el) return null;
+    const canvas = await captureSafeCanvas(el);
+    const imgData = canvas.toDataURL('image/jpeg', 0.85);
+    const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4', compress: true });
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+    const imgHeight = (canvas.height * pdfWidth) / canvas.width;
 
-      let heightLeft = imgHeight;
-      let renderedCanvasY = 0;
-
-      // Render Page 1 (offset 0 - no top margin on Page 1)
+    if (imgHeight <= pdfHeight) {
       pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, imgHeight, undefined, 'FAST');
-      renderedCanvasY += pageHeight;
-      heightLeft -= pageHeight;
+    } else {
+      let heightLeft = imgHeight;
+      let position = 0;
 
-      // Render Page 2 and below (with top margin space at starting of Page 2+)
-      while (heightLeft > 0) {
-        const position = subPageTopMargin - renderedCanvasY;
+      pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight, undefined, 'FAST');
+      heightLeft -= pdfHeight;
+
+      while (heightLeft > 3) {
+        position = position - pdfHeight;
         pdf.addPage();
         pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight, undefined, 'FAST');
-        pdf.setFillColor(255, 255, 255);
-        pdf.rect(0, 0, pdfWidth, subPageTopMargin, 'F');
+        heightLeft -= pdfHeight;
+      }
+    }
 
-        const canvasSliceOnSubPage = pageHeight - subPageTopMargin;
-        renderedCanvasY += canvasSliceOnSubPage;
-        heightLeft -= canvasSliceOnSubPage;
+    return pdf;
+  };
+
+  // 1. Native Share PDF Function (Opens Share Chooser ONLY; does not auto-download to storage)
+  const handleSharePDF = async () => {
+    setShareStatusText('preparing');
+    try {
+      const pdf = await generatePdfInstance();
+      if (!pdf) {
+        setShareStatusText('error');
+        setTimeout(() => setShareStatusText(''), 3000);
+        return;
       }
 
-      pdf.save(`KG-Poultry-Invoice-${invNumber}.pdf`);
+      setShareStatusText('opening');
+      const success = await saveAndOpenPdf(pdf, `KG-Poultry-Invoice-${invNumber}.pdf`);
+      if (!success) {
+        setShareStatusText('error');
+        setTimeout(() => setShareStatusText(''), 3000);
+      } else {
+        setTimeout(() => setShareStatusText(''), 1000);
+      }
     } catch (err) {
-      alert('PDF Export Error: ' + err.message);
-    } finally {
-      setDownloading(false);
+      alert('PDF Share Error: ' + err.message);
+      setShareStatusText('error');
+      setTimeout(() => setShareStatusText(''), 3000);
     }
   };
 
-  // WhatsApp Send Function
-  const handleSendToTraderWhatsApp = () => {
-    const textMessage = 
-`🐔 *KG POULTRY FARMS - OFFICIAL DISPATCH INVOICE* 🐔
-----------------------------------------
-📄 *Invoice No:* ${invNumber}
-📅 *Date:* ${invDate}
-🚛 *Vehicle No:* ${vehicleNo}
-👤 *Driver Name:* ${driverName}
-📱 *Trader Contact:* ${customerName} (${customerPhone || 'N/A'})
+  // 2. Explicit Download PDF Function (Saves PDF to public Downloads folder)
+  const handleDownloadPDF = async () => {
+    setDownloadStatusText('preparing');
+    try {
+      const pdf = await generatePdfInstance();
+      if (!pdf) {
+        setDownloadStatusText('error');
+        setTimeout(() => setDownloadStatusText(''), 3000);
+        return;
+      }
 
-📦 *LOAD & WEIGHING BREAKDOWN:*
-- Total Net Weight: *${totalNetWeight.toFixed(2)} kg*
-- Total Birds: *${totalBirds} birds*
-- Average Weight: *${avgWeight} kg/bird*
-----------------------------------------
-✅ *Officially Verified & Passed by KG Poultry Farms*
-Thank you for your business!`;
+      setDownloadStatusText('saving');
+      const success = await downloadPdfFile(pdf, `KG-Poultry-Invoice-${invNumber}.pdf`);
+      if (!success) {
+        setDownloadStatusText('error');
+        setTimeout(() => setDownloadStatusText(''), 3000);
+      } else {
+        setTimeout(() => setDownloadStatusText(''), 1000);
+      }
+    } catch (err) {
+      alert('PDF Download Error: ' + err.message);
+      setDownloadStatusText('error');
+      setTimeout(() => setDownloadStatusText(''), 3000);
+    }
+  };
 
-    const cleanPhone = customerPhone ? customerPhone.replace(/\D/g, '') : '';
-    const phoneParam = cleanPhone.length >= 10 ? (cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone) : '';
-    
-    const waUrl = phoneParam
-      ? `https://wa.me/${phoneParam}?text=${encodeURIComponent(textMessage)}`
-      : `https://wa.me/?text=${encodeURIComponent(textMessage)}`;
+  // 3. Send PDF to Trader WhatsApp Function
+  const handleSendToTraderWhatsApp = async () => {
+    let phoneToUse = customerPhone;
+    if (!phoneToUse) {
+      const input = window.prompt('Enter Trader WhatsApp Mobile Number (10 digits):');
+      if (input === null) return;
+      phoneToUse = input;
+    }
 
-    window.open(waUrl, '_blank');
+    setWaStatusText('preparing');
+    try {
+      const pdf = await generatePdfInstance();
+      if (!pdf) {
+        setWaStatusText('error');
+        setTimeout(() => setWaStatusText(''), 3000);
+        return;
+      }
+
+      setWaStatusText('sending');
+
+      if (Capacitor.isNativePlatform()) {
+        const success = await saveAndOpenPdf(
+          pdf,
+          `KG-Poultry-Invoice-${invNumber}.pdf`,
+          { targetPackage: 'whatsapp', phone: phoneToUse }
+        );
+        if (!success) {
+          setWaStatusText('error');
+          setTimeout(() => setWaStatusText(''), 3000);
+        } else {
+          setTimeout(() => setWaStatusText(''), 1000);
+        }
+      } else {
+        downloadPdfFile(pdf, `KG-Poultry-Invoice-${invNumber}.pdf`);
+        const textMessage = `🐔 *KG POULTRY FARMS - INVOICE ${invNumber}* 🐔\nAttached PDF Invoice for Vehicle ${vehicleNo}. Total Net Weight: ${totalNetWeight.toFixed(2)} kg (${totalBirds} birds).`;
+        const cleanPhone = phoneToUse ? phoneToUse.replace(/\D/g, '') : '';
+        const phoneParam = cleanPhone.length >= 10 ? (cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone) : '';
+        const waUrl = phoneParam
+          ? `https://wa.me/${phoneParam}?text=${encodeURIComponent(textMessage)}`
+          : `https://wa.me/?text=${encodeURIComponent(textMessage)}`;
+        window.open(waUrl, '_blank');
+        setTimeout(() => setWaStatusText(''), 1000);
+      }
+    } catch (err) {
+      alert('WhatsApp PDF Export Error: ' + err.message);
+      setWaStatusText('error');
+      setTimeout(() => setWaStatusText(''), 3000);
+    }
+  };
+
+  // 4. Send PDF to Supervisor WhatsApp Function (Mobile Number: 9500979771)
+  const handleSendToSupervisorWhatsApp = async () => {
+    const supervisorPhone = '919500979771';
+
+    setWaSupervisorStatusText('preparing');
+    try {
+      const pdf = await generatePdfInstance();
+      if (!pdf) {
+        setWaSupervisorStatusText('error');
+        setTimeout(() => setWaSupervisorStatusText(''), 3000);
+        return;
+      }
+
+      setWaSupervisorStatusText('sending');
+
+      if (Capacitor.isNativePlatform()) {
+        const success = await saveAndOpenPdf(
+          pdf,
+          `KG-Poultry-Invoice-${invNumber}.pdf`,
+          { targetPackage: 'whatsapp', phone: supervisorPhone }
+        );
+        if (!success) {
+          setWaSupervisorStatusText('error');
+          setTimeout(() => setWaSupervisorStatusText(''), 3000);
+        } else {
+          setTimeout(() => setWaSupervisorStatusText(''), 1000);
+        }
+      } else {
+        downloadPdfFile(pdf, `KG-Poultry-Invoice-${invNumber}.pdf`);
+        const textMessage = `\u{1F414} *KG POULTRY FARMS - DISPATCH INVOICE* \u{1F414}
+\u{1F4C6} Date: ${invDate}
+\u{1F69A} Vehicle: ${vehicleNo} (${driverName})
+\u{1F464} Trader: ${customerName}
+\u{1F4E6} Total Boxes: ${totalBoxes}
+\u{1F424} Total Birds: ${totalBirds}
+\u{2696}\u{FE0F} Total Net Wt: ${totalNetWeight.toFixed(2)} kg
+\u{1F4C8} Avg Wt: ${avgWeight} g/bird
+\u{1F4C4} Invoice #: ${invNumber}
+
+\u{1F4C4} PDF Invoice file downloaded to device.`;
+
+        const waUrl = `https://wa.me/${supervisorPhone}?text=${encodeURIComponent(textMessage)}`;
+        window.open(waUrl, '_blank');
+        setTimeout(() => setWaSupervisorStatusText(''), 1000);
+      }
+    } catch (err) {
+      alert('WhatsApp PDF Export Error: ' + err.message);
+      setWaSupervisorStatusText('error');
+      setTimeout(() => setWaSupervisorStatusText(''), 3000);
+    }
   };
 
   const handlePrint = () => {
@@ -147,12 +286,9 @@ Thank you for your business!`;
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '16px', marginBottom: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <img
-            src="/kg-logo.jpg"
+            src={KG_LOGO_BASE64 || "/kg-logo.jpg"}
             alt="KG Poultry Logo"
             style={{ height: '56px', width: '56px', borderRadius: '9999px', objectFit: 'contain', border: '2px solid #059669', padding: '2px' }}
-            onError={(e) => {
-              e.target.style.display = 'none';
-            }}
           />
           <div>
             <h1 style={{ color: '#0f172a', fontSize: '22px', fontWeight: '900', letterSpacing: '-0.02em', textTransform: 'uppercase', margin: 0 }}>
@@ -358,40 +494,97 @@ Thank you for your business!`;
           </p>
         </div>
 
-        {/* The 3 Action Buttons ONLY */}
+        {/* Action Buttons (Show ONLY buttons in popup as requested) */}
         <div className="grid grid-cols-1 gap-2.5 pt-2">
-          {/* 1. Download PDF */}
+          {/* 1. Send PDF to Supervisor WhatsApp (9500979771) */}
           <button
-            onClick={handleDownloadPDF}
-            disabled={downloading}
-            className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 px-4 py-3 text-xs font-black text-white shadow-sm transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+            onClick={handleSendToSupervisorWhatsApp}
+            disabled={Boolean(waSupervisorStatusText)}
+            className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-[#25D366] hover:bg-[#1faa53] px-4 py-3 text-xs font-black text-white shadow-sm transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
           >
-            <Download className="h-4 w-4 text-emerald-400" />
-            <span>{downloading ? 'Exporting PDF...' : 'Download PDF Invoice'}</span>
+            <WhatsAppIcon className="h-4 w-4 text-white shrink-0" />
+            <span>
+              {waSupervisorStatusText === 'preparing'
+                ? 'Preparing PDF...'
+                : waSupervisorStatusText === 'sending'
+                ? 'Opening Supervisor WhatsApp...'
+                : waSupervisorStatusText === 'error'
+                ? 'Unable to Open WhatsApp'
+                : (language === 'ta' ? 'மேற்பார்வையாளருக்கு அனுப்பு (வாட்ஸ்அப் PDF)' : 'Send to Supervisor (WhatsApp PDF)')}
+            </span>
           </button>
 
-          {/* 2. Send to Trader (WhatsApp) */}
+          {/* 2. Send PDF to Trader */}
           <button
             onClick={handleSendToTraderWhatsApp}
-            className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 px-4 py-3 text-xs font-black text-white shadow-sm transition-all active:scale-95 cursor-pointer"
+            disabled={Boolean(waStatusText)}
+            className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 px-4 py-3 text-xs font-black text-white shadow-sm transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
           >
-            <Send className="h-4 w-4 text-white" />
-            <span>Send to Trader (WhatsApp)</span>
+            <Send className="h-4 w-4 text-white shrink-0" />
+            <span>
+              {waStatusText === 'preparing'
+                ? 'Preparing PDF...'
+                : waStatusText === 'sending'
+                ? 'Opening WhatsApp...'
+                : waStatusText === 'error'
+                ? 'Unable to Open WhatsApp'
+                : (language === 'ta' ? 'வியாபாரிக்கு அனுப்பு (வாட்ஸ்அப்)' : 'Send to Trader')}
+            </span>
           </button>
 
-          {/* 3. Print Invoice */}
+          {/* 3. Download PDF Invoice */}
           <button
-            onClick={handlePrint}
-            className="w-full flex items-center justify-center gap-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 px-4 py-3 text-xs font-bold text-slate-800 shadow-2xs transition-all active:scale-95 cursor-pointer"
+            onClick={handleDownloadPDF}
+            disabled={Boolean(downloadStatusText)}
+            className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 px-4 py-3 text-xs font-black text-white shadow-sm transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
           >
-            <Printer className="h-4 w-4 text-slate-600" />
-            <span>Print Invoice</span>
+            <Download className="h-4 w-4 text-emerald-400 shrink-0" />
+            <span>
+              {downloadStatusText === 'preparing'
+                ? 'Preparing PDF...'
+                : downloadStatusText === 'saving'
+                ? 'Saving PDF to Downloads...'
+                : downloadStatusText === 'error'
+                ? 'Error Downloading PDF'
+                : (language === 'ta' ? 'PDF ரசீதைப் பதிவிறக்கு' : 'Download PDF Invoice')}
+            </span>
           </button>
+
+          {/* 4. Share PDF Invoice (Native Mobile App Only) */}
+          {Capacitor.isNativePlatform() && (
+            <button
+              onClick={handleSharePDF}
+              disabled={Boolean(shareStatusText)}
+              className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 px-4 py-3 text-xs font-black text-white shadow-sm transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+            >
+              <Share2 className="h-4 w-4 text-emerald-400 shrink-0" />
+              <span>
+                {shareStatusText === 'preparing'
+                  ? 'Preparing PDF...'
+                  : shareStatusText === 'opening'
+                  ? 'Opening Share Menu...'
+                  : shareStatusText === 'error'
+                  ? 'Unable to Share PDF'
+                  : 'Share PDF Invoice'}
+              </span>
+            </button>
+          )}
+
+          {/* 5. Print Invoice (Web Browsers Only - Hidden on Mobile App) */}
+          {!Capacitor.isNativePlatform() && (
+            <button
+              onClick={handlePrint}
+              className="w-full flex items-center justify-center gap-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 px-4 py-3 text-xs font-bold text-slate-800 shadow-2xs transition-all active:scale-95 cursor-pointer"
+            >
+              <Printer className="h-4 w-4 text-slate-600 shrink-0" />
+              <span>{language === 'ta' ? 'ரசீதை அச்சிடு' : 'Print Invoice'}</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Offscreen document template captured safely via iframe by captureSafeCanvas */}
-      <div style={{ position: 'fixed', left: '-9999px', top: '-9999px', width: '800px', opacity: 0, pointerEvents: 'none', zIndex: -100 }}>
+      {/* Offscreen document template positioned at -9999px for crisp canvas PDF generation */}
+      <div style={{ position: 'fixed', left: '-9999px', top: '0px', width: '800px', backgroundColor: '#ffffff', pointerEvents: 'none', zIndex: -9999 }}>
         {renderDocumentContent()}
       </div>
     </Modal>

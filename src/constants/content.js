@@ -64,6 +64,8 @@ export const content = {
     returnFeed: "Return Feed",
     recordDailyLog: "Record Daily Log",
     targetStandards: "Target Standards",
+    sendToSupervisor: "Send to Supervisor",
+    sendToSupervisorWhatsApp: "Send to Supervisor WhatsApp",
 
     // Card Labels & Headers
     available: "AVAILABLE",
@@ -260,6 +262,8 @@ export const content = {
     returnFeed: "தீவனம் திருப்பு",
     recordDailyLog: "தினசரி பதிவு",
     targetStandards: "இலக்குகள்",
+    sendToSupervisor: "மேற்பார்வையாளருக்கு அனுப்பு",
+    sendToSupervisorWhatsApp: "மேற்பார்வையாளருக்கு வாட்ஸ்அப் அனுப்பு",
 
     // Card Labels & Headers
     available: "இருப்பு",

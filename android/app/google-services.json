@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "951648043399",
+    "firebase_url": "https://kg-poultry-farms-default-rtdb.firebaseio.com",
+    "project_id": "kg-poultry-farms",
+    "storage_bucket": "kg-poultry-farms.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:951648043399:android:b741e72c48c5e7e046d322",
+        "android_client_info": {
+          "package_name": "com.kgpoultry.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "951648043399-46ncdcrhaho1jdhcp80vf4ogsub6rk44.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kgpoultry.app",
+            "certificate_hash": "5a58b244f42a325a3f3402d17f996055b5c508f8"
+          }
+        },
+        {
+          "client_id": "951648043399-gcuds69dffohrmsinjb7qm58c3smuns8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBGRYPpaHjdRiJGt0k4CgWrbsi8DV-W25s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "951648043399-gcuds69dffohrmsinjb7qm58c3smuns8.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -11,6 +11,14 @@ import { ClipboardList, AlertCircle, Save, CheckCircle2, Edit, Trash2, Layers, P
 import CustomSelect from '../components/common/CustomSelect';
 import CustomDatePicker from '../components/common/CustomDatePicker';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import { syncDailyDataEntryReminders } from '../services/notificationService';
+import { sendToSupervisorWhatsApp } from '../utils/whatsappHelper';
+
+const WhatsAppIcon = ({ className = "h-4 w-4" }) => (
+  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.105 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+  </svg>
+);
 
 export const DailyRecordsPage = () => {
   const { userProfile, isFarmer } = useAuth();
@@ -294,6 +302,7 @@ export const DailyRecordsPage = () => {
 
       await dbSaveDailyRecord(selectedBatch.id, formData.recordDate, recordObj);
       await dbUpdateBatchFeedStockPool(selectedBatch.id, deductionResult.updatedStock);
+      await syncDailyDataEntryReminders().catch(() => {});
 
       await dbLogAuditEvent(
         'DAILY_RECORD_SAVED',
@@ -320,6 +329,11 @@ export const DailyRecordsPage = () => {
   const paginatedRecords = recordsList.slice(startIndex, endIndex);
 
   const lastRecord = recordsList.length > 0 ? recordsList[0] : null;
+
+  const handleSendToSupervisor = (record) => {
+    if (!record) return;
+    sendToSupervisorWhatsApp(record, selectedBatch?.chickArrivalDate);
+  };
 
   // Compute current flock age day for selected batch
   let currentFlockAgeDay = 1;
@@ -407,11 +421,30 @@ export const DailyRecordsPage = () => {
   return (
     <div className="space-y-6">
       {/* Page Header with Action Button */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900 shrink-0">
           {t('dailyFarmRecords')}
         </h1>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {/* Send to Supervisor WhatsApp Button (Enabled if today's record is entered, disabled if not) */}
+          <button
+            onClick={() => handleSendToSupervisor(recordsMap[todayStr])}
+            disabled={!recordsMap || !recordsMap[todayStr]}
+            title={
+              recordsMap && recordsMap[todayStr]
+                ? (language === 'ta' ? 'மேற்பார்வையாளருக்கு இன்றைய பதிவை அனுப்பு' : 'Send today\'s record to Supervisor on WhatsApp')
+                : (language === 'ta' ? 'இன்றைய பதிவு இன்னும் சேர்க்கப்படவில்லை' : 'Today\'s daily entry is not logged yet')
+            }
+            className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs font-bold transition-all shadow-2xs shrink-0 cursor-pointer ${
+              recordsMap && recordsMap[todayStr]
+                ? 'bg-[#25D366] hover:bg-[#1faa53] text-white active:scale-95 shadow-xs'
+                : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-75'
+            }`}
+          >
+            <WhatsAppIcon className="h-4 w-4 shrink-0" />
+            <span>{t('sendToSupervisor')}</span>
+          </button>
+
           <button
             onClick={() => setShowTargetsTable(!showTargetsTable)}
             className="hidden sm:inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-2xs cursor-pointer"
@@ -797,28 +830,39 @@ export const DailyRecordsPage = () => {
             </div>
 
             {/* Modal Actions */}
-            <div className="flex gap-2 pt-1">
+            <div className="flex flex-col sm:flex-row gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => setViewingRecord(null)}
-                className="flex-1 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                onClick={() => handleSendToSupervisor(viewingRecord)}
+                className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#25D366] hover:bg-[#1faa53] py-2.5 px-3 text-xs font-bold text-white shadow-sm transition-all active:scale-95 cursor-pointer"
               >
-                {language === 'ta' ? 'மூடு' : 'Close'}
+                <WhatsAppIcon className="h-4 w-4 shrink-0" />
+                <span>{t('sendToSupervisorWhatsApp')}</span>
               </button>
-              {!isReadOnly && (
+
+              <div className="flex gap-2 w-full sm:w-auto">
                 <button
                   type="button"
-                  onClick={() => {
-                    const r = viewingRecord;
-                    setViewingRecord(null);
-                    handleEditRecord(r);
-                  }}
-                  className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 transition-colors shadow-sm"
+                  onClick={() => setViewingRecord(null)}
+                  className="flex-1 rounded-xl border border-slate-200 py-2.5 px-3 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
                 >
-                  <Edit className="h-4 w-4" />
-                  <span>{language === 'ta' ? 'பதிவைத் திருத்து' : 'Edit Record'}</span>
+                  {language === 'ta' ? 'மூடு' : 'Close'}
                 </button>
-              )}
+                {!isReadOnly && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const r = viewingRecord;
+                      setViewingRecord(null);
+                      handleEditRecord(r);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 px-3 text-xs font-bold text-white hover:bg-emerald-700 transition-colors shadow-sm"
+                  >
+                    <Edit className="h-4 w-4" />
+                    <span>{language === 'ta' ? 'திருத்து' : 'Edit'}</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -903,32 +947,44 @@ export const DailyRecordsPage = () => {
                         {r.averageWeight} g <span className={`text-[10px] font-semibold ${rWeightDiff < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>({rDiffStr})</span>
                       </td>
                       <td className="p-3 text-right">
-                        {!isReadOnly ? (
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditRecord(r);
-                              }}
-                              className="rounded-lg p-1 text-slate-500 hover:bg-slate-200/60 hover:text-slate-900"
-                              title="Edit Record"
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteRecord(r.recordDate);
-                              }}
-                              className="rounded-lg p-1 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
-                              title="Delete Record"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-[10px] text-slate-400 font-semibold italic">Locked</span>
-                        )}
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSendToSupervisor(r);
+                            }}
+                            className="rounded-lg p-1 text-[#25D366] hover:bg-emerald-50 hover:text-[#1faa53] transition-colors"
+                            title={language === 'ta' ? 'மேற்பார்வையாளருக்கு வாட்ஸ்அப் மூலம் அனுப்பு' : 'Send to Supervisor WhatsApp'}
+                          >
+                            <WhatsAppIcon className="h-3.5 w-3.5" />
+                          </button>
+                          {!isReadOnly ? (
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditRecord(r);
+                                }}
+                                className="rounded-lg p-1 text-slate-500 hover:bg-slate-200/60 hover:text-slate-900"
+                                title="Edit Record"
+                              >
+                                <Edit className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteRecord(r.recordDate);
+                                }}
+                                className="rounded-lg p-1 text-rose-500 hover:bg-rose-50 hover:text-rose-700"
+                                title="Delete Record"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 font-semibold italic ml-1">Locked</span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1008,30 +1064,44 @@ export const DailyRecordsPage = () => {
                       <span>{t('viewDetails')}</span>
                     </span>
 
-                    {!isReadOnly && (
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditRecord(r);
-                          }}
-                          className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
-                          title="Edit Record"
-                        >
-                          <Edit className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteRecord(r.recordDate);
-                          }}
-                          className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors"
-                          title="Delete Record"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSendToSupervisor(r);
+                        }}
+                        className="flex items-center gap-1 text-[11px] font-extrabold text-[#25D366] hover:text-[#1faa53] bg-emerald-50/80 hover:bg-emerald-100 px-2 py-1 rounded-lg border border-emerald-200/70 transition-colors"
+                        title={language === 'ta' ? 'வாட்ஸ்அப்பில் அனுப்பு' : 'Send to Supervisor WhatsApp'}
+                      >
+                        <WhatsAppIcon className="h-3.5 w-3.5" />
+                        <span>WhatsApp</span>
+                      </button>
+
+                      {!isReadOnly && (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditRecord(r);
+                            }}
+                            className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                            title="Edit Record"
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteRecord(r.recordDate);
+                            }}
+                            className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors"
+                            title="Delete Record"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
