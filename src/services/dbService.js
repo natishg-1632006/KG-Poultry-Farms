@@ -20,6 +20,19 @@ const INITIAL_LOCAL_STATE = {
       "passwordHash": "79e5b42b1a94f1a1f89af873157dfc87724d8b649debc83b7dc49c85a451fc4e",
       "createdAt": "2026-07-25T00:00:00.000Z",
       "updatedAt": "2026-09-19T17:00:00.000Z"
+    },
+    "farmer-user-1": {
+      "uid": "farmer-user-1",
+      "name": "Farm Manager / Farmer",
+      "email": "farmer@kgpoultry.com",
+      "phone": "+91 9876543211",
+      "farmName": "KG Poultry Shed 1",
+      "role": "Farmer",
+      "active": true,
+      "assignedBatches": ["KG001", "KG002"],
+      "passwordHash": "79e5b42b1a94f1a1f89af873157dfc87724d8b649debc83b7dc49c85a451fc4e",
+      "createdAt": "2026-07-25T00:00:00.000Z",
+      "updatedAt": "2026-09-19T17:00:00.000Z"
     }
   },
   "batches": {
