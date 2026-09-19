@@ -11,6 +11,7 @@ import { Capacitor } from '@capacitor/core';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { auth } from '../services/firebase';
 import { dbGetUsers, dbSaveUser, dbLogAuditEvent } from '../services/dbService';
+import { hashPassword, verifyPassword } from '../utils/cryptoUtils';
 
 const googleProvider = new GoogleAuthProvider();
 
@@ -117,12 +118,24 @@ export const AuthProvider = ({ children }) => {
       throw new Error(inactiveMsg);
     }
 
-    // 2. Validate password dynamically against database record
-    if (cleanPassword !== matched.password) {
+    // 2. Validate password dynamically against database record (SHA-256 hash or legacy plain text)
+    const isPasswordValid = await verifyPassword(cleanPassword, matched.password, matched.passwordHash);
+
+    if (!isPasswordValid) {
       const invMsg = 'Invalid email or password. Please try again.';
       setError(invMsg);
       throw new Error(invMsg);
     }
+
+    // Auto-migrate legacy plain-text password to SHA-256 hash
+    if (matched.password && !matched.passwordHash) {
+      const newHash = await hashPassword(cleanPassword);
+      matched.passwordHash = newHash;
+      delete matched.password;
+      await dbSaveUser(matched);
+    }
+
+    const { password: _p, passwordHash: _ph, ...safeProfile } = matched;
 
     // 3. Attempt Firebase Auth if available, fallback to DB record
     try {
@@ -131,11 +144,11 @@ export const AuthProvider = ({ children }) => {
       // Proceed with verified DB user record
     }
 
-    setCurrentUser({ uid: matched.uid, email: matched.email });
-    setUserProfile(matched);
-    localStorage.setItem('kg_poultry_active_session', JSON.stringify(matched));
-    dbLogAuditEvent('LOGIN', `User ${matched.email} logged in`, matched.name || matched.email);
-    return matched;
+    setCurrentUser({ uid: safeProfile.uid, email: safeProfile.email });
+    setUserProfile(safeProfile);
+    localStorage.setItem('kg_poultry_active_session', JSON.stringify(safeProfile));
+    dbLogAuditEvent('LOGIN', `User ${safeProfile.email} logged in`, safeProfile.name || safeProfile.email);
+    return safeProfile;
   };
 
   const processGoogleUser = async (user) => {

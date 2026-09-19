@@ -2,6 +2,7 @@ import { ref, get, set, update, remove, push, child } from 'firebase/database';
 import { db } from './firebase';
 import { FEED_CONSUMPTION_TARGETS, AVERAGE_WEIGHT_TARGETS } from '../constants/companyTargets';
 import { deductFeedStock } from '../utils/calculations';
+import { hashPassword } from '../utils/cryptoUtils';
 
 const MOCK_STORAGE_KEY = 'kg_poultry_local_db_v4';
 
@@ -2937,6 +2938,11 @@ export async function dbGetUsers() {
 export async function dbSaveUser(userData) {
   const uid = userData.uid || `user-${Date.now()}`;
   const record = { ...userData, uid, updatedAt: new Date().toISOString() };
+
+  if (record.password) {
+    record.passwordHash = await hashPassword(record.password);
+    delete record.password;
+  }
 
   try {
     await withTimeout(set(ref(db, `users/${uid}`), record));
