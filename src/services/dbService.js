@@ -8,7 +8,20 @@ const MOCK_STORAGE_KEY = 'kg_poultry_local_db_v4';
 
 // Initial seed state for local fallback mode
 const INITIAL_LOCAL_STATE = {
-  "users": {},
+  "users": {
+    "admin-kg-poultry": {
+      "uid": "admin-kg-poultry",
+      "name": "KG Poultry Farms Admin",
+      "email": "kgpoultryfarms@gmail.com",
+      "phone": "9080691947",
+      "farmName": "Central Operations",
+      "role": "Admin",
+      "active": true,
+      "passwordHash": "79e5b42b1a94f1a1f89af873157dfc87724d8b649debc83b7dc49c85a451fc4e",
+      "createdAt": "2026-07-25T00:00:00.000Z",
+      "updatedAt": "2026-09-19T17:00:00.000Z"
+    }
+  },
   "batches": {
     "KG001": {
       "id": "KG001",

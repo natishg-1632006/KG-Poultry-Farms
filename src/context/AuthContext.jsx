@@ -104,7 +104,13 @@ export const AuthProvider = ({ children }) => {
 
     // 1. Fetch authorized users dynamically from the database
     const users = await dbGetUsers();
-    const matched = users.find(u => (u.email || '').trim().toLowerCase() === cleanEmail);
+    const isKgEmail = (e) => e === 'kgpoultryfarms@gmail.com' || e === 'kgpoultryfarms@gmaiil.com';
+    const matched = users.find(u => {
+      const uEmail = (u.email || '').trim().toLowerCase();
+      if (uEmail === cleanEmail) return true;
+      if (isKgEmail(cleanEmail) && isKgEmail(uEmail)) return true;
+      return false;
+    });
 
     if (!matched) {
       const invMsg = 'Invalid email or password. Please try again.';
@@ -153,10 +159,16 @@ export const AuthProvider = ({ children }) => {
 
   const processGoogleUser = async (user) => {
     const googleEmail = (user.email || '').toLowerCase().trim();
+    const isKgEmail = (e) => e === 'kgpoultryfarms@gmail.com' || e === 'kgpoultryfarms@gmaiil.com';
 
     // Look up user dynamically in the database
     const users = await dbGetUsers();
-    let matched = users.find(u => (u.email || '').toLowerCase().trim() === googleEmail);
+    let matched = users.find(u => {
+      const uEmail = (u.email || '').trim().toLowerCase();
+      if (uEmail === googleEmail) return true;
+      if (isKgEmail(googleEmail) && isKgEmail(uEmail)) return true;
+      return false;
+    });
 
     if (!matched) {
       try { await firebaseSignOut(auth); } catch (_e) {}
