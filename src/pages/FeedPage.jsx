@@ -133,9 +133,13 @@ export const FeedPage = () => {
   const starterArrivedBags = Math.max(starterNetArrivedBags, starterAvailableBags);
   const finisherArrivedBags = Math.max(finisherNetArrivedBags, finisherAvailableBags);
 
-  const preConsumedBags = Math.max(0, parseFloat((preArrivedBags - preAvailableBags).toFixed(1)));
-  const starterConsumedBags = Math.max(0, parseFloat((starterArrivedBags - starterAvailableBags).toFixed(1)));
-  const finisherConsumedBags = Math.max(0, parseFloat((finisherArrivedBags - finisherAvailableBags).toFixed(1)));
+  const preConsumedRaw = Math.max(0, parseFloat((preArrivedBags - preAvailableBags).toFixed(1)));
+  const starterConsumedRaw = Math.max(0, parseFloat((starterArrivedBags - starterAvailableBags).toFixed(1)));
+  const finisherConsumedRaw = Math.max(0, parseFloat((finisherArrivedBags - finisherAvailableBags).toFixed(1)));
+
+  const preConsumedBags = Math.min(preNetArrivedBags, preConsumedRaw);
+  const starterConsumedBags = Math.min(starterNetArrivedBags, starterConsumedRaw);
+  const finisherConsumedBags = Math.min(finisherNetArrivedBags, finisherConsumedRaw);
 
   const handleEditArrival = (arrival) => {
     if (isReadOnly) return;

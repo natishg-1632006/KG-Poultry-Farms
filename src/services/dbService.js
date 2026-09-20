@@ -3632,8 +3632,20 @@ export async function dbGetBatchHistoryData(batchId) {
   const mortalityPercentage = initialChickCount > 0 ? ((totalMortality / initialChickCount) * 100).toFixed(2) : '0.00';
   const remainingChickCount = Number(selectedBatch.remainingChickCount ?? Math.max(0, initialChickCount - totalMortality));
 
-  const totalFeedConsumedKg = dailyRecords.reduce((sum, r) => sum + Number(r.feedConsumption || 0), 0);
-  const totalFeedBags = parseFloat((totalFeedConsumedKg / 70).toFixed(2));
+  const totalFeedArrivedBags = feedArrivals.reduce((acc, f) => {
+    const isReturn = f.transactionType === 'Return';
+    const totalKg = Number(f.quantityReceivedKg ?? f.quantityReceived ?? ((Number(f.bagsReceived || 0) * 70) + Number(f.additionalKg || 0)));
+    const bags = totalKg / 70;
+    return isReturn ? acc - bags : acc + bags;
+  }, 0);
+  const netArrivedBags = Math.max(0, totalFeedArrivedBags);
+  const rawConsumedBags = dailyRecords.reduce((sum, r) => sum + Number(r.feedConsumption || 0), 0) / 70;
+  const hasReturns = feedArrivals.some(f => f.transactionType === 'Return');
+  const isBatchDone = (selectedBatch.status || '').toLowerCase() === 'completed';
+  const totalFeedBags = (hasReturns || isBatchDone) && netArrivedBags > 0
+    ? parseFloat(Math.min(rawConsumedBags, netArrivedBags).toFixed(2))
+    : parseFloat(rawConsumedBags.toFixed(2));
+  const totalFeedConsumedKg = parseFloat((totalFeedBags * 70).toFixed(2));
 
   // Dispatches & Trader breakdown
   let totalDispatchedWeight = 0;

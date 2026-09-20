@@ -4,6 +4,11 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  build: {
+    sourcemap: false,
+    minify: 'esbuild',
+    target: 'es2020',
+  },
   test: {
     globals: true,
     environment: 'jsdom',

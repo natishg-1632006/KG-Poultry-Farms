@@ -60,12 +60,7 @@ export const FarmerDashboard = () => {
     ? Number(activeBatch.remainingChickCount)
     : Math.max(0, initialChicks - totalMortality);
 
-  const totalFeedConsumedKg = records.reduce((acc, r) => {
-    const kg = Number(r.feedConsumption || 0) || (Number(r.feedConsumptionBags || 0) * KG_PER_BAG);
-    return acc + kg;
-  }, 0);
-
-  const totalFeedConsumedBags = records.reduce((acc, r) => {
+  const rawConsumedBags = records.reduce((acc, r) => {
     const bags = r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG);
     return acc + Number(bags || 0);
   }, 0);
@@ -82,6 +77,14 @@ export const FarmerDashboard = () => {
   }, 0);
 
   const totalArrivedBagsFinal = Math.max(0, totalFeedArrivedBags);
+  const hasReturns = feedArrivals.some(f => f.transactionType === 'Return');
+  const isBatchDone = (activeBatch?.status || '').toLowerCase() === 'completed';
+
+  const totalFeedConsumedBags = (hasReturns || isBatchDone) && totalArrivedBagsFinal > 0
+    ? Math.min(rawConsumedBags, totalArrivedBagsFinal)
+    : rawConsumedBags;
+
+  const totalFeedConsumedKg = totalFeedConsumedBags * KG_PER_BAG;
 
   const consumedStr = Number.isInteger(totalFeedConsumedBags) ? totalFeedConsumedBags : parseFloat(totalFeedConsumedBags.toFixed(1));
   const arrivedStr = Number.isInteger(totalArrivedBagsFinal) ? totalArrivedBagsFinal : parseFloat(totalArrivedBagsFinal.toFixed(1));
