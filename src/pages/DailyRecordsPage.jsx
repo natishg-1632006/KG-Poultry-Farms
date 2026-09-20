@@ -416,6 +416,13 @@ export const DailyRecordsPage = () => {
     viewingWeightDiff = Number(viewingRecord.averageWeight || 0) - viewingTargetWeight;
   }
 
+  let minDailyRecordDate = null;
+  if (selectedBatch?.chickArrivalDate) {
+    const arrDate = new Date(selectedBatch.chickArrivalDate);
+    arrDate.setDate(arrDate.getDate() + 1);
+    minDailyRecordDate = arrDate.toISOString().split('T')[0];
+  }
+
   if (loading) return <LoadingSpinner message="Loading Daily Farm Records..." />;
 
   return (
@@ -619,7 +626,7 @@ export const DailyRecordsPage = () => {
             <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'பதிவு தேதி *' : 'Record Date *'}</label>
             <CustomDatePicker
               value={formData.recordDate}
-              min={selectedBatch?.chickArrivalDate}
+              min={minDailyRecordDate}
               max={todayStr}
               disabled={isReadOnly}
               loggedDates={Object.keys(recordsMap || {})}

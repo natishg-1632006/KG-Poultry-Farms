@@ -54,9 +54,10 @@ describe('Calculations Utility Tests', () => {
       expect(res.valid).toBe(true);
     });
 
-    it('allows dates prior to arrival date for pre-arrival entries', () => {
-      const res = validateRecordDate('2026-08-30', '2026-09-01', '2026-09-13');
-      expect(res.valid).toBe(true);
+    it('rejects dates on or before arrival date (starts from Day 1)', () => {
+      const res = validateRecordDate('2026-09-01', '2026-09-01', '2026-09-13');
+      expect(res.valid).toBe(false);
+      expect(res.message).toContain('Daily record entries start from Day 1');
     });
 
     it('rejects future dates', () => {

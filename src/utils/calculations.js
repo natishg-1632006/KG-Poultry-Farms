@@ -106,6 +106,15 @@ export function validateRecordDate(dateStr, arrivalDateStr, todayStr = new Date(
     return { valid: false, message: 'Record date is required.' };
   }
 
+  if (arrivalDateStr) {
+    const arrDate = new Date(arrivalDateStr);
+    arrDate.setDate(arrDate.getDate() + 1);
+    const minRecordDate = arrDate.toISOString().split('T')[0];
+    if (dateStr < minRecordDate) {
+      return { valid: false, message: `Daily record entries start from Day 1 (${minRecordDate}).` };
+    }
+  }
+
   if (dateStr > todayStr) {
     return { valid: false, message: 'Future dates are not allowed.' };
   }
