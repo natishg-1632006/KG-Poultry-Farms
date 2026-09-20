@@ -54,10 +54,9 @@ describe('Calculations Utility Tests', () => {
       expect(res.valid).toBe(true);
     });
 
-    it('rejects dates prior to arrival date', () => {
+    it('allows dates prior to arrival date for pre-arrival entries', () => {
       const res = validateRecordDate('2026-08-30', '2026-09-01', '2026-09-13');
-      expect(res.valid).toBe(false);
-      expect(res.message).toContain('cannot be earlier than chick arrival date');
+      expect(res.valid).toBe(true);
     });
 
     it('rejects future dates', () => {
@@ -68,9 +67,9 @@ describe('Calculations Utility Tests', () => {
   });
 
   describe('calculateDayOfBatch', () => {
-    it('calculates 1-based day index correctly', () => {
-      expect(calculateDayOfBatch('2026-09-01', '2026-09-01')).toBe(1);
-      expect(calculateDayOfBatch('2026-09-01', '2026-09-07')).toBe(7);
+    it('calculates day index correctly with next day as Day 1', () => {
+      expect(calculateDayOfBatch('2026-08-04', '2026-08-05')).toBe(1);
+      expect(calculateDayOfBatch('2026-08-04', '2026-08-10')).toBe(6);
     });
   });
 

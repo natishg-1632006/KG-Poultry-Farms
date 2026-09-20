@@ -341,7 +341,7 @@ export const DailyRecordsPage = () => {
     const arrivalDate = new Date(selectedBatch.chickArrivalDate);
     const today = new Date();
     const diffMs = Math.max(0, today.getTime() - arrivalDate.getTime());
-    currentFlockAgeDay = Math.min(45, Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1);
+    currentFlockAgeDay = Math.min(45, Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24))));
   }
 
   // Compute Target Feed & Weight info for selected form date
@@ -350,7 +350,7 @@ export const DailyRecordsPage = () => {
     const arrivalDate = new Date(selectedBatch.chickArrivalDate);
     const recDate = new Date(formData.recordDate);
     const diffMs = Math.max(0, recDate.getTime() - arrivalDate.getTime());
-    formFlockAgeDay = Math.min(45, Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1);
+    formFlockAgeDay = Math.min(45, Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24))));
   }
 
   const targetGramPerBird = FEED_CONSUMPTION_TARGETS[formFlockAgeDay] || 20;
@@ -374,7 +374,7 @@ export const DailyRecordsPage = () => {
       const arrivalDate = new Date(selectedBatch.chickArrivalDate);
       const recDate = new Date(lastRecord.recordDate);
       const diffMs = Math.max(0, recDate.getTime() - arrivalDate.getTime());
-      lastRecordFlockAgeDay = Math.min(45, Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1);
+      lastRecordFlockAgeDay = Math.min(45, Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24))));
     }
     lastRecordTargetGram = FEED_CONSUMPTION_TARGETS[lastRecordFlockAgeDay] || 20;
     lastRecordTargetWeightGram = AVERAGE_WEIGHT_TARGETS[lastRecordFlockAgeDay] || 58;
@@ -403,7 +403,7 @@ export const DailyRecordsPage = () => {
       const arrDate = new Date(selectedBatch.chickArrivalDate);
       const rDate = new Date(viewingRecord.recordDate);
       const diffMs = Math.max(0, rDate.getTime() - arrDate.getTime());
-      viewingAgeDay = Math.min(45, Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1);
+      viewingAgeDay = Math.min(45, Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24))));
     }
     viewingTargetIntake = FEED_CONSUMPTION_TARGETS[viewingAgeDay] || 20;
     viewingTargetWeight = AVERAGE_WEIGHT_TARGETS[viewingAgeDay] || 58;

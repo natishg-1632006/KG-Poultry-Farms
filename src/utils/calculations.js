@@ -106,10 +106,6 @@ export function validateRecordDate(dateStr, arrivalDateStr, todayStr = new Date(
     return { valid: false, message: 'Record date is required.' };
   }
 
-  if (arrivalDateStr && dateStr < arrivalDateStr) {
-    return { valid: false, message: `Record date cannot be earlier than chick arrival date (${arrivalDateStr}).` };
-  }
-
   if (dateStr > todayStr) {
     return { valid: false, message: 'Future dates are not allowed.' };
   }
@@ -118,7 +114,7 @@ export function validateRecordDate(dateStr, arrivalDateStr, todayStr = new Date(
 }
 
 /**
- * Calculates 1-based day index of batch (Day 1, Day 2...)
+ * Calculates day index of batch (Day 1 for next day after arrival)
  * @param {string} arrivalDateStr YYYY-MM-DD
  * @param {string} recordDateStr YYYY-MM-DD
  * @returns {number}
@@ -129,7 +125,7 @@ export function calculateDayOfBatch(arrivalDateStr, recordDateStr) {
   const record = new Date(recordDateStr);
   const diffTime = record.getTime() - arrival.getTime();
   const diffDays = Math.floor(diffTime / (1000 * 3600 * 24));
-  return Math.max(1, diffDays + 1);
+  return Math.max(1, diffDays);
 }
 
 /**

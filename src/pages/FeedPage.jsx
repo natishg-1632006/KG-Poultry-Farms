@@ -38,6 +38,7 @@ export const FeedPage = () => {
   const [formData, setFormData] = useState({
     transactionType: 'Receive',
     feedType: 'Pre-Starter',
+    billNumber: '',
     driverName: '',
     vehicleNumber: '',
     bagsReceived: 5,
@@ -144,6 +145,7 @@ export const FeedPage = () => {
     setFormData({
       transactionType: arrival.transactionType || 'Receive',
       feedType: arrival.feedType || 'Pre-Starter',
+      billNumber: arrival.billNumber || '',
       driverName: arrival.driverName || '',
       vehicleNumber: arrival.vehicleNumber || '',
       bagsReceived: bags,
@@ -207,6 +209,7 @@ export const FeedPage = () => {
         id: editingFeedId || `feed-${Date.now()}`,
         transactionType: formData.transactionType || 'Receive',
         feedType: formData.feedType,
+        billNumber: formData.billNumber || '',
         driverName: formData.driverName,
         vehicleNumber: formData.vehicleNumber,
         bagsReceived: bags,
@@ -232,6 +235,7 @@ export const FeedPage = () => {
       setFormData({
         transactionType: 'Receive',
         feedType: 'Pre-Starter',
+        billNumber: '',
         driverName: '',
         vehicleNumber: '',
         bagsReceived: 5,
@@ -538,11 +542,23 @@ export const FeedPage = () => {
               <CustomDatePicker
                 value={formData.date}
                 onChange={(dStr) => setFormData({ ...formData, date: dStr })}
-                min={selectedBatch?.chickArrivalDate}
                 loggedDates={feedArrivals.map(f => f.date)}
               />
             </div>
 
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'பில் எண் / ரசீது எண்' : 'Bill Number / Invoice No'}</label>
+              <input
+                type="text"
+                value={formData.billNumber}
+                onChange={(e) => setFormData({ ...formData, billNumber: e.target.value })}
+                placeholder={language === 'ta' ? 'எ.கா. BILL-1002' : 'e.g. BILL-1002'}
+                className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'வாகன எண்' : 'Vehicle Number'}</label>
               <input
@@ -553,17 +569,17 @@ export const FeedPage = () => {
                 className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
               />
             </div>
-          </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'ஓட்டுநர் / சேகரிப்பாளர் பெயர்' : 'Driver / Collector Name'}</label>
-            <input
-              type="text"
-              value={formData.driverName}
-              onChange={(e) => setFormData({ ...formData, driverName: e.target.value })}
-              placeholder={language === 'ta' ? 'எ.கா. முருகன்' : 'e.g. Murugan'}
-              className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
-            />
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'ஓட்டுநர் / சேகரிப்பாளர் பெயர்' : 'Driver / Collector Name'}</label>
+              <input
+                type="text"
+                value={formData.driverName}
+                onChange={(e) => setFormData({ ...formData, driverName: e.target.value })}
+                placeholder={language === 'ta' ? 'எ.கா. முருகன்' : 'e.g. Murugan'}
+                className="w-full rounded-xl border border-slate-200 py-2 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600"
+              />
+            </div>
           </div>
 
           <div>
@@ -586,6 +602,7 @@ export const FeedPage = () => {
                 setFormData({
                   transactionType: 'Receive',
                   feedType: 'Pre-Starter',
+                  billNumber: '',
                   driverName: '',
                   vehicleNumber: '',
                   bagsReceived: 5,
@@ -638,6 +655,7 @@ export const FeedPage = () => {
             <thead className="bg-slate-50 sticky top-0 border-b border-slate-100 uppercase tracking-wider text-slate-400 font-semibold whitespace-nowrap">
               <tr>
                 <th className="py-3 px-3">{t('date')}</th>
+                <th className="py-3 px-3">{language === 'ta' ? 'பில் எண்' : 'Bill No'}</th>
                 <th className="py-3 px-3">{t('transactionType')}</th>
                 <th className="py-3 px-3">{t('feedType')}</th>
                 <th className="py-3 px-3">{t('quantity')}</th>
@@ -647,7 +665,7 @@ export const FeedPage = () => {
             <tbody className="divide-y divide-slate-100 font-medium whitespace-nowrap">
               {filteredFeedArrivals.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="py-8 text-center text-slate-400">No feed transactions recorded matching criteria.</td>
+                  <td colSpan="6" className="py-8 text-center text-slate-400">No feed transactions recorded matching criteria.</td>
                 </tr>
               ) : (
                 filteredFeedArrivals.map((f) => {
@@ -660,6 +678,16 @@ export const FeedPage = () => {
                       className="hover:bg-slate-50 cursor-pointer transition-colors"
                     >
                       <td className="py-3 px-3 font-bold text-slate-900">{f.date}</td>
+                      <td className="py-3 px-3 font-bold text-slate-700">
+                        {f.billNumber ? (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-800 border border-slate-200 font-bold">
+                            <FileText className="h-3 w-3 text-slate-500" />
+                            {f.billNumber}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 italic">—</span>
+                        )}
+                      </td>
                       <td className="py-3 px-3 font-bold">
                         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-extrabold ${
                           isReturn ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
@@ -740,6 +768,12 @@ export const FeedPage = () => {
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-emerald-600 shrink-0" />
                       <span className="text-sm font-black text-slate-900">{f.date}</span>
+                      {f.billNumber && (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700 border border-slate-200">
+                          <FileText className="h-3 w-3 text-slate-500 shrink-0" />
+                          <span>{f.billNumber}</span>
+                        </span>
+                      )}
                     </div>
                     <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-extrabold ${
                       isReturn ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
@@ -807,6 +841,80 @@ export const FeedPage = () => {
           )}
         </div>
       </div>
+
+      {/* Feed Transaction Detail View Modal */}
+      {viewingDetail && (
+        <Modal
+          isOpen={!!viewingDetail}
+          onClose={() => setViewingDetail(null)}
+          title={language === 'ta' ? 'தீவனப் பரிவர்த்தனை விவரங்கள்' : 'Feed Transaction Details'}
+        >
+          <div className="space-y-4 text-xs">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl bg-slate-50 p-3 border border-slate-100">
+                <span className="text-slate-400 font-bold block mb-0.5">{language === 'ta' ? 'தேதி' : 'Date'}</span>
+                <span className="font-extrabold text-slate-900 text-sm">{viewingDetail.date}</span>
+              </div>
+              <div className="rounded-xl bg-slate-50 p-3 border border-slate-100">
+                <span className="text-slate-400 font-bold block mb-0.5">{language === 'ta' ? 'பில் எண்' : 'Bill Number'}</span>
+                <span className="font-extrabold text-slate-900 text-sm">{viewingDetail.billNumber || '—'}</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl bg-slate-50 p-3 border border-slate-100">
+                <span className="text-slate-400 font-bold block mb-0.5">{language === 'ta' ? 'தீவன வகை' : 'Feed Type'}</span>
+                <span className="font-extrabold text-slate-900 text-sm">{viewingDetail.feedType}</span>
+              </div>
+              <div className="rounded-xl bg-slate-50 p-3 border border-slate-100">
+                <span className="text-slate-400 font-bold block mb-0.5">{language === 'ta' ? 'பரிவர்த்தனை வகை' : 'Transaction Type'}</span>
+                <span className="font-extrabold text-slate-900 text-sm">
+                  {viewingDetail.transactionType === 'Return' 
+                    ? (language === 'ta' ? 'திரும்பப் பெறுதல் (Return)' : 'Return Feed') 
+                    : (language === 'ta' ? 'வரவு (Receive)' : 'Receive Feed')}
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-emerald-50 p-3 border border-emerald-100 text-emerald-950">
+              <span className="text-emerald-700 font-bold block mb-0.5">{language === 'ta' ? 'மொத்த அளவு' : 'Total Quantity'}</span>
+              <span className="font-black text-base block">
+                {viewingDetail.bagsReceived || 0} {language === 'ta' ? 'பைகள்' : 'Bags'} {viewingDetail.additionalKg ? `& ${viewingDetail.additionalKg} kg` : ''}
+              </span>
+              <span className="text-slate-500 font-medium text-[11px]">
+                ({(Number(viewingDetail.bagsReceived || 0) * KG_PER_BAG) + Number(viewingDetail.additionalKg || 0)} kg total)
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl bg-slate-50 p-3 border border-slate-100">
+                <span className="text-slate-400 font-bold block mb-0.5">{language === 'ta' ? 'வாகன எண்' : 'Vehicle Number'}</span>
+                <span className="font-semibold text-slate-800">{viewingDetail.vehicleNumber || '—'}</span>
+              </div>
+              <div className="rounded-xl bg-slate-50 p-3 border border-slate-100">
+                <span className="text-slate-400 font-bold block mb-0.5">{language === 'ta' ? 'ஓட்டுநர் பெயர்' : 'Driver Name'}</span>
+                <span className="font-semibold text-slate-800">{viewingDetail.driverName || '—'}</span>
+              </div>
+            </div>
+
+            {viewingDetail.notes && (
+              <div className="rounded-xl bg-slate-50 p-3 border border-slate-100">
+                <span className="text-slate-400 font-bold block mb-0.5">{language === 'ta' ? 'குறிப்புகள்' : 'Notes'}</span>
+                <span className="text-slate-700 font-medium">{viewingDetail.notes}</span>
+              </div>
+            )}
+
+            <div className="pt-2 text-right">
+              <button
+                onClick={() => setViewingDetail(null)}
+                className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800"
+              >
+                {language === 'ta' ? 'மூடு' : 'Close'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Custom Delete Confirmation Modal */}
       <ConfirmModal

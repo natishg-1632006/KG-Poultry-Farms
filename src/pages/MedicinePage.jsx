@@ -318,7 +318,6 @@ export const MedicinePage = () => {
             <CustomDatePicker
               value={date}
               onChange={(dStr) => setDate(dStr)}
-              min={selectedBatch?.chickArrivalDate}
               loggedDates={records.map(r => r.date)}
             />
           </div>

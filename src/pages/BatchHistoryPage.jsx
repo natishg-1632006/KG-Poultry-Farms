@@ -1456,7 +1456,7 @@ export const BatchHistoryPage = () => {
                                   } else if (b.chickArrivalDate && dateStr !== 'N/A') {
                                     const d1 = new Date(b.chickArrivalDate);
                                     const d2 = new Date(dateStr);
-                                    const diffDays = Math.floor((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
+                                    const diffDays = Math.floor((d2 - d1) / (1000 * 60 * 60 * 24));
                                     if (!isNaN(diffDays) && diffDays >= 0) {
                                       birdAgeStr = language === 'ta' ? `நாள் ${diffDays}` : `Day ${diffDays}`;
                                     }
@@ -1517,7 +1517,7 @@ export const BatchHistoryPage = () => {
                               } else if (b.chickArrivalDate && dateStr !== 'N/A') {
                                 const d1 = new Date(b.chickArrivalDate);
                                 const d2 = new Date(dateStr);
-                                const diffDays = Math.floor((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
+                                const diffDays = Math.floor((d2 - d1) / (1000 * 60 * 60 * 24));
                                 if (!isNaN(diffDays) && diffDays >= 0) {
                                   birdAgeStr = language === 'ta' ? `நாள் ${diffDays}` : `Day ${diffDays}`;
                                 }
@@ -1762,7 +1762,7 @@ export const BatchHistoryPage = () => {
             const d1 = new Date(b.chickArrivalDate);
             const d2 = new Date(viewingDailyRecord.recordDate);
             const diffMs = Math.max(0, d2.getTime() - d1.getTime());
-            viewingAgeDay = Math.min(45, Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1);
+            viewingAgeDay = Math.min(45, Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24))));
           }
           const targetWeight = AVERAGE_WEIGHT_TARGETS[viewingAgeDay] || 58;
           const weightDiff = Number(viewingDailyRecord.averageWeight || 0) - targetWeight;

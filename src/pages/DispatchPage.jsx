@@ -1713,7 +1713,6 @@ export const DispatchPage = () => {
               <CustomDatePicker
                 value={dispatchHeader.dispatchDate}
                 onChange={(dStr) => setDispatchHeader({ ...dispatchHeader, dispatchDate: dStr })}
-                min={selectedBatch?.chickArrivalDate}
                 loggedDates={dispatches.map(d => d.dispatchDate)}
               />
             </div>
