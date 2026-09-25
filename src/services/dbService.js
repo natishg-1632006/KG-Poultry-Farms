@@ -2914,12 +2914,15 @@ export function recalculateBatchRemainingChickens(batchId, local = getLocalDB())
   let totalDispatchedBirds = 0;
 
   for (const d of dispatchesList) {
-    const setsRaw = (local.boxSets || {})[d.id] || [];
+    const hasBoxSetsKey = Object.prototype.hasOwnProperty.call(local.boxSets || {}, d.id) || Array.isArray(d.boxSets);
+    const setsRaw = (local.boxSets || {})[d.id] || d.boxSets || [];
     const sets = Array.isArray(setsRaw) ? setsRaw : Object.values(setsRaw);
     const loadedSets = sets.filter(s => Number(s.loadedWeight) > 0 || Number(s.totalChickenWeight) > 0);
     const setBirds = loadedSets.reduce((sum, s) => sum + Number(s.chickenCount || 0), 0);
 
-    const birds = setBirds > 0 ? setBirds : Number(d.birdsCount || d.totalBirds || (d.status === 'Completed' ? d.totalChickens : 0) || 0);
+    const birds = hasBoxSetsKey 
+      ? setBirds 
+      : (setBirds > 0 ? setBirds : Number(d.birdsCount || d.totalBirds || (d.status === 'Completed' ? d.totalChickens : 0) || 0));
     totalDispatchedBirds += birds;
   }
 
@@ -3549,49 +3552,50 @@ export async function dbSaveBoxSet(dispatchId, boxSetData) {
 }
 
 export async function dbDeleteBoxSet(dispatchId, setId) {
-  try {
-    await withTimeout(remove(ref(db, `boxSets/${dispatchId}/${setId}`)));
-  } catch (_err) {
-    // fallback
-  }
-
   const local = getLocalDB();
-  if (local.boxSets[dispatchId]) {
-    local.boxSets[dispatchId] = local.boxSets[dispatchId].filter(s => s.id !== setId && s.boxSetNumber !== setId);
+  if (local.boxSets && local.boxSets[dispatchId]) {
+    local.boxSets[dispatchId] = local.boxSets[dispatchId].filter(s => s.id !== setId && s.boxSetNumber !== setId && String(s.boxSetNumber) !== String(setId));
   }
 
   const dispatch = (local.dispatches || {})[dispatchId];
+  let remaining = null;
+
   if (dispatch) {
     const allSets = local.boxSets[dispatchId] || [];
     const loadedSets = allSets.filter(s => Number(s.loadedWeight) > 0 || Number(s.totalChickenWeight) > 0);
     const setBirds = loadedSets.reduce((sum, s) => sum + Number(s.chickenCount || 0), 0);
     const setWeight = loadedSets.reduce((sum, s) => sum + Number(s.totalChickenWeight || 0), 0);
+    const setCrates = loadedSets.reduce((sum, s) => sum + Number(s.boxesInSet || 1), 0);
 
     dispatch.birdsCount = setBirds;
     dispatch.totalBirds = setBirds;
+    dispatch.totalChickens = setBirds;
     dispatch.totalWeight = setWeight;
     dispatch.netWeight = setWeight;
-
-    try {
-      await withTimeout(set(ref(db, `dispatches/${dispatchId}/birdsCount`), setBirds));
-      await withTimeout(set(ref(db, `dispatches/${dispatchId}/totalBirds`), setBirds));
-      await withTimeout(set(ref(db, `dispatches/${dispatchId}/totalWeight`), setWeight));
-      await withTimeout(set(ref(db, `dispatches/${dispatchId}/netWeight`), setWeight));
-    } catch (_e) {
-      // fallback
-    }
+    dispatch.cratesCount = setCrates;
+    dispatch.totalCrates = setCrates;
+    dispatch.status = (dispatch.totalBoxCount > 0 && setCrates >= dispatch.totalBoxCount) ? 'Completed' : 'In Progress';
+    dispatch.boxSets = allSets;
 
     if (dispatch.batchId && local.batches[dispatch.batchId]) {
-      const remaining = recalculateBatchRemainingChickens(dispatch.batchId, local);
-      try {
-        await withTimeout(set(ref(db, `batches/${dispatch.batchId}/remainingChickCount`), remaining));
-      } catch (_e) {
-        // fallback
-      }
+      remaining = recalculateBatchRemainingChickens(dispatch.batchId, local);
     }
   }
 
   saveLocalDB(local);
+
+  try {
+    const writes = [
+      set(ref(db, `boxSets/${dispatchId}`), local.boxSets[dispatchId] || []),
+      dispatch ? set(ref(db, `dispatches/${dispatchId}`), dispatch) : Promise.resolve()
+    ];
+    if (remaining !== null && dispatch?.batchId) {
+      writes.push(set(ref(db, `batches/${dispatch.batchId}/remainingChickCount`), remaining));
+    }
+    await withTimeout(Promise.all(writes));
+  } catch (_e) {
+    // fallback
+  }
 }
 
 // COMPANY TARGETS

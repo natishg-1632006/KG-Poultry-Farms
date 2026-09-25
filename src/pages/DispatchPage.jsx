@@ -604,7 +604,13 @@ export const DispatchPage = () => {
 
         const updatedDispatch = {
           ...activeDispatch,
+          birdsCount: combinedChicks,
+          totalBirds: combinedChicks,
+          totalChickens: combinedChicks,
           totalWeight: parseFloat(combinedWeight.toFixed(2)),
+          netWeight: parseFloat(combinedWeight.toFixed(2)),
+          cratesCount: combinedLoadedBoxes,
+          totalCrates: combinedLoadedBoxes,
           averageWeight: combinedAvg,
           status: combinedLoadedBoxes >= activeDispatch.totalBoxCount ? 'Completed' : 'In Progress',
           boxSets: updatedSets
