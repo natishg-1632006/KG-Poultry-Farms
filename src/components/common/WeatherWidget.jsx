@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { 
   Sun, 
+  Moon,
   CloudSun, 
   Cloud, 
   CloudFog, 
@@ -22,7 +23,7 @@ import {
 import { fetchWeather, searchVillageLocation, DEFAULT_FARM_LOCATION, getPoultryWeatherAdvisory } from '../../services/weatherService';
 import { Badge } from './Badge';
 
-import { WEATHER_3D_ICON_MAP, CloudSun3D } from './Weather3DIcons';
+import { WEATHER_3D_ICON_MAP, CloudSun3D, CloudMoon3D } from './Weather3DIcons';
 
 const LOCATION_STORAGE_KEY = 'kg_poultry_farm_weather_location';
 const WEATHER_CACHE_KEY = 'kg_poultry_farm_weather_cache';
@@ -41,6 +42,63 @@ const INITIAL_FALLBACK_WEATHER = {
   advisory: getPoultryWeatherAdvisory(31),
   updatedAt: 'Live'
 };
+
+function getTimeOfDay() {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) {
+    return {
+      period: 'morning',
+      labelEn: 'Morning',
+      labelTa: 'காலை',
+      cardClass: 'bg-gradient-to-br from-amber-50/90 via-yellow-50/60 to-orange-50/40 border-amber-200/90 shadow-amber-500/5',
+      accentLine: 'from-amber-400 via-amber-500 to-yellow-400',
+      iconBoxClass: 'from-amber-100/90 to-yellow-100/60 border-amber-200/90',
+      badgeClass: 'bg-amber-100/80 text-amber-900 border-amber-300/80',
+      timeIcon: Sun
+    };
+  } else if (hour >= 12 && hour < 17) {
+    return {
+      period: 'afternoon',
+      labelEn: 'Afternoon',
+      labelTa: 'மதியம்',
+      cardClass: 'bg-gradient-to-br from-sky-50/90 via-blue-50/60 to-cyan-50/40 border-sky-200/90 shadow-sky-500/5',
+      accentLine: 'from-sky-400 via-blue-500 to-cyan-400',
+      iconBoxClass: 'from-sky-100/90 to-blue-100/60 border-sky-200/90',
+      badgeClass: 'bg-sky-100/80 text-sky-900 border-sky-300/80',
+      timeIcon: Sun
+    };
+  } else if (hour >= 17 && hour < 20) {
+    return {
+      period: 'evening',
+      labelEn: 'Evening',
+      labelTa: 'மாலை',
+      cardClass: 'bg-gradient-to-br from-orange-50/90 via-rose-50/60 to-amber-50/40 border-orange-200/90 shadow-orange-500/5',
+      accentLine: 'from-orange-400 via-rose-400 to-amber-400',
+      iconBoxClass: 'from-orange-100/90 to-rose-100/60 border-orange-200/90',
+      badgeClass: 'bg-orange-100/80 text-orange-900 border-orange-300/80',
+      timeIcon: Sun
+    };
+  } else {
+    return {
+      period: 'night',
+      labelEn: 'Night',
+      labelTa: 'இரவு',
+      cardClass: 'bg-gradient-to-br from-indigo-50/90 via-slate-50/80 to-purple-50/40 border-indigo-200/90 shadow-indigo-500/5',
+      accentLine: 'from-indigo-400 via-purple-500 to-indigo-600',
+      iconBoxClass: 'from-indigo-100/90 to-purple-100/60 border-indigo-200/90',
+      badgeClass: 'bg-indigo-100/80 text-indigo-900 border-indigo-300/80',
+      timeIcon: Moon
+    };
+  }
+}
+
+function getEffective3DIconKey(rawKey, period) {
+  if (period === 'night') {
+    if (rawKey === 'Sun') return 'Moon';
+    if (rawKey === 'CloudSun' || rawKey === 'Cloud') return 'CloudMoon';
+  }
+  return rawKey;
+}
 
 export const WeatherWidget = () => {
   const { language, t } = useLanguage();
@@ -133,7 +191,10 @@ export const WeatherWidget = () => {
     );
   }
 
-  const Weather3DIcon = weather && WEATHER_3D_ICON_MAP[weather.weatherIconKey] ? WEATHER_3D_ICON_MAP[weather.weatherIconKey] : CloudSun3D;
+  const timeOfDay = getTimeOfDay();
+  const effectiveIconKey = getEffective3DIconKey(weather?.weatherIconKey, timeOfDay.period);
+  const Weather3DIcon = WEATHER_3D_ICON_MAP[effectiveIconKey] || (timeOfDay.period === 'night' ? CloudMoon3D : CloudSun3D);
+  const TimeIcon = timeOfDay.timeIcon;
 
   if (loading) {
     return (
@@ -153,16 +214,16 @@ export const WeatherWidget = () => {
   const advisory = weather?.advisory;
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs transition-all duration-300 hover:shadow-md">
+    <div className={`relative overflow-hidden rounded-2xl border transition-all duration-300 hover:shadow-md ${timeOfDay.cardClass}`}>
       {/* Top accent line */}
-      <div className="h-1.5 w-full bg-gradient-to-r from-emerald-600 to-teal-400" />
+      <div className={`h-1.5 w-full bg-gradient-to-r ${timeOfDay.accentLine}`} />
 
       <div className="p-5">
-        {/* Header: Village location & Refresh button */}
-        <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+        {/* Header: Village location & Time of day badge & Refresh button */}
+        <div className="flex items-center justify-between gap-2 border-b border-slate-200/60 pb-3">
           <div className="flex items-center gap-1.5 min-w-0">
             <MapPin className="h-4 w-4 text-emerald-600 shrink-0" />
-            <span className="text-xs font-bold text-slate-800 tracking-tight truncate max-w-[140px] sm:max-w-xs">
+            <span className="text-xs font-bold text-slate-800 tracking-tight truncate max-w-[130px] sm:max-w-xs">
               {location.name}
             </span>
             <button
@@ -173,7 +234,13 @@ export const WeatherWidget = () => {
             </button>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
+          <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
+            {/* Time of Day Badge */}
+            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-extrabold tracking-wide ${timeOfDay.badgeClass}`}>
+              <TimeIcon className="h-3 w-3 shrink-0" />
+              <span>{language === 'ta' ? timeOfDay.labelTa : timeOfDay.labelEn}</span>
+            </span>
+
             <span className="text-[10px] font-semibold text-slate-400 whitespace-nowrap">
               {weather?.updatedAt}
             </span>
@@ -181,7 +248,7 @@ export const WeatherWidget = () => {
               onClick={loadWeatherData}
               disabled={refreshing}
               title="Refresh weather"
-              className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors shrink-0"
+              className="p-1 rounded-lg text-slate-400 hover:bg-slate-200/60 hover:text-slate-600 transition-colors shrink-0"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin text-emerald-600' : ''}`} />
             </button>
@@ -191,8 +258,8 @@ export const WeatherWidget = () => {
         {/* Main Weather Display */}
         <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3.5">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-slate-100 bg-gradient-to-br from-slate-50 to-emerald-50/50 shadow-2xs">
-              <Weather3DIcon className="h-11 w-11 drop-shadow-sm transition-transform duration-300 hover:scale-105" />
+            <div className="shrink-0 flex items-center justify-center p-1">
+              <Weather3DIcon className="h-20 w-20 sm:h-24 sm:w-24 drop-shadow-xl transition-transform duration-300 hover:scale-110 filter" />
             </div>
             <div>
               <div className="flex items-baseline gap-2 flex-wrap">
@@ -203,14 +270,14 @@ export const WeatherWidget = () => {
                   {t('feelsLike')} {weather?.feelsLike}°C
                 </span>
               </div>
-              <p className="text-xs font-bold text-slate-600">
-                {language === 'ta' && (weather?.weatherLabelTa || weatherInfo?.labelTa) ? (weather.weatherLabelTa || weatherInfo?.labelTa) : weather?.weatherLabel} • H: {weather?.tempMax}°C L: {weather?.tempMin}°C
+              <p className="text-xs font-bold text-slate-700">
+                {language === 'ta' && weather?.weatherLabelTa ? weather.weatherLabelTa : weather?.weatherLabel} • H: {weather?.tempMax}°C L: {weather?.tempMin}°C
               </p>
             </div>
           </div>
 
           {/* Quick Metrics (Humidity & Wind) */}
-          <div className="flex items-center gap-4 rounded-xl bg-slate-50 border border-slate-100 p-2.5 sm:px-4">
+          <div className="flex items-center gap-4 rounded-xl bg-white/70 backdrop-blur-xs border border-slate-200/60 p-2.5 sm:px-4 shadow-2xs">
             <div className="flex items-center gap-1.5">
               <Droplets className="h-4 w-4 text-blue-500" />
               <div>
@@ -218,7 +285,7 @@ export const WeatherWidget = () => {
                 <p className="text-xs font-bold text-slate-800">{weather?.humidity}%</p>
               </div>
             </div>
-            <div className="h-6 w-px bg-slate-200" />
+            <div className="h-6 w-px bg-slate-200/80" />
             <div className="flex items-center gap-1.5">
               <Wind className="h-4 w-4 text-teal-600" />
               <div>

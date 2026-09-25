@@ -293,15 +293,15 @@ export const FeedPage = () => {
       </div>
 
       {isReadOnly && (
-        <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-amber-800 flex items-center justify-between shadow-xs">
-          <div className="flex items-center gap-3">
+        <div className="rounded-xl bg-amber-50 border border-amber-200 p-3.5 text-amber-800 flex items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-2.5 min-w-0">
             <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
-            <div>
-              <p className="text-xs font-bold">Batch Marked as Completed ({selectedBatch?.batchName || selectedBatch?.batchNumber})</p>
-              <p className="text-[11px] text-amber-700">This batch is completed. Feed transactions are in read-only mode.</p>
+            <div className="min-w-0">
+              <p className="text-xs font-bold truncate">Batch Marked as Completed ({selectedBatch?.batchName || selectedBatch?.batchNumber})</p>
+              <p className="text-[11px] text-amber-700 leading-tight">This batch is completed. Feed transactions are in read-only mode.</p>
             </div>
           </div>
-          <span className="rounded-md bg-amber-200/80 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-900">
+          <span className="shrink-0 whitespace-nowrap rounded-md bg-amber-200/90 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-900">
             {t('readOnlyMode')}
           </span>
         </div>
