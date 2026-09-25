@@ -2919,12 +2919,7 @@ export function recalculateBatchRemainingChickens(batchId, local = getLocalDB())
     const loadedSets = sets.filter(s => Number(s.loadedWeight) > 0 || Number(s.totalChickenWeight) > 0);
     const setBirds = loadedSets.reduce((sum, s) => sum + Number(s.chickenCount || 0), 0);
 
-    let birds = 0;
-    if (sets && sets.length > 0) {
-      birds = setBirds;
-    } else {
-      birds = Number(d.birdsCount || d.totalBirds || (d.status === 'Completed' ? d.totalChickens : 0) || 0);
-    }
+    const birds = setBirds > 0 ? setBirds : Number(d.birdsCount || d.totalBirds || (d.status === 'Completed' ? d.totalChickens : 0) || 0);
     totalDispatchedBirds += birds;
   }
 
@@ -3743,9 +3738,7 @@ export async function dbGetBatchHistoryData(batchId) {
     fcr = parseFloat((totalFeedConsumedKg / totalLiveWeightKg).toFixed(2));
   }
 
-  const finalDispatchedBirds = isCompleted
-    ? (totalDispatchedBirds > 0 ? Math.max(totalDispatchedBirds, survivingBirds) : survivingBirds)
-    : totalDispatchedBirds;
+  const dispatchedAvgWeight = totalDispatchedBirds > 0 ? parseFloat((totalDispatchedWeight / totalDispatchedBirds).toFixed(3)) : 0;
 
   return {
     batch: selectedBatch,
@@ -3756,9 +3749,10 @@ export async function dbGetBatchHistoryData(batchId) {
     totalFeedConsumedKg,
     totalFeedBags,
     totalDispatchedWeight: parseFloat(totalDispatchedWeight.toFixed(2)),
-    totalDispatchedBirds: finalDispatchedBirds,
+    totalDispatchedBirds: totalDispatchedBirds,
     totalCratesCount,
     avgBirdWeight,
+    dispatchedAvgWeight,
     fcr,
     traderBreakdown,
     dailyRecords,

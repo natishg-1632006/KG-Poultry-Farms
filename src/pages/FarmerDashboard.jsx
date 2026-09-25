@@ -135,12 +135,24 @@ export const FarmerDashboard = () => {
   }
 
   const displayChicksVal = isBatchDone
-    ? `${finalDispatchedBirds.toLocaleString()} / ${initialChicks.toLocaleString()}`
+    ? `${totalDispatchedBirds.toLocaleString()} / ${initialChicks.toLocaleString()}`
     : `${Number(remainingChicks).toLocaleString()} / ${initialChicks.toLocaleString()}`;
 
   const displayChicksSubtext = isBatchDone
     ? (language === 'ta' ? 'விநியோகிக்கப்பட்டவை / ஆரம்ப குஞ்சுகள்' : 'Dispatched / Initial Chicks')
     : t('liveInitialChicks');
+
+  const dispatchedAvgWeightGrams = totalDispatchedBirds > 0
+    ? Math.round((totalDispatchedWeight / totalDispatchedBirds) * 1000)
+    : 0;
+
+  const displayAvgWeight = (isBatchDone || totalDispatchedBirds > 0) && dispatchedAvgWeightGrams > 0
+    ? `${dispatchedAvgWeightGrams} g`
+    : (latestAvgWeight ? `${latestAvgWeight} g` : '0 g');
+
+  const displayAvgWeightSubtext = (isBatchDone || totalDispatchedBirds > 0) && dispatchedAvgWeightGrams > 0
+    ? (language === 'ta' ? 'அனுப்பப்பட்ட சராசரி எடை (எடை / கோழிகள்)' : 'Dispatched Avg (Total Wt / Dispatched Birds)')
+    : (latestRecord ? `${t('latestEntry')}: ${latestRecord.recordDate}` : t('noDailyRecordsYet'));
 
   return (
     <div className="space-y-6">
@@ -190,9 +202,9 @@ export const FarmerDashboard = () => {
               color="amber"
             />
             <StatCard
-              title={t('latestAvgWeight')}
-              value={`${latestAvgWeight} g`}
-              subtext={latestRecord ? `${t('latestEntry')}: ${latestRecord.recordDate}` : t('noDailyRecordsYet')}
+              title={isBatchDone || totalDispatchedBirds > 0 ? (language === 'ta' ? 'அனுப்பப்பட்ட சராசரி எடை' : 'Dispatched Avg Weight') : t('latestAvgWeight')}
+              value={displayAvgWeight}
+              subtext={displayAvgWeightSubtext}
               icon={Scale}
               color="emerald"
             />

@@ -981,12 +981,21 @@ export const BatchHistoryPage = () => {
                 </div>
               </div>
               <div className="mt-3">
-                <div className="text-xl sm:text-2xl font-black text-emerald-800 tracking-tight whitespace-nowrap">
-                  {historyData.avgBirdWeight} <span className="text-xs font-bold text-slate-500">kg</span>
-                </div>
-                <div className="mt-1 text-[10px] sm:text-xs font-extrabold text-emerald-700 whitespace-nowrap truncate">
-                  {historyData.avgBirdWeight > 0 ? `${(historyData.avgBirdWeight * 1000).toFixed(0)} g / ${language === 'ta' ? 'கோழி' : 'bird'}` : (language === 'ta' ? 'எடை பதிவு இல்லை' : 'No weight data')}
-                </div>
+                {(() => {
+                  const displayAvgWtVal = (historyData.totalDispatchedBirds > 0 && historyData.totalDispatchedWeight > 0)
+                    ? parseFloat((historyData.totalDispatchedWeight / historyData.totalDispatchedBirds).toFixed(3))
+                    : historyData.avgBirdWeight;
+                  return (
+                    <>
+                      <div className="text-xl sm:text-2xl font-black text-emerald-800 tracking-tight whitespace-nowrap">
+                        {displayAvgWtVal} <span className="text-xs font-bold text-slate-500">kg</span>
+                      </div>
+                      <div className="mt-1 text-[10px] sm:text-xs font-extrabold text-emerald-700 whitespace-nowrap truncate">
+                        {displayAvgWtVal > 0 ? `${(displayAvgWtVal * 1000).toFixed(0)} g / ${language === 'ta' ? 'கோழி' : 'bird'}` : (language === 'ta' ? 'எடை பதிவு இல்லை' : 'No weight data')}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
 
