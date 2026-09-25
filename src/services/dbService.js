@@ -4,7 +4,7 @@ import { FEED_CONSUMPTION_TARGETS, AVERAGE_WEIGHT_TARGETS } from '../constants/c
 import { deductFeedStock, sortBatchesDescending } from '../utils/calculations';
 import { hashPassword } from '../utils/cryptoUtils';
 
-const MOCK_STORAGE_KEY = 'kg_poultry_local_db_v5';
+const MOCK_STORAGE_KEY = 'kg_poultry_local_db_v7';
 
 // Initial seed state for local fallback mode
 const INITIAL_LOCAL_STATE = {
@@ -19,7 +19,8 @@ const INITIAL_LOCAL_STATE = {
       "active": true,
       "assignedBatches": [
         "KG001",
-        "KG002"
+        "KG002",
+        "KG003"
       ],
       "passwordHash": "79e5b42b1a94f1a1f89af873157dfc87724d8b649debc83b7dc49c85a451fc4e",
       "createdAt": "2026-07-25T00:00:00.000Z",
@@ -34,7 +35,7 @@ const INITIAL_LOCAL_STATE = {
       "chickArrivalDate": "2026-07-25",
       "initialChickCount": 5000,
       "remainingChickCount": 0,
-      "assignedFarmerId": "kg-poultry-farms",
+      "assignedFarmerId": "kg-poultry-farms-user",
       "assignedFarmerName": "KG Poultry Farms",
       "vehicleNumber": "TN-38-AX-1234",
       "driverName": "Suresh Kumar",
@@ -51,19 +52,38 @@ const INITIAL_LOCAL_STATE = {
       "batchNumber": "KG002",
       "batchName": "KgPoultryBatch-2",
       "chickArrivalDate": "2026-08-09",
-      "initialChickCount": 4196,
-      "remainingChickCount": 19,
-      "assignedFarmerId": "kg-poultry-farms",
+      "initialChickCount": 5000,
+      "remainingChickCount": 3580,
+      "assignedFarmerId": "kg-poultry-farms-user",
       "assignedFarmerName": "KG Poultry Farms",
       "vehicleNumber": "TN-38-AX-1234",
       "driverName": "Suresh",
-      "status": "Active",
+      "status": "Completed",
       "feedStock": {
         "Pre-Starter": 0,
         "Starter": 0,
         "Finisher": 2500
       },
       "createdAt": "2026-08-09T00:00:00.000Z"
+    },
+    "KG003": {
+      "id": "KG003",
+      "batchNumber": "KG003",
+      "batchName": "KgPoultryBatch-3",
+      "chickArrivalDate": "2026-08-16",
+      "initialChickCount": 4196,
+      "remainingChickCount": 19,
+      "assignedFarmerId": "kg-poultry-farms-user",
+      "assignedFarmerName": "KG Poultry Farms",
+      "vehicleNumber": "N/A",
+      "driverName": "N/A",
+      "status": "Completed",
+      "feedStock": {
+        "Pre-Starter": 0,
+        "Starter": 0,
+        "Finisher": 1800
+      },
+      "createdAt": "2026-08-16T00:00:00.000Z"
     }
   },
   "dailyRecords": {
@@ -1071,6 +1091,489 @@ const INITIAL_LOCAL_STATE = {
         "recordedBy": "KG Poultry Farms",
         "updatedAt": "2026-09-14T18:00:00.000Z"
       }
+    },
+    "KG003": {
+      "2026-08-09": {
+        "batchId": "KG002",
+        "recordDate": "2026-08-09",
+        "mortalityCount": 12,
+        "feedType": "Pre-Starter",
+        "feedConsumption": 60,
+        "feedConsumptionBags": 0,
+        "additionalLooseKg": 60,
+        "averageWeight": 42,
+        "remainingChickCount": 4184,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-08-09T18:00:00.000Z"
+      },
+      "2026-08-10": {
+        "batchId": "KG002",
+        "recordDate": "2026-08-10",
+        "mortalityCount": 12,
+        "feedType": "Pre-Starter",
+        "feedConsumption": 70,
+        "feedConsumptionBags": 1,
+        "additionalLooseKg": 0,
+        "averageWeight": 56,
+        "remainingChickCount": 4172,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-08-10T18:00:00.000Z"
+      },
+      "2026-08-11": {
+        "batchId": "KG002",
+        "recordDate": "2026-08-11",
+        "mortalityCount": 12,
+        "feedType": "Pre-Starter",
+        "feedConsumption": 85,
+        "feedConsumptionBags": 1,
+        "additionalLooseKg": 15,
+        "averageWeight": 74,
+        "remainingChickCount": 4160,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-08-11T18:00:00.000Z"
+      },
+      "2026-08-12": {
+        "batchId": "KG002",
+        "recordDate": "2026-08-12",
+        "mortalityCount": 12,
+        "feedType": "Pre-Starter",
+        "feedConsumption": 100,
+        "feedConsumptionBags": 1,
+        "additionalLooseKg": 30,
+        "averageWeight": 96,
+        "remainingChickCount": 4148,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-08-12T18:00:00.000Z"
+      },
+      "2026-08-13": {
+        "batchId": "KG002",
+        "recordDate": "2026-08-13",
+        "mortalityCount": 12,
+        "feedType": "Pre-Starter",
+        "feedConsumption": 120,
+        "feedConsumptionBags": 1,
+        "additionalLooseKg": 50,
+        "averageWeight": 122,
+        "remainingChickCount": 4136,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-08-13T18:00:00.000Z"
+      },
+      "2026-08-14": {
+        "batchId": "KG002",
+        "recordDate": "2026-08-14",
+        "mortalityCount": 12,
+        "feedType": "Pre-Starter",
+        "feedConsumption": 140,
+        "feedConsumptionBags": 2,
+        "additionalLooseKg": 0,
+        "averageWeight": 152,
+        "remainingChickCount": 4124,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-08-14T18:00:00.000Z"
+      },
+      "2026-08-15": {
+        "batchId": "KG002",
+        "recordDate": "2026-08-15",
+        "mortalityCount": 12,
+        "feedType": "Pre-Starter",
+        "feedConsumption": 165,
+        "feedConsumptionBags": 2,
+        "additionalLooseKg": 25,
+        "averageWeight": 186,
+        "remainingChickCount": 4112,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-08-15T18:00:00.000Z"
+      },
+      "2026-08-16": {
+        "batchId": "KG002",
+        "recordDate": "2026-08-16",
+        "mortalityCount": 12,
+        "feedType": "Starter",
+        "feedConsumption": 190,
+        "feedConsumptionBags": 2,
+        "additionalLooseKg": 50,
+        "averageWeight": 224,
+        "remainingChickCount": 4100,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-08-16T18:00:00.000Z"
+      },
+      "2026-08-17": {
+        "batchId": "KG002",
+        "recordDate": "2026-08-17",
+        "mortalityCount": 11,
+        "feedType": "Starter",
+        "feedConsumption": 220,
+        "feedConsumptionBags": 3,
+        "additionalLooseKg": 10,
+        "averageWeight": 266,
+        "remainingChickCount": 4089,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-08-17T18:00:00.000Z"
+      },
+      "2026-08-18": {
+        "batchId": "KG002",
+        "recordDate": "2026-08-18",
+        "mortalityCount": 11,
+        "feedType": "Starter",
+        "feedConsumption": 249,
+        "feedConsumptionBags": 3,
+        "additionalLooseKg": 39,
+        "averageWeight": 312,
+        "remainingChickCount": 4078,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-08-18T18:00:00.000Z"
+      },
+      "2026-08-19": {
+        "batchId": "KG002",
+        "recordDate": "2026-08-19",
+        "mortalityCount": 11,
+        "feedType": "Starter",
+        "feedConsumption": 284,
+        "feedConsumptionBags": 4,
+        "additionalLooseKg": 4,
+        "averageWeight": 362,
+        "remainingChickCount": 4067,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-08-19T18:00:00.000Z"
+      },
+      "2026-08-20": {
+        "batchId": "KG002",
+        "recordDate": "2026-08-20",
+        "mortalityCount": 11,
+        "feedType": "Starter",
+        "feedConsumption": 319,
+        "feedConsumptionBags": 4,
+        "additionalLooseKg": 39,
+        "averageWeight": 416,
+        "remainingChickCount": 4056,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-08-20T18:00:00.000Z"
+      },
+      "2026-08-21": {
+        "batchId": "KG002",
+        "recordDate": "2026-08-21",
+        "mortalityCount": 11,
+        "feedType": "Starter",
+        "feedConsumption": 359,
+        "feedConsumptionBags": 5,
+        "additionalLooseKg": 9,
+        "averageWeight": 474,
+        "remainingChickCount": 4045,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-08-21T18:00:00.000Z"
+      },
+      "2026-08-22": {
+        "batchId": "KG002",
+        "recordDate": "2026-08-22",
+        "mortalityCount": 11,
+        "feedType": "Starter",
+        "feedConsumption": 399,
+        "feedConsumptionBags": 5,
+        "additionalLooseKg": 49,
+        "averageWeight": 536,
+        "remainingChickCount": 4034,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-08-22T18:00:00.000Z"
+      },
+      "2026-08-23": {
+        "batchId": "KG002",
+        "recordDate": "2026-08-23",
+        "mortalityCount": 11,
+        "feedType": "Starter",
+        "feedConsumption": 438,
+        "feedConsumptionBags": 6,
+        "additionalLooseKg": 18,
+        "averageWeight": 602,
+        "remainingChickCount": 4023,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-08-23T18:00:00.000Z"
+      },
+      "2026-08-24": {
+        "batchId": "KG002",
+        "recordDate": "2026-08-24",
+        "mortalityCount": 11,
+        "feedType": "Starter",
+        "feedConsumption": 478,
+        "feedConsumptionBags": 6,
+        "additionalLooseKg": 58,
+        "averageWeight": 672,
+        "remainingChickCount": 4012,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-08-24T18:00:00.000Z"
+      },
+      "2026-08-25": {
+        "batchId": "KG002",
+        "recordDate": "2026-08-25",
+        "mortalityCount": 11,
+        "feedType": "Starter",
+        "feedConsumption": 523,
+        "feedConsumptionBags": 7,
+        "additionalLooseKg": 33,
+        "averageWeight": 746,
+        "remainingChickCount": 4001,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-08-25T18:00:00.000Z"
+      },
+      "2026-08-26": {
+        "batchId": "KG002",
+        "recordDate": "2026-08-26",
+        "mortalityCount": 11,
+        "feedType": "Starter",
+        "feedConsumption": 568,
+        "feedConsumptionBags": 8,
+        "additionalLooseKg": 8,
+        "averageWeight": 824,
+        "remainingChickCount": 3990,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-08-26T18:00:00.000Z"
+      },
+      "2026-08-27": {
+        "batchId": "KG002",
+        "recordDate": "2026-08-27",
+        "mortalityCount": 11,
+        "feedType": "Starter",
+        "feedConsumption": 612,
+        "feedConsumptionBags": 8,
+        "additionalLooseKg": 52,
+        "averageWeight": 906,
+        "remainingChickCount": 3979,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-08-27T18:00:00.000Z"
+      },
+      "2026-08-28": {
+        "batchId": "KG002",
+        "recordDate": "2026-08-28",
+        "mortalityCount": 11,
+        "feedType": "Starter",
+        "feedConsumption": 657,
+        "feedConsumptionBags": 9,
+        "additionalLooseKg": 27,
+        "averageWeight": 992,
+        "remainingChickCount": 3968,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-08-28T18:00:00.000Z"
+      },
+      "2026-08-29": {
+        "batchId": "KG002",
+        "recordDate": "2026-08-29",
+        "mortalityCount": 11,
+        "feedType": "Starter",
+        "feedConsumption": 702,
+        "feedConsumptionBags": 10,
+        "additionalLooseKg": 2,
+        "averageWeight": 1082,
+        "remainingChickCount": 3957,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-08-29T18:00:00.000Z"
+      },
+      "2026-08-30": {
+        "batchId": "KG002",
+        "recordDate": "2026-08-30",
+        "mortalityCount": 11,
+        "feedType": "Finisher",
+        "feedConsumption": 746,
+        "feedConsumptionBags": 10,
+        "additionalLooseKg": 46,
+        "averageWeight": 1176,
+        "remainingChickCount": 3946,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-08-30T18:00:00.000Z"
+      },
+      "2026-08-31": {
+        "batchId": "KG002",
+        "recordDate": "2026-08-31",
+        "mortalityCount": 11,
+        "feedType": "Finisher",
+        "feedConsumption": 786,
+        "feedConsumptionBags": 11,
+        "additionalLooseKg": 16,
+        "averageWeight": 1274,
+        "remainingChickCount": 3935,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-08-31T18:00:00.000Z"
+      },
+      "2026-09-01": {
+        "batchId": "KG002",
+        "recordDate": "2026-09-01",
+        "mortalityCount": 11,
+        "feedType": "Finisher",
+        "feedConsumption": 826,
+        "feedConsumptionBags": 11,
+        "additionalLooseKg": 56,
+        "averageWeight": 1376,
+        "remainingChickCount": 3924,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-09-01T18:00:00.000Z"
+      },
+      "2026-09-02": {
+        "batchId": "KG002",
+        "recordDate": "2026-09-02",
+        "mortalityCount": 11,
+        "feedType": "Finisher",
+        "feedConsumption": 860,
+        "feedConsumptionBags": 12,
+        "additionalLooseKg": 20,
+        "averageWeight": 1482,
+        "remainingChickCount": 3913,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-09-02T18:00:00.000Z"
+      },
+      "2026-09-03": {
+        "batchId": "KG002",
+        "recordDate": "2026-09-03",
+        "mortalityCount": 11,
+        "feedType": "Finisher",
+        "feedConsumption": 895,
+        "feedConsumptionBags": 12,
+        "additionalLooseKg": 55,
+        "averageWeight": 1592,
+        "remainingChickCount": 3902,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-09-03T18:00:00.000Z"
+      },
+      "2026-09-04": {
+        "batchId": "KG002",
+        "recordDate": "2026-09-04",
+        "mortalityCount": 11,
+        "feedType": "Finisher",
+        "feedConsumption": 924,
+        "feedConsumptionBags": 13,
+        "additionalLooseKg": 14,
+        "averageWeight": 1706,
+        "remainingChickCount": 3891,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-09-04T18:00:00.000Z"
+      },
+      "2026-09-05": {
+        "batchId": "KG002",
+        "recordDate": "2026-09-05",
+        "mortalityCount": 11,
+        "feedType": "Finisher",
+        "feedConsumption": 949,
+        "feedConsumptionBags": 13,
+        "additionalLooseKg": 39,
+        "averageWeight": 1824,
+        "remainingChickCount": 3880,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-09-05T18:00:00.000Z"
+      },
+      "2026-09-06": {
+        "batchId": "KG002",
+        "recordDate": "2026-09-06",
+        "mortalityCount": 11,
+        "feedType": "Finisher",
+        "feedConsumption": 969,
+        "feedConsumptionBags": 13,
+        "additionalLooseKg": 59,
+        "averageWeight": 1946,
+        "remainingChickCount": 3869,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-09-06T18:00:00.000Z"
+      },
+      "2026-09-07": {
+        "batchId": "KG002",
+        "recordDate": "2026-09-07",
+        "mortalityCount": 11,
+        "feedType": "Finisher",
+        "feedConsumption": 983,
+        "feedConsumptionBags": 14,
+        "additionalLooseKg": 3,
+        "averageWeight": 2072,
+        "remainingChickCount": 3858,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-09-07T18:00:00.000Z"
+      },
+      "2026-09-08": {
+        "batchId": "KG002",
+        "recordDate": "2026-09-08",
+        "mortalityCount": 11,
+        "feedType": "Finisher",
+        "feedConsumption": 993,
+        "feedConsumptionBags": 14,
+        "additionalLooseKg": 13,
+        "averageWeight": 2202,
+        "remainingChickCount": 3847,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-09-08T18:00:00.000Z"
+      },
+      "2026-09-09": {
+        "batchId": "KG002",
+        "recordDate": "2026-09-09",
+        "mortalityCount": 11,
+        "feedType": "Finisher",
+        "feedConsumption": 998,
+        "feedConsumptionBags": 14,
+        "additionalLooseKg": 18,
+        "averageWeight": 2336,
+        "remainingChickCount": 3836,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-09-09T18:00:00.000Z"
+      },
+      "2026-09-10": {
+        "batchId": "KG002",
+        "recordDate": "2026-09-10",
+        "mortalityCount": 11,
+        "feedType": "Finisher",
+        "feedConsumption": 998,
+        "feedConsumptionBags": 14,
+        "additionalLooseKg": 18,
+        "averageWeight": 2474,
+        "remainingChickCount": 3825,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-09-10T18:00:00.000Z"
+      },
+      "2026-09-11": {
+        "batchId": "KG002",
+        "recordDate": "2026-09-11",
+        "mortalityCount": 11,
+        "feedType": "Finisher",
+        "feedConsumption": 992,
+        "feedConsumptionBags": 14,
+        "additionalLooseKg": 12,
+        "averageWeight": 2616,
+        "remainingChickCount": 3814,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-09-11T18:00:00.000Z"
+      },
+      "2026-09-12": {
+        "batchId": "KG002",
+        "recordDate": "2026-09-12",
+        "mortalityCount": 11,
+        "feedType": "Finisher",
+        "feedConsumption": 982,
+        "feedConsumptionBags": 14,
+        "additionalLooseKg": 2,
+        "averageWeight": 2762,
+        "remainingChickCount": 3803,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-09-12T18:00:00.000Z"
+      },
+      "2026-09-13": {
+        "batchId": "KG002",
+        "recordDate": "2026-09-13",
+        "mortalityCount": 11,
+        "feedType": "Finisher",
+        "feedConsumption": 962,
+        "feedConsumptionBags": 13,
+        "additionalLooseKg": 52,
+        "averageWeight": 2912,
+        "remainingChickCount": 3792,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-09-13T18:00:00.000Z"
+      },
+      "2026-09-14": {
+        "batchId": "KG002",
+        "recordDate": "2026-09-14",
+        "mortalityCount": 11,
+        "feedType": "Finisher",
+        "feedConsumption": 937,
+        "feedConsumptionBags": 13,
+        "additionalLooseKg": 27,
+        "averageWeight": 2272,
+        "remainingChickCount": 3781,
+        "recordedBy": "KG Poultry Farms",
+        "updatedAt": "2026-09-14T18:00:00.000Z"
+      }
     }
   },
   "feedStocks": {
@@ -1155,6 +1658,47 @@ const INITIAL_LOCAL_STATE = {
         "notes": "Finisher feed arrival for KG002",
         "createdAt": "2026-08-30T10:00:00.000Z"
       }
+    ],
+    "KG003": [
+      {
+        "id": "feed-b2-1",
+        "batchId": "KG002",
+        "feedType": "Pre-Starter",
+        "driverName": "Suresh",
+        "vehicleNumber": "TN-38-AX-9911",
+        "quantityReceived": 1000,
+        "quantityReceivedKg": 1000,
+        "bagsReceived": 14.3,
+        "date": "2026-08-09",
+        "notes": "Initial pre-starter arrival for KG002",
+        "createdAt": "2026-08-09T08:00:00.000Z"
+      },
+      {
+        "id": "feed-b2-2",
+        "batchId": "KG002",
+        "feedType": "Starter",
+        "driverName": "Suresh",
+        "vehicleNumber": "TN-38-AX-9911",
+        "quantityReceived": 3500,
+        "quantityReceivedKg": 3500,
+        "bagsReceived": 50,
+        "date": "2026-08-16",
+        "notes": "Starter feed arrival for KG002",
+        "createdAt": "2026-08-16T09:00:00.000Z"
+      },
+      {
+        "id": "feed-b2-3",
+        "batchId": "KG002",
+        "feedType": "Finisher",
+        "driverName": "Suresh",
+        "vehicleNumber": "TN-38-AX-9911",
+        "quantityReceived": 12000,
+        "quantityReceivedKg": 12000,
+        "bagsReceived": 171.4,
+        "date": "2026-08-30",
+        "notes": "Finisher feed arrival for KG002",
+        "createdAt": "2026-08-30T10:00:00.000Z"
+      }
     ]
   },
   "medicineRecords": {
@@ -1179,6 +1723,26 @@ const INITIAL_LOCAL_STATE = {
       }
     ],
     "KG002": [
+      {
+        "id": "med-b2-1",
+        "batchId": "KG002",
+        "medicineName": "Newcastle Vaccine (B1 Strain)",
+        "date": "2026-08-15",
+        "dosage": "100 ml",
+        "notes": "Administered in drinking water Day 7",
+        "createdAt": "2026-08-15T09:00:00.000Z"
+      },
+      {
+        "id": "med-b2-2",
+        "batchId": "KG002",
+        "medicineName": "Gumboro Vaccine (IBD)",
+        "date": "2026-08-22",
+        "dosage": "150 ml",
+        "notes": "Administered Day 14 booster",
+        "createdAt": "2026-08-22T09:00:00.000Z"
+      }
+    ],
+    "KG003": [
       {
         "id": "med-b2-1",
         "batchId": "KG002",
@@ -1334,7 +1898,7 @@ const INITIAL_LOCAL_STATE = {
     },
     "disp-kg002-1": {
       "id": "disp-kg002-1",
-      "batchId": "KG002",
+      "batchId": "KG003",
       "dispatchDate": "2026-09-13",
       "invoiceNumber": "INV-2026-9901",
       "vehicleName": "Greenland Chicken Shop - Karur",
@@ -1356,7 +1920,7 @@ const INITIAL_LOCAL_STATE = {
     },
     "disp-kg002-2": {
       "id": "disp-kg002-2",
-      "batchId": "KG002",
+      "batchId": "KG003",
       "dispatchDate": "2026-09-14",
       "invoiceNumber": "INV-2026-9902",
       "vehicleName": "Pioneer Poultry & Traders - Dindigul",
@@ -3516,8 +4080,10 @@ function withTimeout(promise, ms = 1500) {
 
 function getLocalDB() {
   try {
-    if (typeof localStorage !== 'undefined' && localStorage.getItem('kg_poultry_local_db_v4')) {
+    if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('kg_poultry_local_db_v4');
+      localStorage.removeItem('kg_poultry_local_db_v5');
+      localStorage.removeItem('kg_poultry_local_db_v6');
     }
     const raw = localStorage.getItem(MOCK_STORAGE_KEY);
     if (!raw) {
@@ -3525,7 +4091,7 @@ function getLocalDB() {
       return INITIAL_LOCAL_STATE;
     }
     const parsed = JSON.parse(raw);
-    if (!parsed.batches || !parsed.batches.KG002 || parsed.batches.KG002.initialChickCount !== 4196) {
+    if (!parsed.batches || !parsed.batches.KG003) {
       localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(INITIAL_LOCAL_STATE));
       return INITIAL_LOCAL_STATE;
     }
