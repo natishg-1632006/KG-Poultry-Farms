@@ -22,15 +22,7 @@ import {
 import { fetchWeather, searchVillageLocation, DEFAULT_FARM_LOCATION, getPoultryWeatherAdvisory } from '../../services/weatherService';
 import { Badge } from './Badge';
 
-const ICON_MAP = {
-  Sun,
-  CloudSun,
-  Cloud,
-  CloudFog,
-  CloudDrizzle,
-  CloudRain,
-  CloudLightning
-};
+import { WEATHER_3D_ICON_MAP, CloudSun3D } from './Weather3DIcons';
 
 const LOCATION_STORAGE_KEY = 'kg_poultry_farm_weather_location';
 const WEATHER_CACHE_KEY = 'kg_poultry_farm_weather_cache';
@@ -141,7 +133,7 @@ export const WeatherWidget = () => {
     );
   }
 
-  const WeatherIcon = weather && ICON_MAP[weather.weatherIconKey] ? ICON_MAP[weather.weatherIconKey] : CloudSun;
+  const Weather3DIcon = weather && WEATHER_3D_ICON_MAP[weather.weatherIconKey] ? WEATHER_3D_ICON_MAP[weather.weatherIconKey] : CloudSun3D;
 
   if (loading) {
     return (
@@ -199,8 +191,8 @@ export const WeatherWidget = () => {
         {/* Main Weather Display */}
         <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3.5">
-            <div className="flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl border border-emerald-100 bg-emerald-50 text-emerald-600 shadow-2xs">
-              <WeatherIcon className="h-7 w-7 text-emerald-600" />
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-slate-100 bg-gradient-to-br from-slate-50 to-emerald-50/50 shadow-2xs">
+              <Weather3DIcon className="h-11 w-11 drop-shadow-sm transition-transform duration-300 hover:scale-105" />
             </div>
             <div>
               <div className="flex items-baseline gap-2 flex-wrap">
