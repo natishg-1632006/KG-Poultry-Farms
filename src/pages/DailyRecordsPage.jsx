@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { dbGetBatches, dbGetDailyRecords, dbSaveDailyRecord, dbDeleteDailyRecord, dbUpdateBatchFeedStockPool, dbLogAuditEvent } from '../services/dbService';
+import { dbGetBatches, dbGetDailyRecords, dbGetDispatches, dbSaveDailyRecord, dbDeleteDailyRecord, dbUpdateBatchFeedStockPool, dbLogAuditEvent } from '../services/dbService';
 import { calculateRemainingChickens, validateRecordDate, deductFeedStock, bagsToKg, kgToBags } from '../utils/calculations';
 import { KG_PER_BAG, FEED_CONSUMPTION_TARGETS, AVERAGE_WEIGHT_TARGETS } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
@@ -27,6 +27,7 @@ export const DailyRecordsPage = () => {
   const [batches, setBatches] = useState([]);
   const [selectedBatchId, setSelectedBatchId] = useState('');
   const [recordsMap, setRecordsMap] = useState({});
+  const [dispatches, setDispatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -96,8 +97,12 @@ export const DailyRecordsPage = () => {
 
   async function loadRecordsForBatch(bId) {
     try {
-      const map = await dbGetDailyRecords(bId);
+      const [map, dispList] = await Promise.all([
+        dbGetDailyRecords(bId),
+        dbGetDispatches()
+      ]);
       setRecordsMap(map || {});
+      setDispatches((dispList || []).filter(d => d.batchId === bId));
       if (map && map[todayStr]) {
         const r = map[todayStr];
         const bags = r.feedConsumptionBags !== undefined ? r.feedConsumptionBags : (r.feedConsumption ? Math.floor(r.feedConsumption / KG_PER_BAG) : '');
@@ -416,6 +421,50 @@ export const DailyRecordsPage = () => {
     viewingWeightDiff = Number(viewingRecord.averageWeight || 0) - viewingTargetWeight;
   }
 
+  // Compute Completed Batch metrics for KPI cards when batch is completed
+  const isBatchCompleted = (selectedBatch?.status || '').toLowerCase() === 'completed';
+
+  const totalMortality = recordsList.reduce((acc, r) => acc + Number(r.mortalityCount || 0), 0);
+  const initialChicks = Number(selectedBatch?.initialChickCount || 0);
+  const mortalityPct = initialChicks > 0 ? ((totalMortality / initialChicks) * 100).toFixed(1) : '0.0';
+
+  const totalDispatchedBirds = dispatches.reduce((acc, d) => {
+    const setsRaw = d.boxSets || [];
+    const sets = Array.isArray(setsRaw) ? setsRaw : Object.values(setsRaw);
+    const loadedSets = sets.filter(s => Number(s.loadedWeight) > 0 || Number(s.totalChickenWeight) > 0);
+    const setBirds = loadedSets.reduce((sum, s) => sum + Number(s.chickenCount || 0), 0);
+    return acc + (setBirds > 0 ? setBirds : Number(d.birdsCount || d.totalBirds || 0));
+  }, 0);
+
+  const totalDispatchedWeight = dispatches.reduce((acc, d) => {
+    const setsRaw = d.boxSets || [];
+    const sets = Array.isArray(setsRaw) ? setsRaw : Object.values(setsRaw);
+    const loadedSets = sets.filter(s => Number(s.loadedWeight) > 0 || Number(s.totalChickenWeight) > 0);
+    const setWeight = loadedSets.reduce((sum, s) => sum + Number(s.totalChickenWeight || 0), 0);
+    return acc + (setWeight > 0 ? setWeight : Number(d.totalWeight || d.netWeight || 0));
+  }, 0);
+
+  const dispatchedAvgWeightGrams = totalDispatchedBirds > 0
+    ? Math.round((totalDispatchedWeight / totalDispatchedBirds) * 1000)
+    : (lastRecord ? Number(lastRecord.averageWeight || 0) : 0);
+
+  const rawConsumedKg = recordsList.reduce((acc, r) => acc + Number(r.feedConsumption || 0), 0);
+  const totalFeedBags = Math.round(kgToBags(rawConsumedKg, KG_PER_BAG));
+
+  const finalBirdsForFeed = totalDispatchedBirds > 0 ? totalDispatchedBirds : Math.max(1, initialChicks - totalMortality);
+  const finalFeedPerBirdGram = finalBirdsForFeed > 0 ? Math.round((rawConsumedKg * 1000) / finalBirdsForFeed) : 0;
+
+  let finalFlockAgeDay = lastRecordFlockAgeDay;
+  if (selectedBatch?.chickArrivalDate && lastRecord?.recordDate) {
+    const arrivalDate = new Date(selectedBatch.chickArrivalDate);
+    const recDate = new Date(lastRecord.recordDate);
+    const diffMs = Math.max(0, recDate.getTime() - arrivalDate.getTime());
+    finalFlockAgeDay = Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+  }
+
+  const finalDayTargetWeightGram = AVERAGE_WEIGHT_TARGETS[Math.min(45, finalFlockAgeDay)] || AVERAGE_WEIGHT_TARGETS[45] || 2438;
+  const finalDayWeightDiff = dispatchedAvgWeightGrams - finalDayTargetWeightGram;
+
   let minDailyRecordDate = null;
   if (selectedBatch?.chickArrivalDate) {
     const arrDate = new Date(selectedBatch.chickArrivalDate);
@@ -540,54 +589,68 @@ export const DailyRecordsPage = () => {
         </div>
       )}
 
-      {/* Last Updated Record KPI Summary Cards */}
+      {/* Last Updated Record / Completed Batch KPI Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title={t('lastEntryDate')}
-          value={lastRecord ? lastRecord.recordDate : 'No Entries'}
-          subtext={lastRecord ? t('mostRecentRecordDate') : 'No daily records logged yet'}
+          title={isBatchCompleted ? (language === 'ta' ? 'மொத்த நாட்கள்' : 'TOTAL FLOCK AGE') : t('lastEntryDate')}
+          value={isBatchCompleted ? `${lastRecord ? lastRecord.recordDate : ''} (Day ${finalFlockAgeDay})` : (lastRecord ? lastRecord.recordDate : 'No Entries')}
+          subtext={isBatchCompleted ? (language === 'ta' ? `தொகுதி முடிந்தது (${totalRecords} பதிவுகள்)` : `Batch Completed (${totalRecords} entries)`) : (lastRecord ? t('mostRecentRecordDate') : 'No daily records logged yet')}
           icon={Calendar}
           color="emerald"
         />
         <StatCard
-          title={t('lastDailyMortality')}
-          value={lastRecord ? `${lastRecord.mortalityCount}` : '0'}
-          subtext={lastRecord ? `Logged on ${lastRecord.recordDate}` : 'No mortality logged'}
+          title={isBatchCompleted ? (language === 'ta' ? 'மொத்த இறப்பு' : 'TOTAL MORTALITY') : t('lastDailyMortality')}
+          value={isBatchCompleted ? totalMortality.toLocaleString() : (lastRecord ? `${lastRecord.mortalityCount}` : '0')}
+          subtext={isBatchCompleted ? (language === 'ta' ? `மொத்த இறப்பு எண்ணிக்கை (${mortalityPct}%)` : `Cumulative mortality count (${mortalityPct}%)`) : (lastRecord ? `Logged on ${lastRecord.recordDate}` : 'No mortality logged')}
           icon={AlertCircle}
           color="amber"
         />
         <StatCard
-          title={t('lastFeedConsumed')}
+          title={isBatchCompleted ? (language === 'ta' ? 'மொத்த தீவனப் பயன்பாடு' : 'TOTAL FEED CONSUMED') : t('lastFeedConsumed')}
           statsBreakdown={
-            lastRecord
+            isBatchCompleted
               ? [
-                  { label: t('consumed'), value: `${lastRecordBags} Bags${lastRecordLooseKg > 0 ? ` + ${lastRecordLooseKg}kg` : ''}`, labelColor: 'text-emerald-600', valueColor: 'text-slate-900' },
-                  { label: t('eatBird'), value: `${lastRecordPerBirdGram} g`, labelColor: 'text-orange-600', valueColor: 'text-orange-600' },
+                  { label: t('consumed'), value: `${totalFeedBags} Bags`, labelColor: 'text-emerald-600', valueColor: 'text-slate-900' },
+                  { label: t('eatBird'), value: `${finalFeedPerBirdGram} g`, labelColor: 'text-orange-600', valueColor: 'text-orange-600' },
                   { label: t('target'), value: `${lastRecordTargetGram} g`, labelColor: 'text-blue-600', valueColor: 'text-blue-600' }
                 ]
-              : null
+              : (lastRecord
+                  ? [
+                      { label: t('consumed'), value: `${lastRecordBags} Bags${lastRecordLooseKg > 0 ? ` + ${lastRecordLooseKg}kg` : ''}`, labelColor: 'text-emerald-600', valueColor: 'text-slate-900' },
+                      { label: t('eatBird'), value: `${lastRecordPerBirdGram} g`, labelColor: 'text-orange-600', valueColor: 'text-orange-600' },
+                      { label: t('target'), value: `${lastRecordTargetGram} g`, labelColor: 'text-blue-600', valueColor: 'text-blue-600' }
+                    ]
+                  : null)
           }
-          value={lastRecord ? `${lastRecordBags} Bags${lastRecordLooseKg > 0 ? ` & ${lastRecordLooseKg} kg` : ''} (${lastRecordPerBirdGram} g/bird)` : '0 Bags'}
-          subtext={lastRecord ? `Day ${lastRecordFlockAgeDay} Target: ${lastRecordTargetGram} g/bird (${lastRecord.recordDate})` : 'No feed logged'}
+          value={isBatchCompleted ? `${totalFeedBags} Bags (${finalFeedPerBirdGram} g/bird)` : (lastRecord ? `${lastRecordBags} Bags${lastRecordLooseKg > 0 ? ` & ${lastRecordLooseKg} kg` : ''} (${lastRecordPerBirdGram} g/bird)` : '0 Bags')}
+          subtext={isBatchCompleted ? (language === 'ta' ? 'முடிவுற்ற தொகுதியின் மொத்த தீவனப் பயன்பாடு' : 'Total feed consumed for completed batch') : (lastRecord ? `Day ${lastRecordFlockAgeDay} Target: ${lastRecordTargetGram} g/bird (${lastRecord.recordDate})` : 'No feed logged')}
           icon={Package}
           color="blue"
         />
         <StatCard
-          title={t('lastAvgWeight')}
+          title={isBatchCompleted ? (language === 'ta' ? 'இறுதி சராசரி எடை' : 'FINAL AVG WEIGHT') : t('lastAvgWeight')}
           statsBreakdown={
-            lastRecord
+            isBatchCompleted
               ? [
-                  { label: t('actual'), value: `${lastRecord.averageWeight} g`, labelColor: 'text-slate-600', valueColor: 'text-slate-900' },
-                  { label: t('target'), value: `${lastRecordTargetWeightGram} g`, labelColor: 'text-blue-600', valueColor: 'text-blue-600' },
-                  { label: t('diff'), value: `${lastRecordWeightDiff > 0 ? '+' : ''}${lastRecordWeightDiff} g`, labelColor: lastRecordWeightDiff < 0 ? 'text-rose-600' : 'text-emerald-600', valueColor: lastRecordWeightDiff < 0 ? 'text-rose-600' : 'text-emerald-600' }
+                  { label: t('actual'), value: `${dispatchedAvgWeightGrams} g`, labelColor: 'text-slate-600', valueColor: 'text-slate-900' },
+                  { label: t('target'), value: `${finalDayTargetWeightGram} g`, labelColor: 'text-blue-600', valueColor: 'text-blue-600' },
+                  { label: t('diff'), value: `${finalDayWeightDiff > 0 ? '+' : ''}${finalDayWeightDiff} g`, labelColor: finalDayWeightDiff < 0 ? 'text-rose-600' : 'text-emerald-600', valueColor: finalDayWeightDiff < 0 ? 'text-rose-600' : 'text-emerald-600' }
                 ]
-              : null
+              : (lastRecord
+                  ? [
+                      { label: t('actual'), value: `${lastRecord.averageWeight} g`, labelColor: 'text-slate-600', valueColor: 'text-slate-900' },
+                      { label: t('target'), value: `${lastRecordTargetWeightGram} g`, labelColor: 'text-blue-600', valueColor: 'text-blue-600' },
+                      { label: t('diff'), value: `${lastRecordWeightDiff > 0 ? '+' : ''}${lastRecordWeightDiff} g`, labelColor: lastRecordWeightDiff < 0 ? 'text-rose-600' : 'text-emerald-600', valueColor: lastRecordWeightDiff < 0 ? 'text-rose-600' : 'text-emerald-600' }
+                    ]
+                  : null)
           }
-          value={lastRecord ? `${lastRecord.averageWeight} g` : '0 g'}
+          value={isBatchCompleted ? `${dispatchedAvgWeightGrams} g` : (lastRecord ? `${lastRecord.averageWeight} g` : '0 g')}
           subtext={
-            lastRecord
-              ? `Day ${lastRecordFlockAgeDay} Target: ${lastRecordTargetWeightGram} g (${lastRecordWeightDiff > 0 ? '+' : ''}${lastRecordWeightDiff} g vs target)`
-              : 'No weight logged'
+            isBatchCompleted
+              ? (language === 'ta' ? 'விற்பனை தரவு அடிப்படையிலான சராசரி எடை' : 'Dispatched Avg Weight (Total Wt / Dispatched Birds)')
+              : (lastRecord
+                  ? `Day ${lastRecordFlockAgeDay} Target: ${lastRecordTargetWeightGram} g (${lastRecordWeightDiff > 0 ? '+' : ''}${lastRecordWeightDiff} g vs target)`
+                  : 'No weight logged')
           }
           icon={Scale}
           color="emerald"
