@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { dbGetBatches, dbGetDailyRecords, dbGetCompanyTargets, dbGetDispatches } from '../services/dbService';
+import { dbGetBatches, dbGetDailyRecords, dbGetCompanyTargets, dbGetDispatches, dbGetFeedArrivals } from '../services/dbService';
 import { calculateDayOfBatch } from '../utils/calculations';
 import {
   ResponsiveContainer,
@@ -59,6 +59,7 @@ export const ReportsPage = () => {
   const [dailyRecords, setDailyRecords] = useState([]);
   const [targets, setTargets] = useState(null);
   const [dispatches, setDispatches] = useState([]);
+  const [feedArrivals, setFeedArrivals] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -103,8 +104,12 @@ export const ReportsPage = () => {
 
   async function loadBatchRecords(bId) {
     try {
-      const map = await dbGetDailyRecords(bId);
+      const [map, fList] = await Promise.all([
+        dbGetDailyRecords(bId),
+        dbGetFeedArrivals(bId)
+      ]);
       setDailyRecords(Object.values(map || {}).sort((a, b) => a.recordDate.localeCompare(b.recordDate)));
+      setFeedArrivals(fList || []);
     } catch (err) {
       console.error('Failed loading daily records for reports:', err);
     } finally {
@@ -138,12 +143,68 @@ export const ReportsPage = () => {
   });
 
   // Calculate Batch Stat Summary
+  const isBatchDone = (selectedBatch?.status || '').toLowerCase() === 'completed';
   const totalMortality = dailyRecords.reduce((sum, r) => sum + (r.mortalityCount || 0), 0);
-  const totalFeedKg = dailyRecords.reduce((sum, r) => sum + (r.feedConsumption || 0), 0);
-  const totalFeedBags = (totalFeedKg / 70).toFixed(1);
   const latestRecord = dailyRecords.length > 0 ? dailyRecords[dailyRecords.length - 1] : null;
-  const latestAvgWeight = latestRecord?.averageWeight || 0;
   const latestLiveBirds = latestRecord?.remainingChickCount ?? selectedBatch?.initialChickCount ?? 0;
+
+  // Dispatches calculations for selected batch
+  const batchDispatches = dispatches.filter(d => d.batchId === selectedBatchId);
+  const totalDispatchedBirds = batchDispatches.reduce((acc, d) => {
+    const setsRaw = d.boxSets || [];
+    const sets = Array.isArray(setsRaw) ? setsRaw : Object.values(setsRaw);
+    const loadedSets = sets.filter(s => Number(s.loadedWeight) > 0 || Number(s.totalChickenWeight) > 0);
+    const setBirds = loadedSets.reduce((sum, s) => sum + Number(s.chickenCount || 0), 0);
+    return acc + (setBirds > 0 ? setBirds : Number(d.birdsCount || d.totalBirds || 0));
+  }, 0);
+
+  const totalDispatchedWeight = batchDispatches.reduce((acc, d) => {
+    const setsRaw = d.boxSets || [];
+    const sets = Array.isArray(setsRaw) ? setsRaw : Object.values(setsRaw);
+    const loadedSets = sets.filter(s => Number(s.loadedWeight) > 0 || Number(s.totalChickenWeight) > 0);
+    const setWeight = loadedSets.reduce((sum, s) => sum + Number(s.totalChickenWeight || 0), 0);
+    return acc + (setWeight > 0 ? setWeight : Number(d.totalWeight || d.netWeight || 0));
+  }, 0);
+
+  // Capped net feed consumed bags (Farmer Dashboard logic)
+  const totalFeedArrivedBags = feedArrivals.reduce((acc, f) => {
+    const isReturn = f.transactionType === 'Return';
+    const totalKg = Number(f.quantityReceivedKg ?? f.quantityReceived ?? ((Number(f.bagsReceived || 0) * 70) + Number(f.additionalKg || 0)));
+    const bags = totalKg / 70;
+    return isReturn ? acc - bags : acc + bags;
+  }, 0);
+  const netArrivedBags = Math.max(0, totalFeedArrivedBags);
+  const hasReturns = feedArrivals.some(f => f.transactionType === 'Return');
+
+  const rawConsumedBags = dailyRecords.reduce((sum, r) => {
+    const bags = r.feedConsumptionBags || (r.feedConsumption ? r.feedConsumption / 70 : 0);
+    return sum + Number(bags || 0);
+  }, 0);
+
+  const totalFeedBagsVal = (hasReturns || isBatchDone) && netArrivedBags > 0
+    ? Math.min(rawConsumedBags, netArrivedBags)
+    : rawConsumedBags;
+  const totalFeedBags = totalFeedBagsVal.toFixed(1);
+
+  const dispatchedAvgWeightGrams = totalDispatchedBirds > 0
+    ? Math.round((totalDispatchedWeight / totalDispatchedBirds) * 1000)
+    : (latestRecord ? Number(latestRecord.averageWeight || 0) : 0);
+
+  const displayAvgWeightVal = (isBatchDone || totalDispatchedBirds > 0) && dispatchedAvgWeightGrams > 0
+    ? dispatchedAvgWeightGrams
+    : (latestRecord?.averageWeight || 0);
+
+  const displayLiveBirdsVal = isBatchDone
+    ? (totalDispatchedBirds > 0 ? totalDispatchedBirds : latestLiveBirds)
+    : latestLiveBirds;
+
+  const displayLiveBirdsLabel = isBatchDone
+    ? (language === 'ta' ? 'விற்பனை கோழிகள்' : 'Dispatched Birds')
+    : (language === 'ta' ? 'உயிருள்ளவை' : 'Live Flock');
+
+  const displayAvgWeightLabel = isBatchDone || totalDispatchedBirds > 0
+    ? (language === 'ta' ? 'அனுப்பப்பட்ட சராசரி எடை' : 'Dispatched Avg Wt')
+    : (language === 'ta' ? 'சராசரி எடை' : 'Latest Avg Wt');
 
   return (
     <div className="space-y-6 pb-12">
@@ -184,16 +245,16 @@ export const ReportsPage = () => {
         <>
           {/* Top KPI Stat Summary Cards Row */}
           <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
-            {/* Live Birds Left */}
+            {/* Live Birds Left / Dispatched Birds */}
             <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 truncate">{language === 'ta' ? 'உயிருள்ளவை' : 'Live Flock'}</span>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 truncate">{displayLiveBirdsLabel}</span>
                 <div className="rounded-xl bg-emerald-50 p-2 text-emerald-600 border border-emerald-100">
                   <Bird className="h-4 w-4" />
                 </div>
               </div>
               <div className="mt-2">
-                <span className="text-2xl font-black text-slate-900 tracking-tight">{latestLiveBirds.toLocaleString()}</span>
+                <span className="text-2xl font-black text-slate-900 tracking-tight">{displayLiveBirdsVal.toLocaleString()}</span>
                 {language !== 'ta' && <span className="text-xs font-bold text-slate-500 ml-1">birds</span>}
               </div>
             </div>
@@ -212,16 +273,16 @@ export const ReportsPage = () => {
               </div>
             </div>
 
-            {/* Latest Avg Bird Weight */}
+            {/* Latest Avg Bird Weight / Dispatched Avg Weight */}
             <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 truncate">{language === 'ta' ? 'சராசரி எடை' : 'Latest Avg Wt'}</span>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 truncate">{displayAvgWeightLabel}</span>
                 <div className="rounded-xl bg-purple-50 p-2 text-purple-600 border border-purple-100">
                   <TrendingUp className="h-4 w-4" />
                 </div>
               </div>
               <div className="mt-2">
-                <span className="text-2xl font-black text-purple-800 tracking-tight">{latestAvgWeight}</span>
+                <span className="text-2xl font-black text-purple-800 tracking-tight">{displayAvgWeightVal}</span>
                 <span className="text-xs font-bold text-slate-500 ml-1">{language === 'ta' ? 'கி' : 'g'}</span>
               </div>
             </div>
