@@ -63,8 +63,22 @@ export const FarmerDashboard = () => {
     ? Number(activeBatch.remainingChickCount)
     : Math.max(0, initialChicks - totalMortality);
 
-  const totalDispatchedBirds = dispatches.reduce((acc, d) => acc + Number(d.birdsCount || d.totalBirds || d.totalChickens || 0), 0);
-  const totalDispatchedWeight = dispatches.reduce((acc, d) => acc + Number(d.totalWeight || d.netWeight || 0), 0);
+  let totalDispatchedBirds = 0;
+  let totalDispatchedWeight = 0;
+
+  for (const d of dispatches) {
+    const setsRaw = d.boxSets || [];
+    const sets = Array.isArray(setsRaw) ? setsRaw : Object.values(setsRaw);
+    const loadedSets = sets.filter(s => Number(s.loadedWeight) > 0 || Number(s.totalChickenWeight) > 0);
+    const setBirds = loadedSets.reduce((sum, s) => sum + Number(s.chickenCount || 0), 0);
+    const setWeight = loadedSets.reduce((sum, s) => sum + Number(s.totalChickenWeight || 0), 0);
+
+    const birds = setBirds > 0 ? setBirds : Number(d.birdsCount || d.totalBirds || d.totalChickens || 0);
+    const weight = setWeight > 0 ? setWeight : Number(d.totalWeight || d.netWeight || 0);
+
+    totalDispatchedBirds += birds;
+    totalDispatchedWeight += weight;
+  }
 
   const rawConsumedBags = records.reduce((acc, r) => {
     const bags = r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG);
@@ -85,6 +99,11 @@ export const FarmerDashboard = () => {
   const totalArrivedBagsFinal = Math.max(0, totalFeedArrivedBags);
   const hasReturns = feedArrivals.some(f => f.transactionType === 'Return');
   const isBatchDone = (activeBatch?.status || '').toLowerCase() === 'completed';
+
+  const survivingBirds = initialChicks > 0 ? Math.max(0, initialChicks - totalMortality) : remainingChicks;
+  const finalDispatchedBirds = isBatchDone
+    ? (totalDispatchedBirds > 0 ? Math.max(totalDispatchedBirds, survivingBirds) : survivingBirds)
+    : totalDispatchedBirds;
 
   const totalFeedConsumedBags = (hasReturns || isBatchDone) && totalArrivedBagsFinal > 0
     ? Math.min(rawConsumedBags, totalArrivedBagsFinal)
@@ -115,11 +134,11 @@ export const FarmerDashboard = () => {
     flockAgeDays = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1;
   }
 
-  const displayChicksVal = isBatchDone && totalDispatchedBirds > 0
-    ? `${totalDispatchedBirds.toLocaleString()} / ${initialChicks.toLocaleString()}`
+  const displayChicksVal = isBatchDone
+    ? `${finalDispatchedBirds.toLocaleString()} / ${initialChicks.toLocaleString()}`
     : `${Number(remainingChicks).toLocaleString()} / ${initialChicks.toLocaleString()}`;
 
-  const displayChicksSubtext = isBatchDone && totalDispatchedBirds > 0
+  const displayChicksSubtext = isBatchDone
     ? (language === 'ta' ? 'விநியோகிக்கப்பட்டவை / ஆரம்ப குஞ்சுகள்' : 'Dispatched / Initial Chicks')
     : t('liveInitialChicks');
 

@@ -3672,8 +3672,8 @@ export async function dbGetBatchHistoryData(batchId) {
     const setBoxes = loadedSets.reduce((sum, s) => sum + Number(s.boxesInSet || 0), 0);
     const setWeight = loadedSets.reduce((sum, s) => sum + Number(s.totalChickenWeight || 0), 0);
 
-    const birds = Number(d.birdsCount || d.totalBirds || d.totalChickens || (inv ? inv.totalChickens : 0) || setBirds || 0);
-    const weight = Number(d.totalWeight || d.netWeight || (inv ? inv.totalWeightKg : 0) || setWeight || 0);
+    const birds = setBirds > 0 ? setBirds : Number(d.birdsCount || d.totalBirds || d.totalChickens || (inv ? inv.totalChickens : 0) || 0);
+    const weight = setWeight > 0 ? setWeight : Number(d.totalWeight || d.netWeight || (inv ? inv.totalWeightKg : 0) || 0);
     const crates = Number(d.cratesCount || d.totalCrates || setBoxes || (d.totalBoxCount || 0));
 
     const enrichedDisp = {
@@ -3728,6 +3728,7 @@ export async function dbGetBatchHistoryData(batchId) {
   const isCompleted = (selectedBatch.status || '').toLowerCase() === 'completed';
   const rawAvg = avgBirdWeight;
   const avgKg = rawAvg > 20 ? (rawAvg / 1000) : rawAvg;
+  const survivingBirds = initialChickCount > 0 ? Math.max(0, initialChickCount - totalMortality) : remainingChickCount;
 
   let totalLiveWeightKg = 0;
   if (isCompleted && totalDispatchedWeight > 0) {
@@ -3735,13 +3736,16 @@ export async function dbGetBatchHistoryData(batchId) {
   } else if (totalDispatchedWeight > 0) {
     totalLiveWeightKg = totalDispatchedWeight + (avgKg * remainingChickCount);
   } else {
-    const survivingBirds = initialChickCount > 0 ? Math.max(0, initialChickCount - totalMortality) : remainingChickCount;
     totalLiveWeightKg = avgKg * survivingBirds;
   }
 
   if (totalFeedConsumedKg > 0 && totalLiveWeightKg > 0) {
     fcr = parseFloat((totalFeedConsumedKg / totalLiveWeightKg).toFixed(2));
   }
+
+  const finalDispatchedBirds = isCompleted
+    ? (totalDispatchedBirds > 0 ? Math.max(totalDispatchedBirds, survivingBirds) : survivingBirds)
+    : totalDispatchedBirds;
 
   return {
     batch: selectedBatch,
@@ -3752,7 +3756,7 @@ export async function dbGetBatchHistoryData(batchId) {
     totalFeedConsumedKg,
     totalFeedBags,
     totalDispatchedWeight: parseFloat(totalDispatchedWeight.toFixed(2)),
-    totalDispatchedBirds,
+    totalDispatchedBirds: finalDispatchedBirds,
     totalCratesCount,
     avgBirdWeight,
     fcr,
