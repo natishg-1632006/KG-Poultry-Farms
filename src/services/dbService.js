@@ -3697,27 +3697,17 @@ export async function dbGetBatches() {
     ]);
 
     if (dailySnap.exists()) {
-      local.dailyRecords = dailySnap.val();
+      local.dailyRecords = { ...(local.dailyRecords || {}), ...dailySnap.val() };
     }
     if (dispatchesSnap.exists()) {
-      local.dispatches = dispatchesSnap.val();
+      local.dispatches = { ...(local.dispatches || {}), ...dispatchesSnap.val() };
     }
     if (boxSetsSnap.exists()) {
-      local.boxSets = boxSetsSnap.val();
+      local.boxSets = { ...(local.boxSets || {}), ...boxSetsSnap.val() };
     }
-    saveLocalDB(local);
-
     if (batchesSnap.exists()) {
-      local.batches = batchesSnap.val();
-      saveLocalDB(local);
-
-      const fbBatches = Object.values(batchesSnap.val());
-      const mapped = fbBatches.map(b => ({
-        ...b,
-        remainingChickCount: recalculateBatchRemainingChickens(b.id, local),
-        feedStock: computeBatchFeedStock(b.id, local)
-      }));
-      return sortBatchesDescending(mapped);
+      const fbVal = batchesSnap.val() || {};
+      local.batches = { ...(local.batches || {}), ...fbVal };
     }
     saveLocalDB(local);
   } catch (_err) {
