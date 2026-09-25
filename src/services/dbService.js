@@ -3308,14 +3308,46 @@ export async function dbDeleteMedicineRecord(batchId, recordId) {
 
 // DISPATCH & BOX SETS
 export async function dbGetDispatches() {
+  let list = [];
   try {
     const snap = await withTimeout(get(ref(db, 'dispatches')));
-    if (snap.exists()) return Object.values(snap.val());
+    if (snap.exists()) {
+      const val = snap.val();
+      list = Array.isArray(val) ? val : Object.values(val);
+      const local = getLocalDB();
+      local.dispatches = local.dispatches || {};
+      list.forEach(d => { if (d && d.id) local.dispatches[d.id] = d; });
+      saveLocalDB(local);
+    }
   } catch (_err) {
     // fallback
   }
+
   const local = getLocalDB();
-  return Object.values(local.dispatches || {});
+  if (list.length === 0) {
+    list = Object.values(local.dispatches || {});
+  }
+
+  const boxSetsMap = local.boxSets || {};
+  return list.map(d => {
+    const setsRaw = boxSetsMap[d.id] || d.boxSets || [];
+    const sets = Array.isArray(setsRaw) ? setsRaw : Object.values(setsRaw);
+    const loadedSets = sets.filter(s => Number(s.loadedWeight) > 0 || Number(s.totalChickenWeight) > 0);
+    const setBirds = loadedSets.reduce((sum, s) => sum + Number(s.chickenCount || 0), 0);
+    const setWeight = loadedSets.reduce((sum, s) => sum + Number(s.totalChickenWeight || 0), 0);
+
+    const birds = setBirds > 0 ? setBirds : Number(d.birdsCount || d.totalBirds || d.totalChickens || 0);
+    const weight = setWeight > 0 ? setWeight : Number(d.totalWeight || d.netWeight || 0);
+
+    return {
+      ...d,
+      boxSets: sets,
+      birdsCount: birds,
+      totalBirds: birds,
+      totalWeight: weight,
+      netWeight: weight
+    };
+  });
 }
 
 export async function dbSaveDispatch(dispatchData) {
@@ -3450,12 +3482,40 @@ export async function dbSaveBoxSet(dispatchId, boxSetData) {
   }
 
   const dispatch = (local.dispatches || {})[dispatchId];
-  if (dispatch && dispatch.batchId && local.batches[dispatch.batchId]) {
-    const remaining = recalculateBatchRemainingChickens(dispatch.batchId, local);
+  if (dispatch) {
+    const allSets = local.boxSets[dispatchId] || [];
+    const loadedSets = allSets.filter(s => Number(s.loadedWeight) > 0 || Number(s.totalChickenWeight) > 0);
+    const setBirds = loadedSets.reduce((sum, s) => sum + Number(s.chickenCount || 0), 0);
+    const setWeight = loadedSets.reduce((sum, s) => sum + Number(s.totalChickenWeight || 0), 0);
+
+    if (setBirds > 0) {
+      dispatch.birdsCount = setBirds;
+      dispatch.totalBirds = setBirds;
+    }
+    if (setWeight > 0) {
+      dispatch.totalWeight = setWeight;
+      dispatch.netWeight = setWeight;
+    }
     try {
-      await withTimeout(set(ref(db, `batches/${dispatch.batchId}/remainingChickCount`), remaining));
+      if (setBirds > 0) {
+        await withTimeout(set(ref(db, `dispatches/${dispatchId}/birdsCount`), setBirds));
+        await withTimeout(set(ref(db, `dispatches/${dispatchId}/totalBirds`), setBirds));
+      }
+      if (setWeight > 0) {
+        await withTimeout(set(ref(db, `dispatches/${dispatchId}/totalWeight`), setWeight));
+        await withTimeout(set(ref(db, `dispatches/${dispatchId}/netWeight`), setWeight));
+      }
     } catch (_e) {
       // fallback
+    }
+
+    if (dispatch.batchId && local.batches[dispatch.batchId]) {
+      const remaining = recalculateBatchRemainingChickens(dispatch.batchId, local);
+      try {
+        await withTimeout(set(ref(db, `batches/${dispatch.batchId}/remainingChickCount`), remaining));
+      } catch (_e) {
+        // fallback
+      }
     }
   }
 
@@ -3476,12 +3536,33 @@ export async function dbDeleteBoxSet(dispatchId, setId) {
   }
 
   const dispatch = (local.dispatches || {})[dispatchId];
-  if (dispatch && dispatch.batchId && local.batches[dispatch.batchId]) {
-    const remaining = recalculateBatchRemainingChickens(dispatch.batchId, local);
+  if (dispatch) {
+    const allSets = local.boxSets[dispatchId] || [];
+    const loadedSets = allSets.filter(s => Number(s.loadedWeight) > 0 || Number(s.totalChickenWeight) > 0);
+    const setBirds = loadedSets.reduce((sum, s) => sum + Number(s.chickenCount || 0), 0);
+    const setWeight = loadedSets.reduce((sum, s) => sum + Number(s.totalChickenWeight || 0), 0);
+
+    dispatch.birdsCount = setBirds;
+    dispatch.totalBirds = setBirds;
+    dispatch.totalWeight = setWeight;
+    dispatch.netWeight = setWeight;
+
     try {
-      await withTimeout(set(ref(db, `batches/${dispatch.batchId}/remainingChickCount`), remaining));
+      await withTimeout(set(ref(db, `dispatches/${dispatchId}/birdsCount`), setBirds));
+      await withTimeout(set(ref(db, `dispatches/${dispatchId}/totalBirds`), setBirds));
+      await withTimeout(set(ref(db, `dispatches/${dispatchId}/totalWeight`), setWeight));
+      await withTimeout(set(ref(db, `dispatches/${dispatchId}/netWeight`), setWeight));
     } catch (_e) {
       // fallback
+    }
+
+    if (dispatch.batchId && local.batches[dispatch.batchId]) {
+      const remaining = recalculateBatchRemainingChickens(dispatch.batchId, local);
+      try {
+        await withTimeout(set(ref(db, `batches/${dispatch.batchId}/remainingChickCount`), remaining));
+      } catch (_e) {
+        // fallback
+      }
     }
   }
 
