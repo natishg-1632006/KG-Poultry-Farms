@@ -285,13 +285,7 @@ export function sortBatchesDescending(batches = []) {
     const numB = parseInt((b.batchNumber || b.id || '').replace(/\D/g, ''), 10) || 0;
     if (numA !== numB) return numB - numA;
 
-    // 2. Active status priority
-    const statusA = (a.status || '').toLowerCase();
-    const statusB = (b.status || '').toLowerCase();
-    if (statusA === 'active' && statusB !== 'active') return -1;
-    if (statusA !== 'active' && statusB === 'active') return 1;
-
-    // 3. Newest creation / arrival date first
+    // 2. Newest creation / arrival date first
     const dateA = new Date(a.createdAt || a.chickArrivalDate || a.startDate || a.placementDate || 0).getTime();
     const dateB = new Date(b.createdAt || b.chickArrivalDate || b.startDate || b.placementDate || 0).getTime();
     if (dateA !== dateB) return dateB - dateA;

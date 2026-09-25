@@ -32,10 +32,8 @@ export const AdminDashboard = () => {
         setDispatches(dList);
         setLogs(lList);
 
-        // Calculate FCR for active batch
-        const activeBatchesList = bList.filter(b => (b.status || '').toLowerCase() === 'active');
-        if (activeBatchesList.length > 0) {
-          const currentActive = activeBatchesList[0];
+        if (bList.length > 0) {
+          const currentActive = bList[0];
           const rawDailyMap = await dbGetDailyRecords(currentActive.id);
           const dailyRecords = Object.values(rawDailyMap || {}).sort((a, b) => b.recordDate.localeCompare(a.recordDate));
           const totalFeedConsumedKg = dailyRecords.reduce((sum, r) => sum + Number(r.feedConsumption || 0), 0);
