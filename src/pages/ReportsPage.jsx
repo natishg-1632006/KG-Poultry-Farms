@@ -16,7 +16,7 @@ import {
   Legend,
   Line
 } from 'recharts';
-import { BarChart3, TrendingUp, Wheat, Activity, Bird, Scale, Layers, Award } from 'lucide-react';
+import { BarChart3, TrendingUp, Wheat, Activity, Bird, Scale, Layers } from 'lucide-react';
 import CustomSelect from '../components/common/CustomSelect';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
@@ -62,7 +62,7 @@ export const ReportsPage = () => {
   const [feedArrivals, setFeedArrivals] = useState([]);
   const [allDailyRecordsMap, setAllDailyRecordsMap] = useState({});
   const [allFeedArrivalsMap, setAllFeedArrivalsMap] = useState({});
-  const [compareMetric, setCompareMetric] = useState('fcr'); // 'mortality' | 'birds' | 'feed' | 'avgWeight' | 'totalWeight' | 'fcr'
+  const [viewMode, setViewMode] = useState('single'); // 'single' | 'comparison'
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -143,13 +143,6 @@ export const ReportsPage = () => {
       setLoading(false);
     }
   }
-
-  const scrollToSection = (id) => {
-    const elem = document.getElementById(id);
-    if (elem) {
-      elem.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
 
   const selectedBatch = batches.find(b => b.id === selectedBatchId);
 
@@ -327,7 +320,7 @@ export const ReportsPage = () => {
     };
   });
 
-  // Combined Totals for Comparison Table Footer
+  // Combined Totals Across All Batches for Comparison View KPI Cards
   const summaryTotals = {
     initialChicks: batchSummaries.reduce((sum, b) => sum + b.initialChicks, 0),
     dispatchedBirds: batchSummaries.reduce((sum, b) => sum + b.totalDispatchedBirds, 0),
@@ -338,528 +331,593 @@ export const ReportsPage = () => {
     dispatchedWeight: parseFloat(batchSummaries.reduce((sum, b) => sum + b.totalDispatchedWeight, 0).toFixed(2)),
   };
 
-  const overallFCRVal = summaryTotals.dispatchedWeight > 0
-    ? parseFloat((summaryTotals.feedKg / summaryTotals.dispatchedWeight).toFixed(2))
-    : null;
-
-  // Comparison Chart Configuration Map
-  const metricConfigs = {
-    fcr: {
-      key: 'fcr',
-      name: language === 'ta' ? 'FCR விகிதம்' : 'FCR Ratio',
-      color: '#10b981',
-      unit: '',
-      title: language === 'ta' ? 'தொகுதி வாரியாக FCR ஒப்பீடு' : 'Batch FCR Ratio Comparison',
-      subtext: language === 'ta' ? 'குறைந்த FCR மேலானது (தீவன மாற்று விகிதம்)' : 'Lower FCR indicates higher feed conversion efficiency'
-    },
-    mortality: {
-      key: 'totalMortality',
-      name: language === 'ta' ? 'மொத்த இறப்பு (எண்ணிக்கை)' : 'Total Mortality (birds)',
-      color: '#f43f5e',
-      unit: language === 'ta' ? ' கோழிகள்' : ' birds',
-      title: language === 'ta' ? 'தொகுதி வாரியாக இறப்பு ஒப்பீடு' : 'Batch Total Mortality Comparison',
-      subtext: language === 'ta' ? 'ஒவ்வொரு தொகுதியிலும் மொத்த இறந்த கோழிகளின் எண்ணிக்கை' : 'Total bird mortality count per batch'
-    },
-    birds: {
-      key: 'totalDispatchedBirds',
-      name: language === 'ta' ? 'அனுப்பப்பட்ட கோழிகள்' : 'Dispatched Birds',
-      color: '#3b82f6',
-      unit: language === 'ta' ? ' கோழிகள்' : ' birds',
-      title: language === 'ta' ? 'தொகுதி வாரியாக விநியோக கோழிகள் ஒப்பீடு' : 'Batch Dispatched Birds Comparison',
-      subtext: language === 'ta' ? 'விற்பனை செய்யப்பட்ட கோழிகளின் எண்ணிக்கை' : 'Total dispatched bird count per batch'
-    },
-    feed: {
-      key: 'totalFeedBags',
-      name: language === 'ta' ? 'மொத்த தீவனம் (பைகள்)' : 'Feed Consumed (Bags)',
-      color: '#f59e0b',
-      unit: language === 'ta' ? ' பைகள்' : ' Bags',
-      title: language === 'ta' ? 'தொகுதி வாரியாக தீவன நுகர்வு ஒப்பீடு' : 'Batch Feed Consumption Comparison',
-      subtext: language === 'ta' ? 'பயன்படுத்தப்பட்ட மொத்த தீவன பைகள்' : 'Total feed bags consumed per batch'
-    },
-    avgWeight: {
-      key: 'avgWeightGrams',
-      name: language === 'ta' ? 'சராசரி எடை (கிராம்)' : 'Avg Bird Weight (g)',
-      color: '#8b5cf6',
-      unit: language === 'ta' ? ' கி' : ' g',
-      title: language === 'ta' ? 'தொகுதி வாரியாக சராசரி எடை ஒப்பீடு' : 'Batch Average Weight Comparison',
-      subtext: language === 'ta' ? 'அனுப்பப்பட்ட / தற்போதைய சராசரி எடை' : 'Final dispatched or latest bird weight in grams'
-    },
-    totalWeight: {
-      key: 'totalDispatchedWeight',
-      name: language === 'ta' ? 'மொத்த விநியோக எடை (கிலோ)' : 'Total Weight (kg)',
-      color: '#0d9488',
-      unit: language === 'ta' ? ' கிலோ' : ' kg',
-      title: language === 'ta' ? 'தொகுதி வாரியாக மொத்த எடை ஒப்பீடு' : 'Batch Total Weight Produced Comparison',
-      subtext: language === 'ta' ? 'விற்பனை செய்யப்பட்ட மொத்த எடை கிலோவில்' : 'Total dispatched poultry weight in kilograms'
-    },
-  };
-
-  const activeMetricConfig = metricConfigs[compareMetric] || metricConfigs.fcr;
+  const overallBirdsVal = summaryTotals.dispatchedBirds > 0 ? summaryTotals.dispatchedBirds : summaryTotals.liveBirds;
 
   return (
     <div className="space-y-6 pb-12">
       {/* Page Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 pb-4">
-        <div className="flex items-center gap-3">
-          <div className="rounded-xl bg-emerald-100 p-2.5 text-emerald-800 shrink-0">
-            <TrendingUp className="h-6 w-6" />
-          </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">{language === 'ta' ? 'அறிக்கைகள் & பகுப்பாய்வு' : 'Reports & Analytics'}</h1>
-            <p className="text-xs font-semibold text-slate-500 mt-0.5">
-              {language === 'ta' ? 'வளர்ச்சி, இறப்பு மற்றும் தொகுதி ஒப்பீட்டு பகுப்பாய்வு' : 'Visual growth metrics, mortality trends & batch comparison'}
-            </p>
+      <div className="space-y-3.5 border-b border-slate-200/80 pb-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="rounded-xl bg-emerald-100 p-2 text-emerald-800 shrink-0">
+              <TrendingUp className="h-5 w-5" />
+            </div>
+            <h1 className="text-xl font-black text-slate-900 tracking-tight">
+              {language === 'ta' ? 'அறிக்கைகள் & பகுப்பாய்வு' : 'Reports & Analytics'}
+            </h1>
           </div>
         </div>
 
-        {/* Header Right Controls: Jump Buttons + Batch Selector */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Quick Jump Anchor Buttons */}
-          <div className="flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200">
-            <button
-              type="button"
-              onClick={() => scrollToSection('single-batch-section')}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-extrabold text-emerald-800 bg-white shadow-xs transition-all hover:bg-slate-50"
-            >
-              <BarChart3 className="h-3.5 w-3.5" />
-              <span>{language === 'ta' ? 'ஒற்றைத் தொகுதி' : 'Single Batch'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => scrollToSection('batch-comparison-section')}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-extrabold text-slate-600 hover:text-slate-900 transition-all"
-            >
-              <Layers className="h-3.5 w-3.5" />
-              <span>{language === 'ta' ? 'தொகுதி ஒப்பீடு' : 'Batch Comparison'}</span>
-            </button>
-          </div>
-
-          {/* Batch Selector Dropdown */}
-          {selectedBatch && (
-            <div className="flex items-center gap-2 shrink-0">
-              <CustomSelect
-                value={selectedBatchId}
-                onChange={(e) => setSelectedBatchId(e.target.value)}
-                options={batches.map((b) => ({
-                  value: b.id,
-                  label: `${b.batchNumber} - ${b.batchName}`,
-                }))}
-              />
-            </div>
-          )}
+        {/* View Toggle Buttons - Full Width */}
+        <div className="grid grid-cols-2 w-full rounded-xl bg-slate-100 p-1 border border-slate-200">
+          <button
+            type="button"
+            onClick={() => setViewMode('single')}
+            className={`flex items-center justify-center gap-2 rounded-lg py-2.5 px-3 text-xs sm:text-sm font-extrabold transition-all text-center ${
+              viewMode === 'single'
+                ? 'bg-white text-emerald-800 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <BarChart3 className="h-4 w-4" />
+            <span>{language === 'ta' ? 'ஒற்றைத் தொகுதி' : 'Single Batch'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('comparison')}
+            className={`flex items-center justify-center gap-2 rounded-lg py-2.5 px-3 text-xs sm:text-sm font-extrabold transition-all text-center ${
+              viewMode === 'comparison'
+                ? 'bg-white text-emerald-800 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Layers className="h-4 w-4" />
+            <span>{language === 'ta' ? 'தொகுதி ஒப்பீடு' : 'Batch Comparison'}</span>
+          </button>
         </div>
-      </div>
 
-      {/* SECTION 1: SINGLE BATCH ANALYTICS */}
-      <div id="single-batch-section" className="space-y-6">
-        {chartData.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 p-12 text-center text-slate-400 font-medium text-xs">
-            {language === 'ta' ? 'பகுப்பாய்வு வரைபடங்களைக் காட்ட இந்தத் தொகுதிக்கு பதிவுகள் எதுவும் இல்லை.' : 'No daily record history available for this batch to render analytics graphs.'}
+        {/* Batch Selector Dropdown (Visible only in Single Batch mode) */}
+        {viewMode === 'single' && selectedBatch && (
+          <div className="w-full">
+            <CustomSelect
+              value={selectedBatchId}
+              onChange={(e) => setSelectedBatchId(e.target.value)}
+              options={batches.map((b) => ({
+                value: b.id,
+                label: `${b.batchNumber} - ${b.batchName}`,
+              }))}
+            />
           </div>
-        ) : (
-          <>
-            {/* Top 4 KPI Stat Summary Cards Row */}
-            <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
-              {/* Card 1: Live Birds Left / Dispatched Birds */}
-              <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 truncate">{displayLiveBirdsLabel}</span>
-                  <div className="rounded-xl bg-emerald-50 p-2 text-emerald-600 border border-emerald-100">
-                    <Bird className="h-4 w-4" />
-                  </div>
-                </div>
-                <div className="mt-2">
-                  <span className="text-2xl font-black text-slate-900 tracking-tight">{displayLiveBirdsVal.toLocaleString()}</span>
-                  {language !== 'ta' && <span className="text-xs font-bold text-slate-500 ml-1">birds</span>}
-                </div>
-              </div>
-
-              {/* Card 2: Total Mortality */}
-              <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 truncate">{language === 'ta' ? 'மொத்த இறப்பு' : 'TOTAL MORTALITY'}</span>
-                  <div className="rounded-xl bg-rose-50 p-2 text-rose-600 border border-rose-100">
-                    <Activity className="h-4 w-4" />
-                  </div>
-                </div>
-                <div className="mt-2">
-                  <span className="text-2xl font-black text-rose-700 tracking-tight">{totalMortality.toLocaleString()}</span>
-                  {language !== 'ta' && <span className="text-xs font-bold text-slate-500 ml-1">birds</span>}
-                </div>
-              </div>
-
-              {/* Card 3: Latest Avg Bird Weight / Dispatched Avg Weight */}
-              <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 truncate">{displayAvgWeightLabel}</span>
-                  <div className="rounded-xl bg-purple-50 p-2 text-purple-600 border border-purple-100">
-                    <TrendingUp className="h-4 w-4" />
-                  </div>
-                </div>
-                <div className="mt-2">
-                  <span className="text-2xl font-black text-purple-800 tracking-tight">{displayAvgWeightVal}</span>
-                  <span className="text-xs font-bold text-slate-500 ml-1">{language === 'ta' ? 'கி' : 'g'}</span>
-                </div>
-              </div>
-
-              {/* Card 4: Total Feed Consumed */}
-              <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 truncate">{language === 'ta' ? 'மொத்த தீவனம்' : 'TOTAL FEED'}</span>
-                  <div className="rounded-xl bg-amber-50 p-2 text-amber-600 border border-amber-100">
-                    <Wheat className="h-4 w-4" />
-                  </div>
-                </div>
-                <div className="mt-2">
-                  <span className="text-2xl font-black text-slate-900 tracking-tight">{totalFeedBags}</span>
-                  <span className="text-xs font-bold text-slate-500 ml-1">{language === 'ta' ? 'பைகள்' : 'bags'}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Modern Graphs Grid (4 Single-Batch Charts) */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {/* Chart 1: Daily Mortality Count Graph */}
-              <div className="rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs hover:shadow-md transition-all space-y-4">
-                <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="rounded-xl bg-rose-100 p-2 text-rose-700">
-                      <Activity className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h2 className="text-sm sm:text-base font-extrabold text-slate-900">
-                        {language === 'ta' ? `தினசரி இறப்பு (${selectedBatch?.batchNumber})` : `Daily Mortality (${selectedBatch?.batchNumber})`}
-                      </h2>
-                      <p className="text-[11px] font-semibold text-slate-400">{language === 'ta' ? 'தினசரி இறப்புப் பதிவு' : 'Daily recorded bird mortality'}</p>
-                    </div>
-                  </div>
-                  <span className="rounded-xl bg-rose-50 border border-rose-100 px-2.5 py-1 text-xs font-black text-rose-700">
-                    {language === 'ta' ? 'மொத்தம்:' : 'Total:'} {totalMortality}
-                  </span>
-                </div>
-
-                <div className="h-72 w-full pt-2 outline-none focus:outline-none select-none [&_*]:outline-none">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} style={{ outline: 'none' }}>
-                      <defs>
-                        <linearGradient id="mortalityGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#f43f5e" stopOpacity={0.9} />
-                          <stop offset="100%" stopColor="#be123c" stopOpacity={0.65} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.7} />
-                      <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                      <Tooltip content={<CustomTooltip language={language} />} />
-                      <Bar dataKey="mortality" fill="url(#mortalityGrad)" name={language === 'ta' ? 'தினசரி இறப்பு' : 'Daily Mortality'} radius={[6, 6, 0, 0]} maxBarSize={32} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Chart 2: Average Weight Growth vs Company Target */}
-              <div className="rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs hover:shadow-md transition-all space-y-4">
-                <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="rounded-xl bg-emerald-100 p-2 text-emerald-800">
-                      <TrendingUp className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h2 className="text-sm sm:text-base font-extrabold text-slate-900">
-                        {language === 'ta' ? 'எடை வளர்ச்சி vs இலக்கு' : 'Weight Growth vs Target'}
-                      </h2>
-                      <p className="text-[11px] font-semibold text-slate-400">{language === 'ta' ? 'எடை வளர்ச்சி ஒப்பீடு' : 'Actual weight in grams vs standard targets'}</p>
-                    </div>
-                  </div>
-                  <span className="rounded-xl bg-emerald-50 border border-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-800">
-                    {displayAvgWeightVal} {language === 'ta' ? 'கி' : 'g'}
-                  </span>
-                </div>
-
-                <div className="h-72 w-full pt-2 outline-none focus:outline-none select-none [&_*]:outline-none">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
-                      <defs>
-                        <linearGradient id="weightGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#10b981" stopOpacity={0.35} />
-                          <stop offset="100%" stopColor="#10b981" stopOpacity={0.0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.7} />
-                      <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                      <Tooltip content={<CustomTooltip language={language} />} />
-                      <Legend verticalAlign="top" align="right" height={36} iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 700 }} />
-                      <Area type="monotone" dataKey="actualWeight" stroke="#059669" strokeWidth={3} fill="url(#weightGrad)" name={language === 'ta' ? 'உண்மையான எடை (கி)' : 'Actual Weight (g)'} dot={false} activeDot={{ r: 6, fill: '#059669', stroke: '#fff', strokeWidth: 2 }} />
-                      <Line type="monotone" dataKey="targetWeight" stroke="#a855f7" strokeDasharray="4 4" strokeWidth={2.5} name={language === 'ta' ? 'நிறுவன இலக்கு (கி)' : 'Company Target (g)'} dot={false} activeDot={{ r: 5 }} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Chart 3: Feed Consumption vs Target per Bird */}
-              <div className="rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs hover:shadow-md transition-all space-y-4">
-                <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="rounded-xl bg-amber-100 p-2 text-amber-800">
-                      <Wheat className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h2 className="text-sm sm:text-base font-extrabold text-slate-900">
-                        {language === 'ta' ? 'தீவனப் பயன்பாடு vs இலக்கு' : 'Feed Intake vs Target'}
-                      </h2>
-                      <p className="text-[11px] font-semibold text-slate-400">{language === 'ta' ? 'ஒரு கோழிக்கு தீவன ஒப்பீடு' : 'Gram intake per bird vs expected targets'}</p>
-                    </div>
-                  </div>
-                  <span className="rounded-xl bg-amber-50 border border-amber-100 px-2.5 py-1 text-xs font-black text-amber-800">
-                    {language === 'ta' ? 'கி/எண்ணிக்கை' : 'g/bird ratio'}
-                  </span>
-                </div>
-
-                <div className="h-72 w-full pt-2 outline-none focus:outline-none select-none [&_*]:outline-none">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
-                      <defs>
-                        <linearGradient id="feedGramGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.35} />
-                          <stop offset="100%" stopColor="#f59e0b" stopOpacity={0.0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.7} />
-                      <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                      <Tooltip content={<CustomTooltip language={language} />} />
-                      <Legend verticalAlign="top" align="right" height={36} iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 700 }} />
-                      <Area type="monotone" dataKey="actualFeedGramPerBird" stroke="#d97706" strokeWidth={3} fill="url(#feedGramGrad)" name={language === 'ta' ? 'உண்மையான தீவனம் (கி/எண்ணிக்கை)' : 'Actual Feed (g/bird)'} dot={false} activeDot={{ r: 6, fill: '#d97706', stroke: '#fff', strokeWidth: 2 }} />
-                      <Line type="monotone" dataKey="targetFeed" stroke="#10b981" strokeDasharray="4 4" strokeWidth={2.5} name={language === 'ta' ? 'நிறுவன இலக்கு (கி)' : 'Company Target (g)'} dot={false} activeDot={{ r: 5 }} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Chart 4: Daily Total Feed Consumed (kg) */}
-              <div className="rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs hover:shadow-md transition-all space-y-4">
-                <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="rounded-xl bg-indigo-100 p-2 text-indigo-800">
-                      <BarChart3 className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h2 className="text-sm sm:text-base font-extrabold text-slate-900">
-                        {language === 'ta' ? 'மொத்த தீவனம் (கிலோ)' : 'Total Feed (kg)'}
-                      </h2>
-                      <p className="text-[11px] font-semibold text-slate-400">{language === 'ta' ? 'தினசரி தீவன அளவு' : 'Total daily farm feed usage in kilograms'}</p>
-                    </div>
-                  </div>
-                  <span className="rounded-xl bg-indigo-50 border border-indigo-100 px-2.5 py-1 text-xs font-black text-indigo-800">
-                    {totalFeedKg.toLocaleString()} {language === 'ta' ? 'கிலோ' : 'kg total'}
-                  </span>
-                </div>
-
-                <div className="h-72 w-full pt-2 outline-none focus:outline-none select-none [&_*]:outline-none">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
-                      <defs>
-                        <linearGradient id="feedGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#6366f1" stopOpacity={0.9} />
-                          <stop offset="100%" stopColor="#4338ca" stopOpacity={0.65} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.7} />
-                      <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                      <Tooltip content={<CustomTooltip language={language} />} />
-                      <Bar dataKey="feedConsumptionKg" fill="url(#feedGrad)" name={language === 'ta' ? 'தீவனப் பயன்பாடு (கிலோ)' : 'Feed Consumed (kg)'} radius={[6, 6, 0, 0]} maxBarSize={32} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-          </>
         )}
       </div>
 
-      {/* SECTION 2: BATCH PERFORMANCE COMPARISON (ALL BATCHES) */}
-      <div id="batch-comparison-section" className="space-y-6 pt-6 border-t border-slate-200/80">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-3xl border border-slate-200/90 shadow-2xs">
-          <div className="flex items-center gap-2.5">
-            <div className="rounded-xl bg-emerald-100 p-2 text-emerald-800">
-              <Layers className="h-5 w-5" />
+      {/* VIEW 1: SINGLE BATCH ANALYTICS */}
+      {viewMode === 'single' && (
+        <div className="space-y-6">
+          {chartData.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 p-12 text-center text-slate-400 font-medium text-xs">
+              {language === 'ta' ? 'பகுப்பாய்வு வரைபடங்களைக் காட்ட இந்தத் தொகுதிக்கு பதிவுகள் எதுவும் இல்லை.' : 'No daily record history available for this batch to render analytics graphs.'}
             </div>
-            <div>
-              <h2 className="text-base font-extrabold text-slate-900">
-                {language === 'ta' ? 'தொகுதி செயல்திறன் ஒப்பீடு' : 'Batch Performance Comparison'}
-              </h2>
-              <p className="text-[11px] font-semibold text-slate-400">
-                {language === 'ta' ? 'அனைத்து தொகுதிகளின் ஒப்பீட்டு அளவீடுகள்' : 'Side-by-side performance comparison across all farm batches'}
-              </p>
-            </div>
-          </div>
+          ) : (
+            <>
+              {/* Top 4 Single-Batch KPI Stat Summary Cards Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                {/* Card 1: Live Birds Left / Dispatched Birds */}
+                <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-slate-400">{displayLiveBirdsLabel}</span>
+                    <div className="rounded-xl bg-emerald-50 p-2 text-emerald-600 border border-emerald-100">
+                      <Bird className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-baseline gap-1">
+                    <span className="text-2xl font-black text-slate-900 tracking-tight">{displayLiveBirdsVal.toLocaleString()}</span>
+                    {language !== 'ta' && <span className="text-xs font-bold text-slate-500">birds</span>}
+                  </div>
+                </div>
 
-          {/* Metric Selector Buttons */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            {[
-              { id: 'fcr', label: language === 'ta' ? 'FCR விகிதம்' : 'FCR Ratio', icon: Activity },
-              { id: 'mortality', label: language === 'ta' ? 'மொத்த இறப்பு' : 'Total Mortality', icon: Activity },
-              { id: 'birds', label: language === 'ta' ? 'விநியோகக் கோழிகள்' : 'Dispatched Birds', icon: Bird },
-              { id: 'feed', label: language === 'ta' ? 'தீவனப் பயன்பாடு' : 'Feed Consumed', icon: Wheat },
-              { id: 'avgWeight', label: language === 'ta' ? 'சராசரி எடை (கி)' : 'Avg Weight (g)', icon: TrendingUp },
-              { id: 'totalWeight', label: language === 'ta' ? 'மொத்த எடை (கிலோ)' : 'Total Weight (kg)', icon: Scale },
-            ].map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => setCompareMetric(m.id)}
-                className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-extrabold transition-all border ${
-                  compareMetric === m.id
-                    ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                    : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900'
-                }`}
-              >
-                <m.icon className="h-3.5 w-3.5" />
-                <span>{m.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+                {/* Card 2: Total Mortality */}
+                <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-slate-400">{language === 'ta' ? 'மொத்த இறப்பு' : 'TOTAL MORTALITY'}</span>
+                    <div className="rounded-xl bg-rose-50 p-2 text-rose-600 border border-rose-100">
+                      <Activity className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-baseline gap-1">
+                    <span className="text-2xl font-black text-rose-700 tracking-tight">{totalMortality.toLocaleString()}</span>
+                    {language !== 'ta' && <span className="text-xs font-bold text-slate-500">birds</span>}
+                  </div>
+                </div>
 
-        {/* Interactive Comparison Bar Chart */}
-        <div className="rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-            <div>
-              <h3 className="text-base font-extrabold text-slate-900">{activeMetricConfig.title}</h3>
-              <p className="text-xs font-semibold text-slate-400">{activeMetricConfig.subtext}</p>
-            </div>
-            <span className="rounded-xl px-3 py-1 text-xs font-black text-emerald-800 bg-emerald-50 border border-emerald-100 shrink-0 self-start sm:self-auto">
-              {batchSummaries.length} {language === 'ta' ? 'தொகுதிகள் ஒப்பிடப்படுகின்றன' : 'Batches Compared'}
-            </span>
-          </div>
+                {/* Card 3: Latest Avg Bird Weight / Dispatched Avg Weight */}
+                <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-slate-400">{displayAvgWeightLabel}</span>
+                    <div className="rounded-xl bg-purple-50 p-2 text-purple-600 border border-purple-100">
+                      <TrendingUp className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-baseline gap-1">
+                    <span className="text-2xl font-black text-purple-800 tracking-tight">{displayAvgWeightVal}</span>
+                    <span className="text-xs font-bold text-slate-500">{language === 'ta' ? 'கி' : 'g'}</span>
+                  </div>
+                </div>
 
-          <div className="h-72 w-full pt-2 outline-none focus:outline-none select-none [&_*]:outline-none">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={batchSummaries} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} style={{ outline: 'none' }}>
-                <defs>
-                  <linearGradient id="compareGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={activeMetricConfig.color} stopOpacity={0.9} />
-                    <stop offset="100%" stopColor={activeMetricConfig.color} stopOpacity={0.6} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.7} />
-                <XAxis dataKey="batchNumber" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 700 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                <Tooltip content={<CustomTooltip language={language} />} />
-                <Bar
-                  dataKey={activeMetricConfig.key}
-                  fill="url(#compareGrad)"
-                  name={activeMetricConfig.name}
-                  radius={[6, 6, 0, 0]}
-                  maxBarSize={40}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Full Multi-Batch Performance Comparison Matrix Table */}
-        <div className="rounded-3xl border border-slate-200/90 bg-white shadow-xs overflow-hidden">
-          <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-50/50">
-            <div className="flex items-center gap-2.5">
-              <div className="rounded-xl bg-indigo-100 p-2 text-indigo-800">
-                <Award className="h-5 w-5" />
+                {/* Card 4: Total Feed Consumed */}
+                <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-slate-400">{language === 'ta' ? 'மொத்த தீவனம்' : 'TOTAL FEED'}</span>
+                    <div className="rounded-xl bg-amber-50 p-2 text-amber-600 border border-amber-100">
+                      <Wheat className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-baseline gap-1">
+                    <span className="text-2xl font-black text-slate-900 tracking-tight">{totalFeedBags}</span>
+                    <span className="text-xs font-bold text-slate-500">{language === 'ta' ? 'பைகள்' : 'bags'}</span>
+                  </div>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
-                  {language === 'ta' ? 'முழுமையான தொகுதி ஒப்பீட்டு அட்டவணை' : 'Comprehensive Batch Performance Matrix'}
-                </h3>
-                <p className="text-[11px] font-semibold text-slate-400">
-                  {language === 'ta' ? 'அனைத்து தொகுதிகளின் விரிவான ஒப்பீட்டு விவரங்கள்' : 'Side-by-side performance indicators across all batches'}
-                </p>
+
+              {/* Modern Graphs Grid (4 Single-Batch Daily Charts in 2x2 layout) */}
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                {/* Chart 1: Daily Mortality Count Graph */}
+                <div className="rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs hover:shadow-md transition-all space-y-4">
+                  <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="rounded-xl bg-rose-100 p-2 text-rose-700">
+                        <Activity className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h2 className="text-sm sm:text-base font-extrabold text-slate-900">
+                          {language === 'ta' ? `தினசரி இறப்பு (${selectedBatch?.batchNumber})` : `Daily Mortality (${selectedBatch?.batchNumber})`}
+                        </h2>
+                        <p className="text-[11px] font-semibold text-slate-400">{language === 'ta' ? 'தினசரி இறப்புப் பதிவு' : 'Daily recorded bird mortality'}</p>
+                      </div>
+                    </div>
+                    <span className="rounded-xl bg-rose-50 border border-rose-100 px-2.5 py-1 text-xs font-black text-rose-700">
+                      {language === 'ta' ? 'மொத்தம்:' : 'Total:'} {totalMortality}
+                    </span>
+                  </div>
+
+                  <div className="h-72 w-full pt-2 outline-none focus:outline-none select-none [&_*]:outline-none">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} style={{ outline: 'none' }}>
+                        <defs>
+                          <linearGradient id="mortalityGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#f43f5e" stopOpacity={0.9} />
+                            <stop offset="100%" stopColor="#be123c" stopOpacity={0.65} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.7} />
+                        <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                        <Tooltip content={<CustomTooltip language={language} />} />
+                        <Bar dataKey="mortality" fill="url(#mortalityGrad)" name={language === 'ta' ? 'தினசரி இறப்பு' : 'Daily Mortality'} radius={[6, 6, 0, 0]} maxBarSize={32} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Chart 2: Average Weight Growth vs Company Target */}
+                <div className="rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs hover:shadow-md transition-all space-y-4">
+                  <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="rounded-xl bg-emerald-100 p-2 text-emerald-800">
+                        <TrendingUp className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h2 className="text-sm sm:text-base font-extrabold text-slate-900">
+                          {language === 'ta' ? 'எடை வளர்ச்சி vs இலக்கு' : 'Weight Growth vs Target'}
+                        </h2>
+                        <p className="text-[11px] font-semibold text-slate-400">{language === 'ta' ? 'எடை வளர்ச்சி ஒப்பீடு' : 'Actual weight in grams vs standard targets'}</p>
+                      </div>
+                    </div>
+                    <span className="rounded-xl bg-emerald-50 border border-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-800">
+                      {displayAvgWeightVal} {language === 'ta' ? 'கி' : 'g'}
+                    </span>
+                  </div>
+
+                  <div className="h-72 w-full pt-2 outline-none focus:outline-none select-none [&_*]:outline-none">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+                        <defs>
+                          <linearGradient id="weightGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#10b981" stopOpacity={0.35} />
+                            <stop offset="100%" stopColor="#10b981" stopOpacity={0.0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.7} />
+                        <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                        <Tooltip content={<CustomTooltip language={language} />} />
+                        <Legend verticalAlign="top" align="right" height={36} iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 700 }} />
+                        <Area type="monotone" dataKey="actualWeight" stroke="#059669" strokeWidth={3} fill="url(#weightGrad)" name={language === 'ta' ? 'உண்மையான எடை (கி)' : 'Actual Weight (g)'} dot={false} activeDot={{ r: 6, fill: '#059669', stroke: '#fff', strokeWidth: 2 }} />
+                        <Line type="monotone" dataKey="targetWeight" stroke="#a855f7" strokeDasharray="4 4" strokeWidth={2.5} name={language === 'ta' ? 'நிறுவன இலக்கு (கி)' : 'Company Target (g)'} dot={false} activeDot={{ r: 5 }} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Chart 3: Feed Consumption vs Target per Bird */}
+                <div className="rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs hover:shadow-md transition-all space-y-4">
+                  <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="rounded-xl bg-amber-100 p-2 text-amber-800">
+                        <Wheat className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h2 className="text-sm sm:text-base font-extrabold text-slate-900">
+                          {language === 'ta' ? 'தீவனப் பயன்பாடு vs இலக்கு' : 'Feed Intake vs Target'}
+                        </h2>
+                        <p className="text-[11px] font-semibold text-slate-400">{language === 'ta' ? 'ஒரு கோழிக்கு தீவன ஒப்பீடு' : 'Gram intake per bird vs expected targets'}</p>
+                      </div>
+                    </div>
+                    <span className="rounded-xl bg-amber-50 border border-amber-100 px-2.5 py-1 text-xs font-black text-amber-800">
+                      {language === 'ta' ? 'கி/எண்ணிக்கை' : 'g/bird ratio'}
+                    </span>
+                  </div>
+
+                  <div className="h-72 w-full pt-2 outline-none focus:outline-none select-none [&_*]:outline-none">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+                        <defs>
+                          <linearGradient id="feedGramGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.35} />
+                            <stop offset="100%" stopColor="#f59e0b" stopOpacity={0.0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.7} />
+                        <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                        <Tooltip content={<CustomTooltip language={language} />} />
+                        <Legend verticalAlign="top" align="right" height={36} iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 700 }} />
+                        <Area type="monotone" dataKey="actualFeedGramPerBird" stroke="#d97706" strokeWidth={3} fill="url(#feedGramGrad)" name={language === 'ta' ? 'உண்மையான தீவனம் (கி/எண்ணிக்கை)' : 'Actual Feed (g/bird)'} dot={false} activeDot={{ r: 6, fill: '#d97706', stroke: '#fff', strokeWidth: 2 }} />
+                        <Line type="monotone" dataKey="targetFeed" stroke="#10b981" strokeDasharray="4 4" strokeWidth={2.5} name={language === 'ta' ? 'நிறுவன இலக்கு (கி)' : 'Company Target (g)'} dot={false} activeDot={{ r: 5 }} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Chart 4: Daily Total Feed Consumed (kg) */}
+                <div className="rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs hover:shadow-md transition-all space-y-4">
+                  <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="rounded-xl bg-indigo-100 p-2 text-indigo-800">
+                        <BarChart3 className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h2 className="text-sm sm:text-base font-extrabold text-slate-900">
+                          {language === 'ta' ? 'மொத்த தீவனம் (கிலோ)' : 'Total Feed (kg)'}
+                        </h2>
+                        <p className="text-[11px] font-semibold text-slate-400">{language === 'ta' ? 'தினசரி தீவன அளவு' : 'Total daily farm feed usage in kilograms'}</p>
+                      </div>
+                    </div>
+                    <span className="rounded-xl bg-indigo-50 border border-indigo-100 px-2.5 py-1 text-xs font-black text-indigo-800">
+                      {totalFeedKg.toLocaleString()} {language === 'ta' ? 'கிலோ' : 'kg total'}
+                    </span>
+                  </div>
+
+                  <div className="h-72 w-full pt-2 outline-none focus:outline-none select-none [&_*]:outline-none">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+                        <defs>
+                          <linearGradient id="feedGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#6366f1" stopOpacity={0.9} />
+                            <stop offset="100%" stopColor="#4338ca" stopOpacity={0.65} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.7} />
+                        <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                        <Tooltip content={<CustomTooltip language={language} />} />
+                        <Bar dataKey="feedConsumptionKg" fill="url(#feedGrad)" name={language === 'ta' ? 'தீவனப் பயன்பாடு (கிலோ)' : 'Feed Consumed (kg)'} radius={[6, 6, 0, 0]} maxBarSize={32} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* VIEW 2: BATCH PERFORMANCE COMPARISON (ALL BATCHES) */}
+      {viewMode === 'comparison' && (
+        <div className="space-y-6">
+          {/* Top 4 Combined Summary KPI Cards Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            {/* Card 1: Total Dispatched Birds */}
+            <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
+                  {language === 'ta' ? 'அனைத்து தொகுதி விநியோகம்' : 'TOTAL DISPATCHED BIRDS'}
+                </span>
+                <div className="rounded-xl bg-emerald-50 p-2 text-emerald-600 border border-emerald-100">
+                  <Bird className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline gap-1">
+                <span className="text-2xl font-black text-slate-900 tracking-tight">{overallBirdsVal.toLocaleString()}</span>
+                {language !== 'ta' && <span className="text-xs font-bold text-slate-500">birds</span>}
+              </div>
+            </div>
+
+            {/* Card 2: Total Mortality */}
+            <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
+                  {language === 'ta' ? 'அனைத்து தொகுதி இறப்பு' : 'TOTAL MORTALITY'}
+                </span>
+                <div className="rounded-xl bg-rose-50 p-2 text-rose-600 border border-rose-100">
+                  <Activity className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline gap-1">
+                <span className="text-2xl font-black text-rose-700 tracking-tight">{summaryTotals.mortality.toLocaleString()}</span>
+                {language !== 'ta' && <span className="text-xs font-bold text-slate-500">birds</span>}
+              </div>
+            </div>
+
+            {/* Card 3: Total Weight (kg) */}
+            <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
+                  {language === 'ta' ? 'அனைத்து தொகுதி மொத்த எடை' : 'TOTAL WEIGHT'}
+                </span>
+                <div className="rounded-xl bg-purple-50 p-2 text-purple-600 border border-purple-100">
+                  <Scale className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline gap-1">
+                <span className="text-2xl font-black text-purple-800 tracking-tight">{summaryTotals.dispatchedWeight.toLocaleString()}</span>
+                <span className="text-xs font-bold text-slate-500">{language === 'ta' ? 'கிலோ' : 'kg'}</span>
+              </div>
+            </div>
+
+            {/* Card 4: Total Feed Consumed */}
+            <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
+                  {language === 'ta' ? 'அனைத்து தொகுதி தீவனம்' : 'TOTAL FEED'}
+                </span>
+                <div className="rounded-xl bg-amber-50 p-2 text-amber-600 border border-amber-100">
+                  <Wheat className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline gap-1">
+                <span className="text-2xl font-black text-slate-900 tracking-tight">{summaryTotals.feedBags}</span>
+                <span className="text-xs font-bold text-slate-500">{language === 'ta' ? 'பைகள்' : 'bags'}</span>
               </div>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-100/80 text-[11px] font-black uppercase text-slate-600 border-b border-slate-200">
-                <tr>
-                  <th className="py-3 px-4">{language === 'ta' ? 'தொகுதி #' : 'Batch #'}</th>
-                  <th className="py-3 px-4">{language === 'ta' ? 'ஆரம்ப குஞ்சுகள்' : 'Initial Chicks'}</th>
-                  <th className="py-3 px-4">{language === 'ta' ? 'விநியோகம் / உயிருள்ளவை' : 'Dispatched / Live'}</th>
-                  <th className="py-3 px-4">{language === 'ta' ? 'மொத்த இறப்பு' : 'Total Mortality'}</th>
-                  <th className="py-3 px-4">{language === 'ta' ? 'தீவனப் பயன்பாடு' : 'Feed Consumed'}</th>
-                  <th className="py-3 px-4">{language === 'ta' ? 'சராசரி எடை' : 'Avg Weight'}</th>
-                  <th className="py-3 px-4">{language === 'ta' ? 'மொத்த எடை' : 'Total Weight'}</th>
-                  <th className="py-3 px-4">{language === 'ta' ? 'FCR விகிதம்' : 'FCR Ratio'}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-semibold text-slate-800">
-                {batchSummaries.map((bs) => {
-                  const isDone = (bs.status || '').toLowerCase() === 'completed';
-                  return (
-                    <tr key={bs.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-3.5 px-4 font-black text-slate-900 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span>{bs.batchNumber}</span>
-                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
-                            isDone ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-blue-50 text-blue-700 border-blue-200'
-                          }`}>
-                            {bs.status}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4 font-bold text-slate-700 whitespace-nowrap">
-                        {bs.initialChicks.toLocaleString()}
-                      </td>
-                      <td className="py-3.5 px-4 font-extrabold text-slate-900 whitespace-nowrap">
-                        {bs.totalDispatchedBirds > 0 ? (
-                          <span className="text-emerald-800 font-black">{bs.totalDispatchedBirds.toLocaleString()}</span>
-                        ) : (
-                          <span className="text-slate-700">{bs.remainingLiveBirds.toLocaleString()}</span>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span className="text-rose-700 font-extrabold">{bs.totalMortality}</span>
-                        <span className="text-[11px] text-slate-400 font-semibold ml-1">({bs.mortalityRate}%)</span>
-                      </td>
-                      <td className="py-3.5 px-4 font-bold text-amber-800 whitespace-nowrap">
-                        {bs.totalFeedBags} Bags <span className="text-slate-400 font-normal">({bs.totalFeedKg.toLocaleString()} kg)</span>
-                      </td>
-                      <td className="py-3.5 px-4 font-black text-purple-800 whitespace-nowrap">
-                        {bs.avgWeightGrams} g
-                      </td>
-                      <td className="py-3.5 px-4 font-black text-teal-800 whitespace-nowrap">
-                        {bs.totalDispatchedWeight > 0 ? `${bs.totalDispatchedWeight.toLocaleString()} kg` : '—'}
-                      </td>
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        {bs.fcr ? (
-                          <span className="inline-flex items-center rounded-lg bg-emerald-50 px-2 py-1 text-xs font-black text-emerald-800 border border-emerald-200">
-                            {bs.fcr}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              {/* Summary Table Footer */}
-              <tfoot className="bg-slate-900 text-white font-black text-xs border-t-2 border-slate-800">
-                <tr>
-                  <td className="py-3.5 px-4">{language === 'ta' ? 'மொத்தம் / சராசரி' : 'Total / Summary'}</td>
-                  <td className="py-3.5 px-4">{summaryTotals.initialChicks.toLocaleString()}</td>
-                  <td className="py-3.5 px-4 text-emerald-400">{summaryTotals.dispatchedBirds > 0 ? summaryTotals.dispatchedBirds.toLocaleString() : summaryTotals.liveBirds.toLocaleString()}</td>
-                  <td className="py-3.5 px-4 text-rose-300">{summaryTotals.mortality}</td>
-                  <td className="py-3.5 px-4 text-amber-300">{summaryTotals.feedBags} Bags ({summaryTotals.feedKg.toLocaleString()} kg)</td>
-                  <td className="py-3.5 px-4 text-purple-300">—</td>
-                  <td className="py-3.5 px-4 text-teal-300">{summaryTotals.dispatchedWeight.toLocaleString()} kg</td>
-                  <td className="py-3.5 px-4 text-emerald-300">{overallFCRVal ? overallFCRVal : '—'}</td>
-                </tr>
-              </tfoot>
-            </table>
+          {/* 6 Multi-Batch Comparison Charts Grid */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Compare Card 1: Total Mortality */}
+            <div className="rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs hover:shadow-md transition-all space-y-4">
+              <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="rounded-xl bg-rose-100 p-2 text-rose-700">
+                    <Activity className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
+                      {language === 'ta' ? 'மொத்த இறப்பு' : 'Total Mortality'}
+                    </h3>
+                    <p className="text-[11px] font-semibold text-slate-400">{language === 'ta' ? 'மொத்த இறந்த கோழிகள்' : 'Total mortality count per batch'}</p>
+                  </div>
+                </div>
+                <span className="rounded-xl px-2.5 py-1 text-xs font-black text-rose-700 bg-rose-50 border border-rose-100">
+                  {language === 'ta' ? 'கோழிகள்' : 'birds'}
+                </span>
+              </div>
+              <div className="h-72 w-full pt-2 outline-none focus:outline-none select-none [&_*]:outline-none">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={batchSummaries} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} style={{ outline: 'none' }}>
+                    <defs>
+                      <linearGradient id="mortCompareGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#f43f5e" stopOpacity={0.9} />
+                        <stop offset="100%" stopColor="#be123c" stopOpacity={0.65} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.7} />
+                    <XAxis dataKey="batchNumber" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 700 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <Tooltip content={<CustomTooltip language={language} />} />
+                    <Bar dataKey="totalMortality" fill="url(#mortCompareGrad)" name={language === 'ta' ? 'மொத்த இறப்பு' : 'Total Mortality'} radius={[6, 6, 0, 0]} maxBarSize={36} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Compare Card 2: Dispatched Birds */}
+            <div className="rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs hover:shadow-md transition-all space-y-4">
+              <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="rounded-xl bg-blue-100 p-2 text-blue-700">
+                    <Bird className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
+                      {language === 'ta' ? 'விநியோக கோழிகள்' : 'Dispatched Birds'}
+                    </h3>
+                    <p className="text-[11px] font-semibold text-slate-400">{language === 'ta' ? 'விற்பனை கோழிகள் எண்ணிக்கை' : 'Dispatched bird count per batch'}</p>
+                  </div>
+                </div>
+                <span className="rounded-xl px-2.5 py-1 text-xs font-black text-blue-700 bg-blue-50 border border-blue-100">
+                  {language === 'ta' ? 'கோழிகள்' : 'birds'}
+                </span>
+              </div>
+              <div className="h-72 w-full pt-2 outline-none focus:outline-none select-none [&_*]:outline-none">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={batchSummaries} margin={{ top: 10, right: 10, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+                    <defs>
+                      <linearGradient id="birdCompareGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.9} />
+                        <stop offset="100%" stopColor="#1d4ed8" stopOpacity={0.65} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.7} />
+                    <XAxis dataKey="batchNumber" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 700 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<CustomTooltip language={language} />} />
+                    <Bar dataKey="totalDispatchedBirds" fill="url(#birdCompareGrad)" name={language === 'ta' ? 'விநியோக கோழிகள்' : 'Dispatched Birds'} radius={[6, 6, 0, 0]} maxBarSize={36} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Compare Card 3: Feed Consumed (Bags) */}
+            <div className="rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs hover:shadow-md transition-all space-y-4">
+              <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="rounded-xl bg-amber-100 p-2 text-amber-800">
+                    <Wheat className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
+                      {language === 'ta' ? 'தீவனப் பயன்பாடு (பைகள்)' : 'Feed Consumed (Bags)'}
+                    </h3>
+                    <p className="text-[11px] font-semibold text-slate-400">{language === 'ta' ? 'மொத்த தீவன பைகள்' : 'Total feed bags consumed per batch'}</p>
+                  </div>
+                </div>
+                <span className="rounded-xl px-2.5 py-1 text-xs font-black text-amber-800 bg-amber-50 border border-amber-100">
+                  {language === 'ta' ? 'பைகள்' : 'Bags'}
+                </span>
+              </div>
+              <div className="h-72 w-full pt-2 outline-none focus:outline-none select-none [&_*]:outline-none">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={batchSummaries} margin={{ top: 10, right: 10, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+                    <defs>
+                      <linearGradient id="feedCompareGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.9} />
+                        <stop offset="100%" stopColor="#b45309" stopOpacity={0.65} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.7} />
+                    <XAxis dataKey="batchNumber" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 700 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<CustomTooltip language={language} />} />
+                    <Bar dataKey="totalFeedBags" fill="url(#feedCompareGrad)" name={language === 'ta' ? 'தீவன பைகள்' : 'Feed Bags'} radius={[6, 6, 0, 0]} maxBarSize={36} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Compare Card 4: Average Weight (g) */}
+            <div className="rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs hover:shadow-md transition-all space-y-4">
+              <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="rounded-xl bg-purple-100 p-2 text-purple-700">
+                    <TrendingUp className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
+                      {language === 'ta' ? 'சராசரி எடை (கிராம்)' : 'Average Weight (g)'}
+                    </h3>
+                    <p className="text-[11px] font-semibold text-slate-400">{language === 'ta' ? 'சராசரி கோழி எடை' : 'Average bird weight in grams per batch'}</p>
+                  </div>
+                </div>
+                <span className="rounded-xl px-2.5 py-1 text-xs font-black text-purple-700 bg-purple-50 border border-purple-100">
+                  {language === 'ta' ? 'கி' : 'g'}
+                </span>
+              </div>
+              <div className="h-72 w-full pt-2 outline-none focus:outline-none select-none [&_*]:outline-none">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={batchSummaries} margin={{ top: 10, right: 10, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+                    <defs>
+                      <linearGradient id="weightCompareGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.9} />
+                        <stop offset="100%" stopColor="#6d28d9" stopOpacity={0.65} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.7} />
+                    <XAxis dataKey="batchNumber" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 700 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<CustomTooltip language={language} />} />
+                    <Bar dataKey="avgWeightGrams" fill="url(#weightCompareGrad)" name={language === 'ta' ? 'சராசரி எடை (கி)' : 'Avg Weight (g)'} radius={[6, 6, 0, 0]} maxBarSize={36} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Compare Card 5: Total Dispatched Weight (kg) */}
+            <div className="rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs hover:shadow-md transition-all space-y-4">
+              <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="rounded-xl bg-teal-100 p-2 text-teal-800">
+                    <Scale className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
+                      {language === 'ta' ? 'மொத்த எடை (கிலோ)' : 'Total Weight (kg)'}
+                    </h3>
+                    <p className="text-[11px] font-semibold text-slate-400">{language === 'ta' ? 'மொத்த உற்பத்தியான எடை' : 'Total dispatched weight in kg per batch'}</p>
+                  </div>
+                </div>
+                <span className="rounded-xl px-2.5 py-1 text-xs font-black text-teal-800 bg-teal-50 border border-teal-100">
+                  {language === 'ta' ? 'கிலோ' : 'kg'}
+                </span>
+              </div>
+              <div className="h-72 w-full pt-2 outline-none focus:outline-none select-none [&_*]:outline-none">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={batchSummaries} margin={{ top: 10, right: 10, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+                    <defs>
+                      <linearGradient id="totalWtCompareGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#0d9488" stopOpacity={0.9} />
+                        <stop offset="100%" stopColor="#115e59" stopOpacity={0.65} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.7} />
+                    <XAxis dataKey="batchNumber" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 700 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<CustomTooltip language={language} />} />
+                    <Bar dataKey="totalDispatchedWeight" fill="url(#totalWtCompareGrad)" name={language === 'ta' ? 'மொத்த எடை (கிலோ)' : 'Total Weight (kg)'} radius={[6, 6, 0, 0]} maxBarSize={36} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Compare Card 6: FCR Ratio Compare */}
+            <div className="rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs hover:shadow-md transition-all space-y-4">
+              <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="rounded-xl bg-emerald-100 p-2 text-emerald-800">
+                    <Activity className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
+                      {language === 'ta' ? 'FCR விகிதம்' : 'FCR Ratio'}
+                    </h3>
+                    <p className="text-[11px] font-semibold text-slate-400">{language === 'ta' ? 'குறைந்த FCR மேலானது' : 'Feed Conversion Ratio per batch'}</p>
+                  </div>
+                </div>
+                <span className="rounded-xl px-2.5 py-1 text-xs font-black text-emerald-800 bg-emerald-50 border border-emerald-100">
+                  FCR
+                </span>
+              </div>
+              <div className="h-72 w-full pt-2 outline-none focus:outline-none select-none [&_*]:outline-none">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={batchSummaries} margin={{ top: 10, right: 10, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+                    <defs>
+                      <linearGradient id="fcrCompareGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#10b981" stopOpacity={0.9} />
+                        <stop offset="100%" stopColor="#047857" stopOpacity={0.65} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.7} />
+                    <XAxis dataKey="batchNumber" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 700 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<CustomTooltip language={language} />} />
+                    <Bar dataKey="fcr" fill="url(#fcrCompareGrad)" name={language === 'ta' ? 'FCR விகிதம்' : 'FCR Ratio'} radius={[6, 6, 0, 0]} maxBarSize={36} />
+                  </BarChart>
+                </ResponsiveContainer>
+            </div>
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 };
