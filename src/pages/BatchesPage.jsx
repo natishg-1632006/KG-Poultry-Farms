@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { dbGetBatches, dbSaveBatch, dbDeleteBatch, dbGetUsers, dbLogAuditEvent } from '../services/dbService';
+import { syncDailyDataEntryReminders, syncFarmWeatherAndLightingAlerts } from '../services/notificationService';
 import { generateBatchNumber, generateBatchName } from '../utils/calculations';
 import { Modal } from '../components/common/Modal';
 import { ConfirmModal } from '../components/common/ConfirmModal';
@@ -144,6 +145,8 @@ export const BatchesPage = () => {
       );
       setIsModalOpen(false);
       loadData();
+      syncDailyDataEntryReminders().catch(() => {});
+      syncFarmWeatherAndLightingAlerts().catch(() => {});
     } catch (err) {
       alert('Failed saving batch: ' + err.message);
     }
@@ -159,6 +162,8 @@ export const BatchesPage = () => {
         currentUserProfile?.name
       );
       loadData();
+      syncDailyDataEntryReminders().catch(() => {});
+      syncFarmWeatherAndLightingAlerts().catch(() => {});
     } catch (err) {
       alert('Failed updating batch status.');
     }
@@ -235,6 +240,8 @@ export const BatchesPage = () => {
           await dbDeleteBatch(batchId);
           await dbLogAuditEvent('BATCH_DELETED', `Deleted batch ${batchId}`, currentUserProfile?.name);
           loadData();
+          syncDailyDataEntryReminders().catch(() => {});
+          syncFarmWeatherAndLightingAlerts().catch(() => {});
           setDeleteModal({ isOpen: false, title: '', message: '', confirmText: '', cancelText: '', onConfirm: null, loading: false });
         } catch (err) {
           setDeleteModal({ isOpen: false, title: '', message: '', confirmText: '', cancelText: '', onConfirm: null, loading: false });

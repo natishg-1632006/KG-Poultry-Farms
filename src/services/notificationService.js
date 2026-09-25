@@ -114,6 +114,30 @@ const isTodayEntrySubmitted = async () => {
 };
 
 /**
+ * Helper to cancel all scheduled notifications across the app
+ */
+export const cancelAllScheduledNotifications = async () => {
+  if (!Capacitor.isNativePlatform()) return;
+
+  try {
+    const pending = await LocalNotifications.getPending();
+    if (pending && pending.notifications && pending.notifications.length > 0) {
+      await LocalNotifications.cancel({ notifications: pending.notifications });
+    }
+  } catch (err) {
+    console.warn('Error fetching pending notifications to cancel:', err);
+  }
+
+  try {
+    await LocalNotifications.cancel({
+      notifications: Object.values(NOTIF_IDS).map(id => ({ id }))
+    });
+  } catch (err) {
+    console.warn('Error cancelling known notifications:', err);
+  }
+};
+
+/**
  * Requirement 1: Smart Daily Data Entry Reminders (8 AM, 1 PM, 6 PM)
  * - Reminds for Mortality, Feed, and Average Weight (NO water).
  * - Displays "KG Poultry Farms" in English for both languages.
@@ -125,15 +149,9 @@ export const syncDailyDataEntryReminders = async () => {
   try {
     const activeCount = await getActiveBatchesCount();
     
-    // Rule: If NO active batch, cancel all entry reminders
+    // Rule: If NO active batch, cancel all scheduled notifications and exit
     if (activeCount === 0) {
-      await LocalNotifications.cancel({
-        notifications: [
-          { id: NOTIF_IDS.ENTRY_8AM },
-          { id: NOTIF_IDS.ENTRY_1PM },
-          { id: NOTIF_IDS.ENTRY_6PM }
-        ]
-      });
+      await cancelAllScheduledNotifications();
       return;
     }
 
@@ -211,7 +229,10 @@ export const syncDailyDataEntryReminders = async () => {
 export const syncFarmWeatherAndLightingAlerts = async () => {
   try {
     const activeCount = await getActiveBatchesCount();
-    if (activeCount === 0) return; // Only process if active batch found!
+    if (activeCount === 0) {
+      await cancelAllScheduledNotifications();
+      return;
+    }
 
     const now = new Date();
     const nowMs = now.getTime();
