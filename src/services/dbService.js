@@ -4081,9 +4081,12 @@ function withTimeout(promise, ms = 1500) {
 function getLocalDB() {
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem('kg_poultry_local_db_v4');
-      localStorage.removeItem('kg_poultry_local_db_v5');
-      localStorage.removeItem('kg_poultry_local_db_v6');
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('kg_poultry_local_db') && key !== MOCK_STORAGE_KEY) {
+          localStorage.removeItem(key);
+        }
+      }
     }
     const raw = localStorage.getItem(MOCK_STORAGE_KEY);
     if (!raw) {
@@ -4263,17 +4266,16 @@ export async function dbGetBatches() {
     ]);
 
     if (dailySnap.exists()) {
-      local.dailyRecords = { ...(local.dailyRecords || {}), ...dailySnap.val() };
+      local.dailyRecords = dailySnap.val() || {};
     }
     if (dispatchesSnap.exists()) {
-      local.dispatches = { ...(local.dispatches || {}), ...dispatchesSnap.val() };
+      local.dispatches = dispatchesSnap.val() || {};
     }
     if (boxSetsSnap.exists()) {
-      local.boxSets = { ...(local.boxSets || {}), ...boxSetsSnap.val() };
+      local.boxSets = boxSetsSnap.val() || {};
     }
     if (batchesSnap.exists()) {
-      const fbVal = batchesSnap.val() || {};
-      local.batches = { ...(local.batches || {}), ...fbVal };
+      local.batches = batchesSnap.val() || {};
     }
     saveLocalDB(local);
   } catch (_err) {
