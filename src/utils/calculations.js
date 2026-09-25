@@ -270,3 +270,31 @@ export function calculateActiveBatchFCR(
   return calculateFCR(feed, totalLiveWeightKg);
 }
 
+/**
+ * Sorts batches deterministically descending:
+ * 1. Active batches first
+ * 2. Newest creation/arrival date first
+ * 3. Highest numerical batch number first
+ * @param {Array} batches
+ * @returns {Array} sorted batches array
+ */
+export function sortBatchesDescending(batches = []) {
+  return [...batches].sort((a, b) => {
+    const statusA = (a.status || '').toLowerCase();
+    const statusB = (b.status || '').toLowerCase();
+    if (statusA === 'active' && statusB !== 'active') return -1;
+    if (statusA !== 'active' && statusB === 'active') return 1;
+
+    const dateA = new Date(a.createdAt || a.chickArrivalDate || a.startDate || a.placementDate || 0).getTime();
+    const dateB = new Date(b.createdAt || b.chickArrivalDate || b.startDate || b.placementDate || 0).getTime();
+    if (dateA !== dateB) return dateB - dateA;
+
+    const numA = parseInt((a.batchNumber || a.id || '').replace(/\D/g, ''), 10) || 0;
+    const numB = parseInt((b.batchNumber || b.id || '').replace(/\D/g, ''), 10) || 0;
+    if (numA !== numB) return numB - numA;
+
+    return String(b.id || b.batchNumber || '').localeCompare(String(a.id || a.batchNumber || ''));
+  });
+}
+
+

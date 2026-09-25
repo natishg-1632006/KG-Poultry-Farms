@@ -1,7 +1,7 @@
 import { ref, get, set, update, remove, push, child } from 'firebase/database';
 import { db } from './firebase';
 import { FEED_CONSUMPTION_TARGETS, AVERAGE_WEIGHT_TARGETS } from '../constants/companyTargets';
-import { deductFeedStock } from '../utils/calculations';
+import { deductFeedStock, sortBatchesDescending } from '../utils/calculations';
 import { hashPassword } from '../utils/cryptoUtils';
 
 const MOCK_STORAGE_KEY = 'kg_poultry_local_db_v4';
@@ -3010,22 +3010,28 @@ export async function dbGetBatches() {
     saveLocalDB(local);
 
     if (batchesSnap.exists()) {
+      local.batches = batchesSnap.val();
+      saveLocalDB(local);
+
       const fbBatches = Object.values(batchesSnap.val());
-      return fbBatches.map(b => ({
+      const mapped = fbBatches.map(b => ({
         ...b,
         remainingChickCount: recalculateBatchRemainingChickens(b.id, local),
         feedStock: computeBatchFeedStock(b.id, local)
       }));
+      return sortBatchesDescending(mapped);
     }
+    saveLocalDB(local);
   } catch (_err) {
     // fallback
   }
 
-  return Object.values(local.batches || {}).map(b => ({
+  const localMapped = Object.values(local.batches || {}).map(b => ({
     ...b,
     remainingChickCount: recalculateBatchRemainingChickens(b.id, local),
     feedStock: computeBatchFeedStock(b.id, local)
   }));
+  return sortBatchesDescending(localMapped);
 }
 
 export async function dbSaveBatch(batchData) {

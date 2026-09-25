@@ -32,8 +32,8 @@ export const FarmerDashboard = () => {
       setAssignedBatches(farmerBatches);
       const activeBatchesList = farmerBatches.filter(b => (b.status || '').toLowerCase() === 'active');
       const currentActive = activeBatchesList.length > 0
-        ? activeBatchesList[activeBatchesList.length - 1]
-        : (farmerBatches.length > 0 ? farmerBatches[farmerBatches.length - 1] : null);
+        ? activeBatchesList[0]
+        : (farmerBatches.length > 0 ? farmerBatches[0] : null);
       setActiveBatch(currentActive);
 
       if (currentActive) {

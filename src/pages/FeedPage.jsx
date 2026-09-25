@@ -66,8 +66,8 @@ export const FeedPage = () => {
       if (accessible.length > 0) {
         const activeBatches = accessible.filter(b => (b.status || '').toLowerCase() === 'active');
         const defaultBatch = activeBatches.length > 0 
-          ? activeBatches[activeBatches.length - 1] 
-          : accessible[accessible.length - 1];
+          ? activeBatches[0] 
+          : accessible[0];
         setSelectedBatchId(defaultBatch.id);
         await loadFeedArrivals(defaultBatch.id);
       } else {
