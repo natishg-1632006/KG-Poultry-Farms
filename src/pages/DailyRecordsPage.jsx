@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { dbGetBatches, dbGetDailyRecords, dbGetDispatches, dbSaveDailyRecord, dbDeleteDailyRecord, dbUpdateBatchFeedStockPool, dbLogAuditEvent } from '../services/dbService';
+import { dbGetBatches, dbGetDailyRecords, dbGetDispatches, dbGetFeedArrivals, dbSaveDailyRecord, dbDeleteDailyRecord, dbUpdateBatchFeedStockPool, dbLogAuditEvent } from '../services/dbService';
 import { calculateRemainingChickens, validateRecordDate, deductFeedStock, bagsToKg, kgToBags } from '../utils/calculations';
 import { KG_PER_BAG, FEED_CONSUMPTION_TARGETS, AVERAGE_WEIGHT_TARGETS } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
@@ -28,6 +28,7 @@ export const DailyRecordsPage = () => {
   const [selectedBatchId, setSelectedBatchId] = useState('');
   const [recordsMap, setRecordsMap] = useState({});
   const [dispatches, setDispatches] = useState([]);
+  const [feedArrivals, setFeedArrivals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -97,12 +98,14 @@ export const DailyRecordsPage = () => {
 
   async function loadRecordsForBatch(bId) {
     try {
-      const [map, dispList] = await Promise.all([
+      const [map, dispList, feedList] = await Promise.all([
         dbGetDailyRecords(bId),
-        dbGetDispatches()
+        dbGetDispatches(),
+        dbGetFeedArrivals(bId)
       ]);
       setRecordsMap(map || {});
       setDispatches((dispList || []).filter(d => d.batchId === bId));
+      setFeedArrivals(feedList || []);
       if (map && map[todayStr]) {
         const r = map[todayStr];
         const bags = r.feedConsumptionBags !== undefined ? r.feedConsumptionBags : (r.feedConsumption ? Math.floor(r.feedConsumption / KG_PER_BAG) : '');
@@ -448,11 +451,29 @@ export const DailyRecordsPage = () => {
     ? Math.round((totalDispatchedWeight / totalDispatchedBirds) * 1000)
     : (lastRecord ? Number(lastRecord.averageWeight || 0) : 0);
 
-  const rawConsumedKg = recordsList.reduce((acc, r) => acc + Number(r.feedConsumption || 0), 0);
-  const totalFeedBags = Math.round(kgToBags(rawConsumedKg, KG_PER_BAG));
+  const totalFeedArrivedBags = feedArrivals.reduce((acc, f) => {
+    const isReturn = f.transactionType === 'Return';
+    const totalKg = Number(f.quantityReceivedKg ?? f.quantityReceived ?? ((Number(f.bagsReceived || 0) * KG_PER_BAG) + Number(f.additionalKg || 0)));
+    const bags = totalKg / KG_PER_BAG;
+    return isReturn ? acc - bags : acc + bags;
+  }, 0);
+  const totalArrivedBagsFinal = Math.max(0, totalFeedArrivedBags);
+  const hasReturns = feedArrivals.some(f => f.transactionType === 'Return');
+
+  const rawConsumedBags = recordsList.reduce((acc, r) => {
+    const bags = r.feedConsumptionBags || (r.feedConsumption ? r.feedConsumption / KG_PER_BAG : 0);
+    return acc + Number(bags || 0);
+  }, 0);
+
+  const totalFeedConsumedBags = (hasReturns || isBatchCompleted) && totalArrivedBagsFinal > 0
+    ? Math.min(rawConsumedBags, totalArrivedBagsFinal)
+    : rawConsumedBags;
+
+  const totalFeedConsumedKg = totalFeedConsumedBags * KG_PER_BAG;
+  const displayConsumedBagsStr = Number.isInteger(totalFeedConsumedBags) ? totalFeedConsumedBags : parseFloat(totalFeedConsumedBags.toFixed(1));
 
   const finalBirdsForFeed = totalDispatchedBirds > 0 ? totalDispatchedBirds : Math.max(1, initialChicks - totalMortality);
-  const finalFeedPerBirdGram = finalBirdsForFeed > 0 ? Math.round((rawConsumedKg * 1000) / finalBirdsForFeed) : 0;
+  const finalFeedPerBirdGram = finalBirdsForFeed > 0 ? Math.round((totalFeedConsumedKg * 1000) / finalBirdsForFeed) : 0;
 
   let finalFlockAgeDay = lastRecordFlockAgeDay;
   if (selectedBatch?.chickArrivalDate && lastRecord?.recordDate) {
@@ -460,6 +481,11 @@ export const DailyRecordsPage = () => {
     const recDate = new Date(lastRecord.recordDate);
     const diffMs = Math.max(0, recDate.getTime() - arrivalDate.getTime());
     finalFlockAgeDay = Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+  }
+
+  let cumulativeTargetGramPerBird = 0;
+  for (let day = 1; day <= finalFlockAgeDay; day++) {
+    cumulativeTargetGramPerBird += (FEED_CONSUMPTION_TARGETS[day] || FEED_CONSUMPTION_TARGETS[45] || 167);
   }
 
   const finalDayTargetWeightGram = AVERAGE_WEIGHT_TARGETS[Math.min(45, finalFlockAgeDay)] || AVERAGE_WEIGHT_TARGETS[45] || 2438;
@@ -610,9 +636,9 @@ export const DailyRecordsPage = () => {
           statsBreakdown={
             isBatchCompleted
               ? [
-                  { label: t('consumed'), value: `${totalFeedBags} Bags`, labelColor: 'text-emerald-600', valueColor: 'text-slate-900' },
+                  { label: t('consumed'), value: `${displayConsumedBagsStr} Bags`, labelColor: 'text-emerald-600', valueColor: 'text-slate-900' },
                   { label: t('eatBird'), value: `${finalFeedPerBirdGram} g`, labelColor: 'text-orange-600', valueColor: 'text-orange-600' },
-                  { label: t('target'), value: `${lastRecordTargetGram} g`, labelColor: 'text-blue-600', valueColor: 'text-blue-600' }
+                  { label: t('target'), value: `${cumulativeTargetGramPerBird} g`, labelColor: 'text-blue-600', valueColor: 'text-blue-600' }
                 ]
               : (lastRecord
                   ? [
@@ -622,7 +648,7 @@ export const DailyRecordsPage = () => {
                     ]
                   : null)
           }
-          value={isBatchCompleted ? `${totalFeedBags} Bags (${finalFeedPerBirdGram} g/bird)` : (lastRecord ? `${lastRecordBags} Bags${lastRecordLooseKg > 0 ? ` & ${lastRecordLooseKg} kg` : ''} (${lastRecordPerBirdGram} g/bird)` : '0 Bags')}
+          value={isBatchCompleted ? `${displayConsumedBagsStr} Bags (${finalFeedPerBirdGram} g/bird)` : (lastRecord ? `${lastRecordBags} Bags${lastRecordLooseKg > 0 ? ` & ${lastRecordLooseKg} kg` : ''} (${lastRecordPerBirdGram} g/bird)` : '0 Bags')}
           subtext={isBatchCompleted ? (language === 'ta' ? 'முடிவுற்ற தொகுதியின் மொத்த தீவனப் பயன்பாடு' : 'Total feed consumed for completed batch') : (lastRecord ? `Day ${lastRecordFlockAgeDay} Target: ${lastRecordTargetGram} g/bird (${lastRecord.recordDate})` : 'No feed logged')}
           icon={Package}
           color="blue"
