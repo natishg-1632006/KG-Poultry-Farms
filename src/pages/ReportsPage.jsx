@@ -186,6 +186,7 @@ export const ReportsPage = () => {
     ? Math.min(rawConsumedBags, netArrivedBags)
     : rawConsumedBags;
   const totalFeedBags = totalFeedBagsVal.toFixed(1);
+  const totalFeedKg = Math.round(totalFeedBagsVal * 70);
 
   const dispatchedAvgWeightGrams = totalDispatchedBirds > 0
     ? Math.round((totalDispatchedWeight / totalDispatchedBirds) * 1000)
