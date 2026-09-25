@@ -230,22 +230,43 @@ export function calculateFCR(totalFeedKg, totalLiveWeightKg) {
 }
 
 /**
- * Calculates active batch FCR using current feed consumed (kg),
- * latest average bird weight (in grams or kg), and current live chick count.
- * Formula: total feed consumed (kg) / (latest avg weight in kg * current bird count)
+ * Calculates active/completed batch FCR using current feed consumed (kg),
+ * latest average bird weight (in grams or kg), remaining live chick count,
+ * total dispatched weight (kg), and completed status.
+ * Formula: total feed consumed (kg) / total live & dispatched body weight (kg)
  * @param {number} totalFeedKg
  * @param {number} latestAvgWeightGrams
  * @param {number} remainingBirdCount
+ * @param {number} [totalDispatchedWeightKg=0]
+ * @param {boolean} [isBatchDone=false]
  * @returns {number|null}
  */
-export function calculateActiveBatchFCR(totalFeedKg, latestAvgWeightGrams, remainingBirdCount) {
+export function calculateActiveBatchFCR(
+  totalFeedKg,
+  latestAvgWeightGrams,
+  remainingBirdCount,
+  totalDispatchedWeightKg = 0,
+  isBatchDone = false
+) {
   const feed = Number(totalFeedKg) || 0;
   const rawAvg = Number(latestAvgWeightGrams) || 0;
-  const birds = Number(remainingBirdCount) || 0;
+  const remaining = Number(remainingBirdCount) || 0;
+  const dispatchedWeight = Number(totalDispatchedWeightKg) || 0;
 
-  if (feed <= 0 || rawAvg <= 0 || birds <= 0) return null;
+  if (feed <= 0) return null;
+
   const avgKg = rawAvg > 20 ? (rawAvg / 1000) : rawAvg;
-  const totalLiveWeightKg = avgKg * birds;
+
+  let totalLiveWeightKg = 0;
+  if (isBatchDone && dispatchedWeight > 0) {
+    totalLiveWeightKg = dispatchedWeight;
+  } else if (dispatchedWeight > 0) {
+    totalLiveWeightKg = dispatchedWeight + (remaining * avgKg);
+  } else {
+    totalLiveWeightKg = remaining * avgKg;
+  }
+
+  if (totalLiveWeightKg <= 0) return null;
   return calculateFCR(feed, totalLiveWeightKg);
 }
 

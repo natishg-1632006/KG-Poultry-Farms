@@ -3717,19 +3717,24 @@ export async function dbGetBatchHistoryData(batchId) {
   }
 
   // FCR (Feed Conversion Ratio) Calculation
-  // Formula for completed: total feed weight (kg) / total final weight of birds (kg)
-  // Formula for active: total feed weight at current (kg) / (that day's avg weight in kg * current bird count)
+  // Formula: total feed weight (kg) / total produced weight (kg)
   let fcr = null;
   const isCompleted = (selectedBatch.status || '').toLowerCase() === 'completed';
+  const rawAvg = avgBirdWeight;
+  const avgKg = rawAvg > 20 ? (rawAvg / 1000) : rawAvg;
+
+  let totalLiveWeightKg = 0;
   if (isCompleted && totalDispatchedWeight > 0) {
-    fcr = totalFeedConsumedKg > 0 ? parseFloat((totalFeedConsumedKg / totalDispatchedWeight).toFixed(2)) : null;
+    totalLiveWeightKg = totalDispatchedWeight;
+  } else if (totalDispatchedWeight > 0) {
+    totalLiveWeightKg = totalDispatchedWeight + (avgKg * remainingChickCount);
   } else {
-    const rawAvg = avgBirdWeight;
-    const avgKg = rawAvg > 20 ? (rawAvg / 1000) : rawAvg;
-    const totalLiveWeightKg = avgKg * remainingChickCount;
-    if (totalFeedConsumedKg > 0 && totalLiveWeightKg > 0) {
-      fcr = parseFloat((totalFeedConsumedKg / totalLiveWeightKg).toFixed(2));
-    }
+    const survivingBirds = initialChickCount > 0 ? Math.max(0, initialChickCount - totalMortality) : remainingChickCount;
+    totalLiveWeightKg = avgKg * survivingBirds;
+  }
+
+  if (totalFeedConsumedKg > 0 && totalLiveWeightKg > 0) {
+    fcr = parseFloat((totalFeedConsumedKg / totalLiveWeightKg).toFixed(2));
   }
 
   return {

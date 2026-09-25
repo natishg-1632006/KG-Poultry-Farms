@@ -41,7 +41,18 @@ export const AdminDashboard = () => {
           const totalFeedConsumedKg = dailyRecords.reduce((sum, r) => sum + Number(r.feedConsumption || 0), 0);
           const latestAvgWeight = dailyRecords.length > 0 ? Number(dailyRecords[0].averageWeight || 0) : 0;
           const remainingChicks = Number(currentActive.remainingChickCount ?? currentActive.initialChickCount ?? 0);
-          const computedFCR = calculateActiveBatchFCR(totalFeedConsumedKg, latestAvgWeight, remainingChicks);
+
+          const batchDispatches = dList.filter(d => d.batchId === currentActive.id);
+          const totalDispatchedWeight = batchDispatches.reduce((acc, d) => acc + Number(d.totalWeight || d.netWeight || 0), 0);
+          const isBatchDone = (currentActive.status || '').toLowerCase() === 'completed';
+
+          const computedFCR = calculateActiveBatchFCR(
+            totalFeedConsumedKg,
+            latestAvgWeight,
+            remainingChicks,
+            totalDispatchedWeight,
+            isBatchDone
+          );
           setActiveFCR(computedFCR);
         }
       } catch (err) {

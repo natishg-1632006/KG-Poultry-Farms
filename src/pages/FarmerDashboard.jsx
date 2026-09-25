@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { dbGetBatches, dbGetDailyRecords, dbGetFeedArrivals } from '../services/dbService';
+import { dbGetBatches, dbGetDailyRecords, dbGetFeedArrivals, dbGetDispatches } from '../services/dbService';
 import { formatFeedStock, kgToBags, calculateActiveBatchFCR } from '../utils/calculations';
 import { KG_PER_BAG } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
@@ -18,6 +18,7 @@ export const FarmerDashboard = () => {
   const [activeBatch, setActiveBatch] = useState(null);
   const [records, setRecords] = useState([]);
   const [feedArrivals, setFeedArrivals] = useState([]);
+  const [dispatches, setDispatches] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -36,12 +37,14 @@ export const FarmerDashboard = () => {
       setActiveBatch(currentActive);
 
       if (currentActive) {
-        const [rMap, fList] = await Promise.all([
+        const [rMap, fList, allDisp] = await Promise.all([
           dbGetDailyRecords(currentActive.id),
-          dbGetFeedArrivals(currentActive.id)
+          dbGetFeedArrivals(currentActive.id),
+          dbGetDispatches()
         ]);
         setRecords(Object.values(rMap).sort((a, b) => b.recordDate.localeCompare(a.recordDate)));
         setFeedArrivals(fList || []);
+        setDispatches((allDisp || []).filter(d => d.batchId === currentActive.id));
       }
     } catch (err) {
       console.error('Failed loading farmer dashboard data:', err);
@@ -59,6 +62,9 @@ export const FarmerDashboard = () => {
   const remainingChicks = activeBatch && activeBatch.remainingChickCount !== undefined
     ? Number(activeBatch.remainingChickCount)
     : Math.max(0, initialChicks - totalMortality);
+
+  const totalDispatchedBirds = dispatches.reduce((acc, d) => acc + Number(d.birdsCount || d.totalBirds || d.totalChickens || 0), 0);
+  const totalDispatchedWeight = dispatches.reduce((acc, d) => acc + Number(d.totalWeight || d.netWeight || 0), 0);
 
   const rawConsumedBags = records.reduce((acc, r) => {
     const bags = r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG);
@@ -92,8 +98,14 @@ export const FarmerDashboard = () => {
   const latestRecord = records.length > 0 ? records[0] : null;
   const latestAvgWeight = latestRecord ? Number(latestRecord.averageWeight || 0) : 0;
 
-  // Active FCR calculation: Total feed consumed (kg) / (Current day's avg weight in kg * Current bird count)
-  const activeFCR = calculateActiveBatchFCR(totalFeedConsumedKg, latestAvgWeight, remainingChicks);
+  // Active/Completed FCR calculation using feed consumed, avg weight, remaining chicks, and total dispatched weight
+  const activeFCR = calculateActiveBatchFCR(
+    totalFeedConsumedKg,
+    latestAvgWeight,
+    remainingChicks,
+    totalDispatchedWeight,
+    isBatchDone
+  );
 
   let flockAgeDays = 1;
   if (activeBatch?.chickArrivalDate) {
@@ -102,6 +114,14 @@ export const FarmerDashboard = () => {
     const diffMs = Math.max(0, today.getTime() - arrivalDate.getTime());
     flockAgeDays = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1;
   }
+
+  const displayChicksVal = isBatchDone && totalDispatchedBirds > 0
+    ? `${totalDispatchedBirds.toLocaleString()} / ${initialChicks.toLocaleString()}`
+    : `${Number(remainingChicks).toLocaleString()} / ${initialChicks.toLocaleString()}`;
+
+  const displayChicksSubtext = isBatchDone && totalDispatchedBirds > 0
+    ? (language === 'ta' ? 'விநியோகிக்கப்பட்டவை / ஆரம்ப குஞ்சுகள்' : 'Dispatched / Initial Chicks')
+    : t('liveInitialChicks');
 
   return (
     <div className="space-y-6">
@@ -131,8 +151,8 @@ export const FarmerDashboard = () => {
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
             <StatCard
               title={t('chicksCount')}
-              value={`${Number(remainingChicks).toLocaleString()} / ${initialChicks.toLocaleString()}`}
-              subtext={t('liveInitialChicks')}
+              value={displayChicksVal}
+              subtext={displayChicksSubtext}
               icon={Activity}
               color="emerald"
             />

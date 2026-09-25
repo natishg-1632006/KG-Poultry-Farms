@@ -123,12 +123,18 @@ describe('Calculations Utility Tests', () => {
       expect(calculateFCR(5000, 0)).toBeNull();
     });
 
-    it('calculates active batch FCR using feed kg, avg weight grams, and bird count', () => {
+    it('calculates active batch FCR using feed kg, avg weight grams, bird count, and dispatched weight', () => {
       // 2100 kg feed / (1.4 kg avg weight * 1000 birds) = 2100 / 1400 = 1.50
       expect(calculateActiveBatchFCR(2100, 1400, 1000)).toBe(1.50);
       // Handles avg weight specified directly in kg (< 20)
       expect(calculateActiveBatchFCR(2100, 1.4, 1000)).toBe(1.50);
       expect(calculateActiveBatchFCR(0, 1400, 1000)).toBeNull();
+
+      // Partial dispatches: 13,860 kg feed / (8300 kg dispatched + (19 remaining * 2.23 kg)) = 13860 / 8342.37 = 1.66
+      expect(calculateActiveBatchFCR(13860, 2230, 19, 8300, false)).toBe(1.66);
+
+      // Completed batch with dispatches: 13,860 kg feed / 8300 kg dispatched = 13860 / 8300 = 1.67
+      expect(calculateActiveBatchFCR(13860, 2230, 0, 8300, true)).toBe(1.67);
     });
   });
 });

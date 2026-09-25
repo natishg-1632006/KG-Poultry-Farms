@@ -897,7 +897,11 @@ export const BatchHistoryPage = () => {
               return (
                 <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 sm:p-4 shadow-2xs transition-all hover:border-blue-300 hover:shadow-xs min-w-0">
                   <div className="flex items-center justify-between gap-1">
-                    <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-400 whitespace-nowrap truncate">{language === 'ta' ? 'மீதமுள்ளவை' : 'Final Birds'}</span>
+                    <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-400 whitespace-nowrap truncate">
+                      {isCompletedBatch 
+                        ? (language === 'ta' ? 'விற்பனை கோழிகள்' : 'Dispatched Birds') 
+                        : (language === 'ta' ? 'உயிருள்ளவை' : 'Live Birds')}
+                    </span>
                     <div className="rounded-xl bg-blue-50 p-1.5 text-blue-600 border border-blue-100 shrink-0">
                       <ShieldCheck className="h-4 w-4" />
                     </div>
