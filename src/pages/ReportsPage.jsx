@@ -147,6 +147,7 @@ export const ReportsPage = () => {
   const totalMortality = dailyRecords.reduce((sum, r) => sum + (r.mortalityCount || 0), 0);
   const latestRecord = dailyRecords.length > 0 ? dailyRecords[dailyRecords.length - 1] : null;
   const latestLiveBirds = latestRecord?.remainingChickCount ?? selectedBatch?.initialChickCount ?? 0;
+  const latestAvgWeight = latestRecord?.averageWeight || 0;
 
   // Dispatches calculations for selected batch
   const batchDispatches = dispatches.filter(d => d.batchId === selectedBatchId);
@@ -357,7 +358,7 @@ export const ReportsPage = () => {
                   </div>
                 </div>
                 <span className="rounded-xl bg-emerald-50 border border-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-800">
-                  {latestAvgWeight} {language === 'ta' ? 'கி' : 'g'}
+                  {displayAvgWeightVal} {language === 'ta' ? 'கி' : 'g'}
                 </span>
               </div>
 
