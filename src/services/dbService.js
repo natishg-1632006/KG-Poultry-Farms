@@ -3307,23 +3307,30 @@ export async function dbDeleteMedicineRecord(batchId, recordId) {
 }
 
 // DISPATCH & BOX SETS
+// DISPATCH & BOX SETS
 export async function dbGetDispatches() {
   let list = [];
+  const local = getLocalDB();
   try {
-    const snap = await withTimeout(get(ref(db, 'dispatches')));
-    if (snap.exists()) {
-      const val = snap.val();
+    const [dispatchesSnap, boxSetsSnap] = await Promise.all([
+      withTimeout(get(ref(db, 'dispatches'))),
+      withTimeout(get(ref(db, 'boxSets')))
+    ]);
+
+    if (dispatchesSnap.exists()) {
+      const val = dispatchesSnap.val();
       list = Array.isArray(val) ? val : Object.values(val);
-      const local = getLocalDB();
       local.dispatches = local.dispatches || {};
       list.forEach(d => { if (d && d.id) local.dispatches[d.id] = d; });
-      saveLocalDB(local);
     }
+    if (boxSetsSnap.exists()) {
+      local.boxSets = boxSetsSnap.val() || {};
+    }
+    saveLocalDB(local);
   } catch (_err) {
-    // fallback
+    // fallback to local
   }
 
-  const local = getLocalDB();
   if (list.length === 0) {
     list = Object.values(local.dispatches || {});
   }
@@ -3373,23 +3380,26 @@ export async function dbSaveDispatch(dispatchData) {
     updatedAt: new Date().toISOString()
   };
 
+  const local = getLocalDB();
+  local.dispatches[id] = record;
+
+  let remaining = null;
+  if (record.batchId && local.batches[record.batchId]) {
+    remaining = recalculateBatchRemainingChickens(record.batchId, local);
+  }
+  saveLocalDB(local);
+
+  // Background Parallel Writes
   try {
-    await withTimeout(set(ref(db, `dispatches/${id}`), record));
+    const writes = [set(ref(db, `dispatches/${id}`), record)];
+    if (remaining !== null) {
+      writes.push(set(ref(db, `batches/${record.batchId}/remainingChickCount`), remaining));
+    }
+    await withTimeout(Promise.all(writes));
   } catch (_err) {
     // fallback
   }
 
-  const local = getLocalDB();
-  local.dispatches[id] = record;
-  if (record.batchId && local.batches[record.batchId]) {
-    const remaining = recalculateBatchRemainingChickens(record.batchId, local);
-    try {
-      await withTimeout(set(ref(db, `batches/${record.batchId}/remainingChickCount`), remaining));
-    } catch (_e) {
-      // fallback
-    }
-  }
-  saveLocalDB(local);
   return record;
 }
 
@@ -3398,10 +3408,14 @@ export async function dbDeleteInvoiceByDispatchId(dispatchId) {
     const snap = await withTimeout(get(ref(db, 'invoices')));
     if (snap.exists()) {
       const data = snap.val();
+      const removePromises = [];
       for (const [key, inv] of Object.entries(data)) {
         if (inv && (inv.dispatchId === dispatchId || inv.id === dispatchId)) {
-          await withTimeout(remove(ref(db, `invoices/${key}`)));
+          removePromises.push(remove(ref(db, `invoices/${key}`)));
         }
+      }
+      if (removePromises.length > 0) {
+        await withTimeout(Promise.all(removePromises));
       }
     }
   } catch (_err) {
@@ -3419,39 +3433,51 @@ export async function dbDeleteDispatch(dispatchId) {
   const localBefore = getLocalDB();
   const batchId = localBefore.dispatches[dispatchId]?.batchId;
 
-  try {
-    await withTimeout(remove(ref(db, `dispatches/${dispatchId}`)));
-    await withTimeout(remove(ref(db, `boxSets/${dispatchId}`)));
-    await dbDeleteInvoiceByDispatchId(dispatchId);
-  } catch (_err) {
-    // fallback
-  }
-
   const local = getLocalDB();
   delete local.dispatches[dispatchId];
   delete local.boxSets[dispatchId];
   if (local.invoices && Array.isArray(local.invoices)) {
     local.invoices = local.invoices.filter(inv => inv.dispatchId !== dispatchId && inv.id !== dispatchId);
   }
+
+  let remaining = null;
   if (batchId && local.batches[batchId]) {
-    const remaining = recalculateBatchRemainingChickens(batchId, local);
-    try {
-      await withTimeout(set(ref(db, `batches/${batchId}/remainingChickCount`), remaining));
-    } catch (_e) {
-      // fallback
-    }
+    remaining = recalculateBatchRemainingChickens(batchId, local);
   }
   saveLocalDB(local);
-}
 
-export async function dbGetBoxSets(dispatchId) {
   try {
-    const snap = await withTimeout(get(ref(db, `boxSets/${dispatchId}`)));
-    if (snap.exists()) return Array.isArray(snap.val()) ? snap.val() : Object.values(snap.val());
+    const updates = {};
+    updates[`dispatches/${dispatchId}`] = null;
+    updates[`boxSets/${dispatchId}`] = null;
+    if (batchId && remaining !== null) {
+      updates[`batches/${batchId}/remainingChickCount`] = remaining;
+    }
+    await withTimeout(update(ref(db), updates));
+    await dbDeleteInvoiceByDispatchId(dispatchId);
   } catch (_err) {
     // fallback
   }
+}
+
+export async function dbGetBoxSets(dispatchId) {
   const local = getLocalDB();
+  if (local.boxSets && local.boxSets[dispatchId]) {
+    return local.boxSets[dispatchId];
+  }
+
+  try {
+    const snap = await withTimeout(get(ref(db, `boxSets/${dispatchId}`)));
+    if (snap.exists()) {
+      const val = Array.isArray(snap.val()) ? snap.val() : Object.values(snap.val());
+      local.boxSets[dispatchId] = val;
+      saveLocalDB(local);
+      return val;
+    }
+  } catch (_err) {
+    // fallback
+  }
+
   return local.boxSets[dispatchId] || [];
 }
 
@@ -3463,12 +3489,6 @@ export async function dbSaveBoxSet(dispatchId, boxSetData) {
     dispatchId,
     savedAt: new Date().toISOString()
   };
-
-  try {
-    await withTimeout(set(ref(db, `boxSets/${dispatchId}/${boxSetData.boxSetNumber - 1}`), record));
-  } catch (_err) {
-    // fallback
-  }
 
   const local = getLocalDB();
   if (!local.boxSets[dispatchId]) {
@@ -3482,11 +3502,15 @@ export async function dbSaveBoxSet(dispatchId, boxSetData) {
   }
 
   const dispatch = (local.dispatches || {})[dispatchId];
+  let setBirds = 0;
+  let setWeight = 0;
+  let remaining = null;
+
   if (dispatch) {
     const allSets = local.boxSets[dispatchId] || [];
     const loadedSets = allSets.filter(s => Number(s.loadedWeight) > 0 || Number(s.totalChickenWeight) > 0);
-    const setBirds = loadedSets.reduce((sum, s) => sum + Number(s.chickenCount || 0), 0);
-    const setWeight = loadedSets.reduce((sum, s) => sum + Number(s.totalChickenWeight || 0), 0);
+    setBirds = loadedSets.reduce((sum, s) => sum + Number(s.chickenCount || 0), 0);
+    setWeight = loadedSets.reduce((sum, s) => sum + Number(s.totalChickenWeight || 0), 0);
 
     if (setBirds > 0) {
       dispatch.birdsCount = setBirds;
@@ -3496,30 +3520,31 @@ export async function dbSaveBoxSet(dispatchId, boxSetData) {
       dispatch.totalWeight = setWeight;
       dispatch.netWeight = setWeight;
     }
-    try {
-      if (setBirds > 0) {
-        await withTimeout(set(ref(db, `dispatches/${dispatchId}/birdsCount`), setBirds));
-        await withTimeout(set(ref(db, `dispatches/${dispatchId}/totalBirds`), setBirds));
-      }
-      if (setWeight > 0) {
-        await withTimeout(set(ref(db, `dispatches/${dispatchId}/totalWeight`), setWeight));
-        await withTimeout(set(ref(db, `dispatches/${dispatchId}/netWeight`), setWeight));
-      }
-    } catch (_e) {
-      // fallback
-    }
 
     if (dispatch.batchId && local.batches[dispatch.batchId]) {
-      const remaining = recalculateBatchRemainingChickens(dispatch.batchId, local);
-      try {
-        await withTimeout(set(ref(db, `batches/${dispatch.batchId}/remainingChickCount`), remaining));
-      } catch (_e) {
-        // fallback
-      }
+      remaining = recalculateBatchRemainingChickens(dispatch.batchId, local);
     }
   }
-
   saveLocalDB(local);
+
+  try {
+    const writes = [set(ref(db, `boxSets/${dispatchId}/${boxSetData.boxSetNumber - 1}`), record)];
+    if (setBirds > 0) {
+      writes.push(set(ref(db, `dispatches/${dispatchId}/birdsCount`), setBirds));
+      writes.push(set(ref(db, `dispatches/${dispatchId}/totalBirds`), setBirds));
+    }
+    if (setWeight > 0) {
+      writes.push(set(ref(db, `dispatches/${dispatchId}/totalWeight`), setWeight));
+      writes.push(set(ref(db, `dispatches/${dispatchId}/netWeight`), setWeight));
+    }
+    if (remaining !== null && dispatch?.batchId) {
+      writes.push(set(ref(db, `batches/${dispatch.batchId}/remainingChickCount`), remaining));
+    }
+    await withTimeout(Promise.all(writes));
+  } catch (_e) {
+    // fallback
+  }
+
   return record;
 }
 

@@ -147,10 +147,9 @@ export const DispatchPage = () => {
       setDispatches(filtered);
 
       const setsMap = {};
-      for (const d of filtered) {
-        const sets = await dbGetBoxSets(d.id);
-        setsMap[d.id] = sets || [];
-      }
+      filtered.forEach(d => {
+        setsMap[d.id] = d.boxSets || [];
+      });
       setAllBoxSetsMap(setsMap);
 
       if (activeDispatch) {
@@ -246,28 +245,28 @@ export const DispatchPage = () => {
       title: 'Delete Vehicle Dispatch Card?',
       message: `Are you sure you want to delete "${vName}" and all its recorded box sets? This action cannot be undone.`,
       loading: false,
-      onConfirm: async () => {
-        setDeleteModal(prev => ({ ...prev, loading: true }));
-        try {
-          await dbDeleteDispatch(dId);
-          if (activeDispatch?.id === dId) {
-            setActiveDispatch(null);
-            setViewMode('grid');
-          }
-          await dbLogAuditEvent(
-            'DISPATCH_DELETED',
-            `Deleted vehicle dispatch ${dId}`,
-            userProfile?.name
-          );
-          setSuccessMsg('Vehicle dispatch card deleted.');
-          if (selectedBatchId) {
-            loadDispatchesForBatch(selectedBatchId);
-          }
-          setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false });
-        } catch (err) {
-          setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false });
-          alert('Failed deleting dispatch: ' + err.message);
+      onConfirm: () => {
+        // Instant Optimistic UI Update (< 10ms)
+        setDispatches(prev => prev.filter(item => item.id !== dId));
+        setAllBoxSetsMap(prev => {
+          const next = { ...prev };
+          delete next[dId];
+          return next;
+        });
+        if (activeDispatch?.id === dId) {
+          setActiveDispatch(null);
+          setViewMode('grid');
         }
+        setSuccessMsg('Vehicle dispatch card deleted.');
+        setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false });
+
+        // Background Async DB execution
+        dbDeleteDispatch(dId).catch(err => console.error('Background dispatch delete error:', err));
+        dbLogAuditEvent(
+          'DISPATCH_DELETED',
+          `Deleted vehicle dispatch ${dId}`,
+          userProfile?.name
+        );
       }
     });
   };
@@ -277,7 +276,6 @@ export const DispatchPage = () => {
     setSuccessMsg('');
     if (!selectedBatch || isReadOnly) return;
 
-    setSaving(true);
     try {
       const newTotalBoxes = Number(dispatchHeader.totalBoxCount);
       const dSets = (activeDispatch?.id ? allBoxSetsMap[activeDispatch.id] : null) || boxSets || [];
@@ -294,30 +292,49 @@ export const DispatchPage = () => {
         totalChickenCount: newTotalBoxes * Number(dispatchHeader.chickenCountPerBox),
         totalWeight: activeDispatch?.totalWeight || 0,
         averageWeight: activeDispatch?.averageWeight || 0,
-        status: calculatedStatus
+        status: calculatedStatus,
+        boxSets: dSets
       };
 
-      const saved = await dbSaveDispatch(payload);
-      await dbLogAuditEvent(
+      // 1. Instant Optimistic State Update (< 10ms)
+      setDispatches(prev => {
+        const idx = prev.findIndex(item => item.id === payload.id);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = payload;
+          return next;
+        }
+        return [payload, ...prev];
+      });
+      setActiveDispatch(payload);
+      setShowHeaderForm(false);
+      setViewMode('detail');
+      setSuccessMsg(`Vehicle ${payload.vehicleNumber} setup updated! Target box count: ${payload.totalBoxCount} boxes.`);
+
+      // Pre-fill Create Set form
+      const currentWeighedBoxes = dSets.reduce((acc, s) => acc + (Number(s.boxesInSet) || 1), 0);
+      const remainingBoxes = Math.max(0, payload.totalBoxCount - currentWeighedBoxes);
+      const defaultBoxesInSet = remainingBoxes > 0 ? Math.min(5, remainingBoxes) : 5;
+      const perBoxCount = payload.chickenCountPerBox || 12;
+
+      setSetForm({
+        boxSetNumber: dSets.length + 1,
+        boxesInSet: defaultBoxesInSet,
+        emptyBoxWeight: '',
+        loadedWeight: '',
+        chickenCount: defaultBoxesInSet * perBoxCount
+      });
+      setShowSetForm(true);
+
+      // 2. Background Async DB Sync
+      dbSaveDispatch(payload).catch(err => console.error('Background dispatch header save error:', err));
+      dbLogAuditEvent(
         activeDispatch ? 'DISPATCH_UPDATED' : 'DISPATCH_CREATED',
         `${activeDispatch ? 'Updated' : 'Created'} dispatch header for ${selectedBatch.batchNumber} (Vehicle: ${payload.vehicleNumber})`,
         userProfile?.name
       );
-
-      setSuccessMsg(`Vehicle ${payload.vehicleNumber} setup updated! Target box count: ${payload.totalBoxCount} boxes.`);
-      setActiveDispatch(saved);
-      setShowHeaderForm(false);
-      await loadDispatchesForBatch(selectedBatch.id);
-
-      setViewMode('detail');
-      await loadBoxSetsForDispatch(saved.id, saved);
-      
-      // Auto open Create Set Popup pre-filled for extra boxes
-      setShowSetForm(true);
     } catch (err) {
       alert('Failed saving dispatch details: ' + err.message);
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -377,7 +394,6 @@ export const DispatchPage = () => {
     setSuccessMsg('');
     if (!activeDispatch) return;
 
-    setSaving(true);
     try {
       const hasLoadWeight = setForm.loadedWeight !== '' && setForm.loadedWeight !== null && setForm.loadedWeight !== undefined && Number(setForm.loadedWeight) > 0;
       const loadedVal = hasLoadWeight ? Number(setForm.loadedWeight) : null;
@@ -402,9 +418,17 @@ export const DispatchPage = () => {
         savedAt: new Date().toISOString()
       };
 
-      await dbSaveBoxSet(activeDispatch.id, setPayload);
+      // 1. Instant Optimistic State Updates (< 10ms)
+      const updatedSets = [...boxSets];
+      const idx = updatedSets.findIndex(s => s.id === setPayload.id || s.boxSetNumber === setPayload.boxSetNumber);
+      if (idx >= 0) {
+        updatedSets[idx] = setPayload;
+      } else {
+        updatedSets.push(setPayload);
+      }
+      setBoxSets(updatedSets);
+      setAllBoxSetsMap(prev => ({ ...prev, [activeDispatch.id]: updatedSets }));
 
-      const updatedSets = await dbGetBoxSets(activeDispatch.id);
       const loadedSets = updatedSets.filter(s => Number(s.loadedWeight) > 0);
       const combinedWeight = loadedSets.reduce((acc, s) => acc + (s.totalChickenWeight || 0), 0);
       const combinedChicks = loadedSets.reduce((acc, s) => acc + (s.chickenCount || 0), 0);
@@ -420,34 +444,14 @@ export const DispatchPage = () => {
         cratesCount: combinedLoadedBoxes,
         totalCrates: combinedLoadedBoxes,
         averageWeight: combinedAvg,
-        status: combinedLoadedBoxes >= activeDispatch.totalBoxCount ? 'Completed' : 'In Progress'
+        status: combinedLoadedBoxes >= activeDispatch.totalBoxCount ? 'Completed' : 'In Progress',
+        boxSets: updatedSets
       };
 
-      await dbSaveDispatch(updatedDispatch);
-
-      if (updatedDispatch.status === 'Completed') {
-        const invPayload = {
-          dispatchId: updatedDispatch.id,
-          batchId: selectedBatch.id,
-          invoiceDate: updatedDispatch.dispatchDate,
-          customerName: updatedDispatch.vehicleName || 'KG Wholesale Poultry Traders',
-          customerPhone: updatedDispatch.driverMobileNumber || '',
-          vehicleNumber: updatedDispatch.vehicleNumber,
-          driverName: updatedDispatch.driverName,
-          totalChickens: combinedChicks,
-          totalWeightKg: combinedWeight,
-          ratePerKg: ratePerKg,
-          totalAmount: combinedWeight * ratePerKg
-        };
-        await dbSaveInvoice(invPayload);
-      }
-
-      await dbLogAuditEvent(
-        'BOX_SET_SAVED',
-        `Saved Box Set #${setPayload.boxSetNumber} (${setPayload.boxesInSet} boxes, ${hasLoadWeight ? `Net: ${setPayload.totalChickenWeight}kg` : 'Tare Weight Saved, Pending Gross Wt'}) for vehicle ${activeDispatch.vehicleNumber}`,
-        userProfile?.name
-      );
-
+      setActiveDispatch(updatedDispatch);
+      setDispatches(prev => prev.map(d => d.id === updatedDispatch.id ? updatedDispatch : d));
+      setEditingBoxSetId(null);
+      setShowSetForm(false);
       setSuccessMsg(
         editingBoxSetId
           ? `Box Set #${setPayload.boxSetNumber} updated successfully!`
@@ -455,15 +459,35 @@ export const DispatchPage = () => {
           ? `Box Set #${setPayload.boxSetNumber} with Loaded Weight saved!`
           : `Box Set #${setPayload.boxSetNumber} Tare Weight saved!`
       );
-      setEditingBoxSetId(null);
-      setShowSetForm(false);
-      setActiveDispatch(updatedDispatch);
-      await loadDispatchesForBatch(selectedBatch.id);
-      await loadBoxSetsForDispatch(activeDispatch.id, updatedDispatch);
+
+      // 2. Background Async Sync
+      Promise.all([
+        dbSaveBoxSet(activeDispatch.id, setPayload),
+        dbSaveDispatch(updatedDispatch),
+        updatedDispatch.status === 'Completed'
+          ? dbSaveInvoice({
+              dispatchId: updatedDispatch.id,
+              batchId: selectedBatch.id,
+              invoiceDate: updatedDispatch.dispatchDate,
+              customerName: updatedDispatch.vehicleName || 'KG Wholesale Poultry Traders',
+              customerPhone: updatedDispatch.driverMobileNumber || '',
+              vehicleNumber: updatedDispatch.vehicleNumber,
+              driverName: updatedDispatch.driverName,
+              totalChickens: combinedChicks,
+              totalWeightKg: combinedWeight,
+              ratePerKg: ratePerKg,
+              totalAmount: combinedWeight * ratePerKg
+            })
+          : Promise.resolve()
+      ]).catch(err => console.error('Background box set save sync error:', err));
+
+      dbLogAuditEvent(
+        'BOX_SET_SAVED',
+        `Saved Box Set #${setPayload.boxSetNumber} (${setPayload.boxesInSet} boxes, ${hasLoadWeight ? `Net: ${setPayload.totalChickenWeight}kg` : 'Tare Weight Saved, Pending Gross Wt'}) for vehicle ${activeDispatch.vehicleNumber}`,
+        userProfile?.name
+      );
     } catch (err) {
       alert('Failed saving box set: ' + err.message);
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -483,7 +507,6 @@ export const DispatchPage = () => {
       return;
     }
 
-    setSaving(true);
     try {
       const setWeights = calculateBoxSetWeights(
         grossVal,
@@ -500,9 +523,11 @@ export const DispatchPage = () => {
         savedAt: new Date().toISOString()
       };
 
-      await dbSaveBoxSet(activeDispatch.id, setPayload);
+      // 1. Instant Optimistic State Updates (< 10ms)
+      const updatedSets = boxSets.map(s => s.id === setPayload.id || s.boxSetNumber === setPayload.boxSetNumber ? setPayload : s);
+      setBoxSets(updatedSets);
+      setAllBoxSetsMap(prev => ({ ...prev, [activeDispatch.id]: updatedSets }));
 
-      const updatedSets = await dbGetBoxSets(activeDispatch.id);
       const loadedSets = updatedSets.filter(s => Number(s.loadedWeight) > 0);
       const combinedWeight = loadedSets.reduce((acc, s) => acc + (s.totalChickenWeight || 0), 0);
       const combinedChicks = loadedSets.reduce((acc, s) => acc + (s.chickenCount || 0), 0);
@@ -513,45 +538,45 @@ export const DispatchPage = () => {
         ...activeDispatch,
         totalWeight: parseFloat(combinedWeight.toFixed(2)),
         averageWeight: combinedAvg,
-        status: combinedLoadedBoxes >= activeDispatch.totalBoxCount ? 'Completed' : 'In Progress'
+        status: combinedLoadedBoxes >= activeDispatch.totalBoxCount ? 'Completed' : 'In Progress',
+        boxSets: updatedSets
       };
 
-      await dbSaveDispatch(updatedDispatch);
+      setActiveDispatch(updatedDispatch);
+      setDispatches(prev => prev.map(d => d.id === updatedDispatch.id ? updatedDispatch : d));
+      setShowLoadWeightModal(false);
+      setLoadWeightSet(null);
+      setQuickLoadedWeight('');
+      setSuccessMsg(`Box Set #${setPayload.boxSetNumber} Loaded Weight (${grossVal} kg) updated!`);
 
-      if (updatedDispatch.status === 'Completed') {
-        const invPayload = {
-          dispatchId: updatedDispatch.id,
-          batchId: selectedBatch.id,
-          invoiceDate: updatedDispatch.dispatchDate,
-          customerName: updatedDispatch.vehicleName || 'KG Wholesale Poultry Traders',
-          customerPhone: updatedDispatch.driverMobileNumber || '',
-          vehicleNumber: updatedDispatch.vehicleNumber,
-          driverName: updatedDispatch.driverName,
-          totalChickens: combinedChicks,
-          totalWeightKg: combinedWeight,
-          ratePerKg: ratePerKg,
-          totalAmount: combinedWeight * ratePerKg
-        };
-        await dbSaveInvoice(invPayload);
-      }
+      // 2. Background Async Sync
+      Promise.all([
+        dbSaveBoxSet(activeDispatch.id, setPayload),
+        dbSaveDispatch(updatedDispatch),
+        updatedDispatch.status === 'Completed'
+          ? dbSaveInvoice({
+              dispatchId: updatedDispatch.id,
+              batchId: selectedBatch.id,
+              invoiceDate: updatedDispatch.dispatchDate,
+              customerName: updatedDispatch.vehicleName || 'KG Wholesale Poultry Traders',
+              customerPhone: updatedDispatch.driverMobileNumber || '',
+              vehicleNumber: updatedDispatch.vehicleNumber,
+              driverName: updatedDispatch.driverName,
+              totalChickens: combinedChicks,
+              totalWeightKg: combinedWeight,
+              ratePerKg: ratePerKg,
+              totalAmount: combinedWeight * ratePerKg
+            })
+          : Promise.resolve()
+      ]).catch(err => console.error('Background quick load weight save error:', err));
 
-      await dbLogAuditEvent(
+      dbLogAuditEvent(
         'BOX_SET_LOADED',
         `Updated Loaded Weight (${grossVal} kg, Net: ${setWeights.totalChickenWeight} kg) for Box Set #${setPayload.boxSetNumber} on vehicle ${activeDispatch.vehicleNumber}`,
         userProfile?.name
       );
-
-      setSuccessMsg(`Box Set #${setPayload.boxSetNumber} Loaded Weight (${grossVal} kg) updated!`);
-      setShowLoadWeightModal(false);
-      setLoadWeightSet(null);
-      setQuickLoadedWeight('');
-      setActiveDispatch(updatedDispatch);
-      await loadDispatchesForBatch(selectedBatch.id);
-      await loadBoxSetsForDispatch(activeDispatch.id, updatedDispatch);
     } catch (err) {
       alert('Failed saving loaded weight: ' + err.message);
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -565,37 +590,36 @@ export const DispatchPage = () => {
       title: `Delete Box Set ${setNum ? `#${setNum}` : ''}?`,
       message: `Are you sure you want to delete Box Set ${setNum ? `#${setNum}` : ''}? This action cannot be undone.`,
       loading: false,
-      onConfirm: async () => {
-        setDeleteModal(prev => ({ ...prev, loading: true }));
-        try {
-          await dbDeleteBoxSet(activeDispatch.id, setId);
-          setSuccessMsg('Box set deleted.');
+      onConfirm: () => {
+        // 1. Instant Optimistic State Update (< 10ms)
+        const updatedSets = boxSets.filter(x => (x.id || x) !== setId && x.boxSetNumber !== setNum);
+        setBoxSets(updatedSets);
+        setAllBoxSetsMap(prev => ({ ...prev, [activeDispatch.id]: updatedSets }));
 
-          const updatedSets = await dbGetBoxSets(activeDispatch.id);
-          const loadedSets = updatedSets.filter(x => Number(x.loadedWeight) > 0);
-          const combinedWeight = loadedSets.reduce((acc, x) => acc + (x.totalChickenWeight || 0), 0);
-          const combinedChicks = loadedSets.reduce((acc, x) => acc + (x.chickenCount || 0), 0);
-          const combinedLoadedBoxes = loadedSets.reduce((acc, x) => acc + (Number(x.boxesInSet) || 1), 0);
-          const combinedAvg = combinedChicks > 0 ? parseFloat((combinedWeight / combinedChicks).toFixed(3)) : 0;
+        const loadedSets = updatedSets.filter(x => Number(x.loadedWeight) > 0);
+        const combinedWeight = loadedSets.reduce((acc, x) => acc + (x.totalChickenWeight || 0), 0);
+        const combinedChicks = loadedSets.reduce((acc, x) => acc + (x.chickenCount || 0), 0);
+        const combinedLoadedBoxes = loadedSets.reduce((acc, x) => acc + (Number(x.boxesInSet) || 1), 0);
+        const combinedAvg = combinedChicks > 0 ? parseFloat((combinedWeight / combinedChicks).toFixed(3)) : 0;
 
-          const updatedDispatch = {
-            ...activeDispatch,
-            totalWeight: parseFloat(combinedWeight.toFixed(2)),
-            averageWeight: combinedAvg,
-            status: combinedLoadedBoxes >= activeDispatch.totalBoxCount ? 'Completed' : 'In Progress'
-          };
+        const updatedDispatch = {
+          ...activeDispatch,
+          totalWeight: parseFloat(combinedWeight.toFixed(2)),
+          averageWeight: combinedAvg,
+          status: combinedLoadedBoxes >= activeDispatch.totalBoxCount ? 'Completed' : 'In Progress',
+          boxSets: updatedSets
+        };
 
-          await dbSaveDispatch(updatedDispatch);
-          setActiveDispatch(updatedDispatch);
-          if (selectedBatch) {
-            await loadDispatchesForBatch(selectedBatch.id);
-          }
-          await loadBoxSetsForDispatch(activeDispatch.id, updatedDispatch);
-          setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false });
-        } catch (err) {
-          setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false });
-          alert('Failed deleting box set.');
-        }
+        setActiveDispatch(updatedDispatch);
+        setDispatches(prev => prev.map(d => d.id === updatedDispatch.id ? updatedDispatch : d));
+        setSuccessMsg('Box set deleted.');
+        setDeleteModal({ isOpen: false, title: '', message: '', onConfirm: null, loading: false });
+
+        // 2. Background Async Sync
+        Promise.all([
+          dbDeleteBoxSet(activeDispatch.id, setId),
+          dbSaveDispatch(updatedDispatch)
+        ]).catch(err => console.error('Background delete box set error:', err));
       }
     });
   };
