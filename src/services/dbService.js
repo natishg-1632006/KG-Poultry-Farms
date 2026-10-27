@@ -4545,17 +4545,101 @@ export async function dbSaveBatch(batchData) {
 
 export async function dbDeleteBatch(batchId) {
   const local = getLocalDB();
-  delete local.batches[batchId];
+
+  // 1. Local cascade: Delete batch
+  if (local.batches) delete local.batches[batchId];
+
+  // 2. Local cascade: Delete daily records
   if (local.dailyRecords) delete local.dailyRecords[batchId];
+
+  // 3. Local cascade: Delete feed stocks & arrivals
   if (local.feedStocks) delete local.feedStocks[batchId];
+
+  // 4. Local cascade: Delete medicine records
   if (local.medicineRecords) delete local.medicineRecords[batchId];
+
+  // 5. Local cascade: Delete dispatches and boxSets for this batch
+  const deletedDispatchIds = [];
+  if (local.dispatches && typeof local.dispatches === 'object') {
+    for (const [dispId, disp] of Object.entries(local.dispatches)) {
+      if (disp && disp.batchId === batchId) {
+        deletedDispatchIds.push(dispId);
+        delete local.dispatches[dispId];
+        if (local.boxSets) delete local.boxSets[dispId];
+      }
+    }
+  }
+
+  // 6. Local cascade: Delete invoices for this batch or its dispatches
+  if (local.invoices) {
+    if (Array.isArray(local.invoices)) {
+      local.invoices = local.invoices.filter(inv =>
+        inv.batchId !== batchId && !deletedDispatchIds.includes(inv.dispatchId)
+      );
+    } else if (typeof local.invoices === 'object') {
+      for (const [invId, inv] of Object.entries(local.invoices)) {
+        if (inv && (inv.batchId === batchId || deletedDispatchIds.includes(inv.dispatchId))) {
+          delete local.invoices[invId];
+        }
+      }
+    }
+  }
+
+  // 7. Local cascade: Remove batch from assignedBatches for all users
+  if (local.users && typeof local.users === 'object') {
+    for (const user of Object.values(local.users)) {
+      if (user && Array.isArray(user.assignedBatches)) {
+        user.assignedBatches = user.assignedBatches.filter(b => b !== batchId);
+      }
+    }
+  }
+
   saveLocalDB(local);
   notifyBatchListeners();
 
-  // Non-blocking async cloud deletion
-  withTimeout(remove(ref(db, `batches/${batchId}`)), 3000).catch((_err) => {
-    console.warn('Background sync warning in dbDeleteBatch:', _err);
-  });
+  // 8. Cloud cascade: Delete all batch records, daily records, feed stocks, medicine, dispatches, boxSets & invoices
+  const cloudCascade = async () => {
+    try {
+      const updates = {};
+      updates[`batches/${batchId}`] = null;
+      updates[`dailyRecords/${batchId}`] = null;
+      updates[`feedStocks/${batchId}`] = null;
+      updates[`medicineRecords/${batchId}`] = null;
+
+      // Also clean up matching dispatches and boxSets in cloud
+      try {
+        const dispSnap = await withTimeout(get(ref(db, 'dispatches')), 2500);
+        if (dispSnap.exists()) {
+          const cloudDispatches = dispSnap.val() || {};
+          for (const [dispId, disp] of Object.entries(cloudDispatches)) {
+            if (disp && disp.batchId === batchId) {
+              updates[`dispatches/${dispId}`] = null;
+              updates[`boxSets/${dispId}`] = null;
+            }
+          }
+        }
+      } catch (_e) {}
+
+      // Also clean up matching invoices in cloud
+      try {
+        const invSnap = await withTimeout(get(ref(db, 'invoices')), 2500);
+        if (invSnap.exists()) {
+          const cloudInvoices = invSnap.val() || {};
+          for (const [invId, inv] of Object.entries(cloudInvoices)) {
+            if (inv && (inv.batchId === batchId || deletedDispatchIds.includes(inv.dispatchId))) {
+              updates[`invoices/${invId}`] = null;
+            }
+          }
+        }
+      } catch (_e) {}
+
+      await withTimeout(update(ref(db), updates), 4000);
+    } catch (_err) {
+      console.warn('Background cloud cascade deletion notice:', _err);
+    }
+  };
+
+  cloudCascade();
 }
 
 // DAILY FARM RECORDS

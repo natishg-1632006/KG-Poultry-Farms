@@ -40,7 +40,10 @@ export const FarmerDashboard = () => {
         selected = farmerBatches.find(b => b.id === targetBatchId);
       }
       if (!selected) {
-        selected = farmerBatches.find(b => (b.status || '').toLowerCase() === 'active') || (farmerBatches.length > 0 ? farmerBatches[0] : null);
+        selected = farmerBatches.find(b => (b.status || '').toLowerCase() === 'active');
+      }
+      if (!selected) {
+        selected = farmerBatches.length > 0 ? farmerBatches[0] : null;
       }
       setActiveBatch(selected);
 
@@ -162,31 +165,39 @@ export const FarmerDashboard = () => {
     ? (language === 'ta' ? 'அனுப்பப்பட்ட சராசரி எடை (எடை / கோழிகள்)' : 'Dispatched Avg (Total Wt / Dispatched Birds)')
     : (latestRecord ? `${t('latestEntry')}: ${latestRecord.recordDate}` : t('noDailyRecordsYet'));
 
+  const hasLiveActiveBatch = assignedBatches.some(b => (b.status || '').toLowerCase() === 'active');
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900">{t('farmerPortal')}</h1>
         </div>
-        {assignedBatches.length > 0 && (
-          <div className="flex items-center gap-1.5 sm:gap-2 rounded-xl bg-emerald-50 border border-emerald-200/80 p-1.5 sm:px-3 sm:py-1.5 text-[11px] sm:text-xs font-bold text-emerald-900 shadow-xs shrink-0">
-            <label className="text-[11px] font-black uppercase text-emerald-800 tracking-wider hidden sm:inline">{t('batchNumber')}:</label>
+        {/* If Active Batch exists: Show exact badge just like before, NO dropdown! */}
+        {hasLiveActiveBatch && activeBatch && (
+          <div className="flex items-center gap-1.5 sm:gap-2 rounded-xl bg-emerald-50 border border-emerald-200/80 px-2.5 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-bold text-emerald-900 shadow-xs shrink-0">
+            <span>{t('batchNumber')}: {activeBatch.batchNumber} • <strong className="text-emerald-700">Day {flockAgeDays}</strong></span>
+            <Badge variant={activeBatch.status}>{activeBatch.status}</Badge>
+          </div>
+        )}
+
+        {/* If NO Active Batch exists: Show a beautifully designed batch selector dropdown */}
+        {!hasLiveActiveBatch && assignedBatches.length > 0 && (
+          <div className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 py-1.5 px-3 text-xs font-bold text-slate-800 shadow-xs">
+            <span className="text-[11px] font-black uppercase text-slate-500 tracking-wider hidden sm:inline">
+              {language === 'ta' ? 'தொகுதி தேர்வு' : 'Batch'}:
+            </span>
             <select
               value={activeBatch?.id || ''}
               onChange={(e) => loadFarmerData(e.target.value)}
-              className="rounded-lg border border-emerald-300 bg-white py-1 px-2 text-xs font-black text-emerald-950 focus:border-emerald-600 focus:outline-hidden cursor-pointer shadow-2xs"
+              className="rounded-lg border border-slate-300 bg-slate-50 py-1 px-2.5 text-xs font-bold text-slate-900 focus:border-emerald-600 focus:bg-white focus:outline-hidden cursor-pointer shadow-2xs"
             >
               {assignedBatches.map(b => (
                 <option key={b.id} value={b.id}>
-                  {b.batchNumber} {b.batchName ? '• ' + b.batchName : ''} ({b.status})
+                  {b.batchNumber} {b.batchName ? '• ' + b.batchName : ''} ({b.status === 'Completed' ? (language === 'ta' ? 'முடிந்தது' : 'Completed') : b.status})
                 </option>
               ))}
             </select>
-            {activeBatch && (
-              <span className="font-extrabold text-emerald-700 shrink-0">
-                Day {flockAgeDays}
-              </span>
-            )}
             {activeBatch && (
               <Badge variant={activeBatch.status}>{activeBatch.status}</Badge>
             )}
