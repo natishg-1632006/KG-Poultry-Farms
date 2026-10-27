@@ -7,10 +7,34 @@ describe('dbService Real-Time Synchronization', () => {
     vi.clearAllMocks();
   });
 
-  it('retrieves seeded batches on initial call', async () => {
+  it('retrieves seeded batches on initial call and includes active batch KG006 with 4528 chicks', async () => {
     const batches = await dbGetBatches();
     expect(Array.isArray(batches)).toBe(true);
     expect(batches.length).toBeGreaterThan(0);
+    const kg006 = batches.find(b => b.id === 'KG006');
+    expect(kg006).toBeDefined();
+    expect(kg006.batchNumber).toBe('KG006');
+    expect(kg006.status).toBe('Active');
+    expect(kg006.initialChickCount).toBe(4528);
+    expect(kg006.remainingChickCount).toBe(4528);
+  });
+
+  it('migrates legacy v7 localStorage data and preserves both custom records and KG006', async () => {
+    localStorage.clear();
+    // Simulate older device with v7 storage
+    localStorage.setItem('kg_poultry_local_db_v7', JSON.stringify({
+      batches: {
+        'CUSTOM-B1': { id: 'CUSTOM-B1', batchNumber: 'CUSTOM-B1', batchName: 'Custom Farm Batch', status: 'Active', initialChickCount: 1000 }
+      }
+    }));
+
+    const batches = await dbGetBatches();
+    const custom = batches.find(b => b.id === 'CUSTOM-B1');
+    const kg006 = batches.find(b => b.id === 'KG006');
+    expect(custom).toBeDefined();
+    expect(kg006).toBeDefined();
+    expect(localStorage.getItem('kg_poultry_local_db_v7')).toBeNull(); // v7 cleaned up
+    expect(localStorage.getItem('kg_poultry_local_db_v8')).not.toBeNull(); // v8 created
   });
 
   it('immediately notifies dbSubscribeToBatches subscribers with current state', async () => {

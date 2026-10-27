@@ -4,7 +4,7 @@ import { FEED_CONSUMPTION_TARGETS, AVERAGE_WEIGHT_TARGETS } from '../constants/c
 import { deductFeedStock, sortBatchesDescending } from '../utils/calculations';
 import { hashPassword } from '../utils/cryptoUtils';
 
-const MOCK_STORAGE_KEY = 'kg_poultry_local_db_v7';
+const MOCK_STORAGE_KEY = 'kg_poultry_local_db_v8';
 
 // Initial seed state for local fallback mode
 const INITIAL_LOCAL_STATE = {
@@ -20,7 +20,8 @@ const INITIAL_LOCAL_STATE = {
       "assignedBatches": [
         "KG001",
         "KG002",
-        "KG003"
+        "KG003",
+        "KG006"
       ],
       "passwordHash": "79e5b42b1a94f1a1f89af873157dfc87724d8b649debc83b7dc49c85a451fc4e",
       "createdAt": "2026-07-25T00:00:00.000Z",
@@ -84,6 +85,25 @@ const INITIAL_LOCAL_STATE = {
         "Finisher": 1800
       },
       "createdAt": "2026-08-16T00:00:00.000Z"
+    },
+    "KG006": {
+      "id": "KG006",
+      "batchNumber": "KG006",
+      "batchName": "KgPoultryBatch-6",
+      "chickArrivalDate": "2026-10-22",
+      "initialChickCount": 4528,
+      "remainingChickCount": 4528,
+      "assignedFarmerId": "kg-poultry-farms-user",
+      "assignedFarmerName": "KG Poultry Farms",
+      "vehicleNumber": "TN-38-AX-1234",
+      "driverName": "Suresh Kumar",
+      "status": "Active",
+      "feedStock": {
+        "Pre-Starter": 700,
+        "Starter": 0,
+        "Finisher": 0
+      },
+      "createdAt": "2026-10-22T08:00:00.000Z"
     }
   },
   "dailyRecords": {
@@ -1698,6 +1718,21 @@ const INITIAL_LOCAL_STATE = {
         "date": "2026-08-30",
         "notes": "Finisher feed arrival for KG002",
         "createdAt": "2026-08-30T10:00:00.000Z"
+      }
+    ],
+    "KG006": [
+      {
+        "id": "feed-b6-1",
+        "batchId": "KG006",
+        "feedType": "Pre-Starter",
+        "driverName": "Suresh Kumar",
+        "vehicleNumber": "TN-38-AX-1234",
+        "quantityReceived": 700,
+        "quantityReceivedKg": 700,
+        "bagsReceived": 10,
+        "date": "2026-10-22",
+        "notes": "Initial pre-starter arrival for KG006 (10 Bags)",
+        "createdAt": "2026-10-22T08:00:00.000Z"
       }
     ]
   },
@@ -4080,24 +4115,79 @@ function withTimeout(promise, ms = 8000) {
 
 function getLocalDB() {
   try {
-    if (typeof localStorage !== 'undefined') {
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('kg_poultry_local_db') && key !== MOCK_STORAGE_KEY) {
-          localStorage.removeItem(key);
-        }
-      }
-    }
     const raw = localStorage.getItem(MOCK_STORAGE_KEY);
     if (!raw) {
-      localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(INITIAL_LOCAL_STATE));
-      return INITIAL_LOCAL_STATE;
+      // Check if previous versions (v7, v6, etc.) exist to migrate user-created batches & records
+      let migrated = null;
+      if (typeof localStorage !== 'undefined') {
+        for (let v = 7; v >= 1; v--) {
+          const oldRaw = localStorage.getItem(`kg_poultry_local_db_v${v}`);
+          if (oldRaw) {
+            try {
+              const oldParsed = JSON.parse(oldRaw);
+              if (oldParsed && typeof oldParsed === 'object' && oldParsed.batches) {
+                migrated = oldParsed;
+                break;
+              }
+            } catch (_e) {}
+          }
+        }
+      }
+
+      const base = JSON.parse(JSON.stringify(INITIAL_LOCAL_STATE));
+      if (migrated) {
+        base.batches = { ...base.batches, ...(migrated.batches || {}) };
+        if (migrated.feedStocks) {
+          base.feedStocks = { ...base.feedStocks, ...migrated.feedStocks };
+        }
+        if (migrated.dailyRecords) {
+          base.dailyRecords = { ...base.dailyRecords, ...migrated.dailyRecords };
+        }
+        if (migrated.medicineRecords) {
+          base.medicineRecords = { ...base.medicineRecords, ...migrated.medicineRecords };
+        }
+        if (migrated.dispatches) {
+          base.dispatches = { ...base.dispatches, ...migrated.dispatches };
+        }
+      }
+
+      // Guarantee KG006 is present
+      if (!base.batches.KG006) {
+        base.batches.KG006 = INITIAL_LOCAL_STATE.batches.KG006;
+      }
+      if (!base.feedStocks.KG006) {
+        base.feedStocks.KG006 = INITIAL_LOCAL_STATE.feedStocks.KG006;
+      }
+
+      localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(base));
+
+      // Clean up legacy keys
+      if (typeof localStorage !== 'undefined') {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('kg_poultry_local_db') && key !== MOCK_STORAGE_KEY) {
+            localStorage.removeItem(key);
+          }
+        }
+      }
+      return base;
     }
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object' || !parsed.batches) {
       localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(INITIAL_LOCAL_STATE));
       return INITIAL_LOCAL_STATE;
     }
+
+    // Guarantee KG006 is present if missing in existing storage
+    if (!parsed.batches.KG006) {
+      parsed.batches.KG006 = INITIAL_LOCAL_STATE.batches.KG006;
+      if (!parsed.feedStocks) parsed.feedStocks = {};
+      if (!parsed.feedStocks.KG006) {
+        parsed.feedStocks.KG006 = INITIAL_LOCAL_STATE.feedStocks.KG006;
+      }
+      localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(parsed));
+    }
+
     return parsed;
   } catch (_err) {
     return INITIAL_LOCAL_STATE;
@@ -4376,7 +4466,17 @@ export async function dbGetBatches() {
     ]);
 
     if (batchesRes.status === 'fulfilled' && batchesRes.value && batchesRes.value.exists()) {
-      local.batches = batchesRes.value.val() || {};
+      const cloudBatches = batchesRes.value.val() || {};
+      // Merge cloud updates with existing local batches
+      local.batches = { ...local.batches, ...cloudBatches };
+
+      // If local has batches not yet in cloud (like KG006), push them to cloud
+      const missingInCloud = Object.keys(local.batches).filter(id => !cloudBatches[id]);
+      if (missingInCloud.length > 0) {
+        missingInCloud.forEach(id => {
+          set(ref(db, `batches/${id}`), local.batches[id]).catch(() => {});
+        });
+      }
     }
     if (dailyRes.status === 'fulfilled' && dailyRes.value && dailyRes.value.exists()) {
       local.dailyRecords = dailyRes.value.val() || {};
