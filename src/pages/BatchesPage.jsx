@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { dbGetBatches, dbSaveBatch, dbDeleteBatch, dbGetUsers, dbLogAuditEvent } from '../services/dbService';
+import { dbGetBatches, dbSaveBatch, dbDeleteBatch, dbGetUsers, dbLogAuditEvent, dbSubscribeToBatches, dbForceSyncAll } from '../services/dbService';
 import { syncDailyDataEntryReminders, syncFarmWeatherAndLightingAlerts } from '../services/notificationService';
 import { generateBatchNumber, generateBatchName } from '../utils/calculations';
 import { Modal } from '../components/common/Modal';
 import { ConfirmModal } from '../components/common/ConfirmModal';
 import { Badge } from '../components/common/Badge';
 import { useAuth } from '../context/AuthContext';
-import { Layers, Plus, Search, Edit, Trash2, RotateCcw, AlertCircle } from 'lucide-react';
+import { Layers, Plus, Search, Edit, Trash2, RotateCcw, AlertCircle, RefreshCw } from 'lucide-react';
 import CustomSelect from '../components/common/CustomSelect';
 import CustomDatePicker from '../components/common/CustomDatePicker';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
@@ -61,9 +61,27 @@ export const BatchesPage = () => {
     status: 'Draft'
   });
 
+  const [syncing, setSyncing] = useState(false);
+
   useEffect(() => {
     loadData();
+    const unsubscribe = dbSubscribeToBatches((updatedBatches) => {
+      setBatches(updatedBatches);
+    });
+    return () => unsubscribe();
   }, []);
+
+  async function handleManualSync() {
+    setSyncing(true);
+    try {
+      const fresh = await dbForceSyncAll();
+      setBatches(fresh);
+    } catch (err) {
+      console.warn('Manual sync notice:', err);
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   async function loadData() {
     try {
@@ -279,23 +297,35 @@ export const BatchesPage = () => {
         <h1 className="text-lg sm:text-2xl font-black tracking-tight text-slate-900 shrink-0">
           {t('batchManagement')}
         </h1>
-        <button
-          disabled={hasActiveBatch}
-          onClick={handleOpenCreateModal}
-          title={
-            hasActiveBatch
-              ? `Active Batch (${activeBatch?.batchName || activeBatch?.batchNumber}) is currently active. Complete it before creating a new batch.`
-              : t('createNewBatch')
-          }
-          className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm font-black text-white shadow-sm transition-all shrink-0 whitespace-nowrap ${
-            hasActiveBatch
-              ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
-              : 'bg-emerald-600 hover:bg-emerald-700 active:scale-95 cursor-pointer'
-          }`}
-        >
-          <Plus className="h-4 w-4 shrink-0" />
-          <span>{t('createNewBatch')}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleManualSync}
+            disabled={syncing}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 sm:px-3.5 sm:py-2.5 text-xs sm:text-sm font-bold text-slate-700 shadow-2xs hover:bg-slate-50 active:scale-95 transition-all cursor-pointer"
+            title="Sync with cloud database"
+          >
+            <RefreshCw className={`h-4 w-4 text-emerald-600 ${syncing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{syncing ? (language === 'ta' ? 'ஒத்திசைக்கிறது...' : 'Syncing...') : (language === 'ta' ? 'மேகக்கணி ஒத்திசைவு' : 'Sync Cloud')}</span>
+          </button>
+          <button
+            disabled={hasActiveBatch}
+            onClick={handleOpenCreateModal}
+            title={
+              hasActiveBatch
+                ? `Active Batch (${activeBatch?.batchName || activeBatch?.batchNumber}) is currently active. Complete it before creating a new batch.`
+                : t('createNewBatch')
+            }
+            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm font-black text-white shadow-sm transition-all shrink-0 whitespace-nowrap ${
+              hasActiveBatch
+                ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
+                : 'bg-emerald-600 hover:bg-emerald-700 active:scale-95 cursor-pointer'
+            }`}
+          >
+            <Plus className="h-4 w-4 shrink-0" />
+            <span>{t('createNewBatch')}</span>
+          </button>
+        </div>
       </div>
 
       {hasActiveBatch && (

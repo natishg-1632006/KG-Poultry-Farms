@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
+import { initRealtimeSync, dbForceSyncAll } from '../../services/dbService';
 import { 
   initNotificationChannels, 
   syncDailyDataEntryReminders, 
@@ -12,17 +13,33 @@ export const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
+    initRealtimeSync();
     initNotificationChannels();
     syncDailyDataEntryReminders();
     syncFarmWeatherAndLightingAlerts();
 
-    // Re-sync weather and data entry reminders every 30 minutes
+    // Auto re-sync when app resumes from background (mobile app or browser tab focus)
+    const handleAppResume = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        dbForceSyncAll().catch(() => {});
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleAppResume);
+    window.addEventListener('focus', handleAppResume);
+
+    // Periodic cloud re-sync every 5 minutes
     const timer = setInterval(() => {
       syncDailyDataEntryReminders();
       syncFarmWeatherAndLightingAlerts();
-    }, 30 * 60 * 1000);
+      dbForceSyncAll().catch(() => {});
+    }, 5 * 60 * 1000);
 
-    return () => clearInterval(timer);
+    return () => {
+      document.removeEventListener('visibilitychange', handleAppResume);
+      window.removeEventListener('focus', handleAppResume);
+      clearInterval(timer);
+    };
   }, []);
 
   return (

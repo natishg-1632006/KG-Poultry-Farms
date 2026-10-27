@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
-import { dbGetBatches, dbGetUsers, dbGetDispatches, dbGetAuditLogs, dbGetDailyRecords } from '../services/dbService';
+import { dbGetBatches, dbGetUsers, dbGetDispatches, dbGetAuditLogs, dbGetDailyRecords, dbSubscribeToBatches } from '../services/dbService';
 import { calculateActiveBatchFCR } from '../utils/calculations';
 import { StatCard } from '../components/common/StatCard';
 import { Badge } from '../components/common/Badge';
@@ -19,6 +19,9 @@ export const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const unsubscribe = dbSubscribeToBatches(() => {
+      loadData();
+    });
     async function loadData() {
       try {
         const [bList, uList, dList, lList] = await Promise.all([
@@ -60,6 +63,7 @@ export const AdminDashboard = () => {
       }
     }
     loadData();
+    return () => unsubscribe();
   }, []);
 
   const activeBatches = batches.filter(b => b.status === 'Active');

@@ -1,4 +1,4 @@
-import { ref, get, set, update, remove, push, child } from 'firebase/database';
+import { ref, get, set, update, remove, push, child, onValue, off } from 'firebase/database';
 import { db } from './firebase';
 import { FEED_CONSUMPTION_TARGETS, AVERAGE_WEIGHT_TARGETS } from '../constants/companyTargets';
 import { deductFeedStock, sortBatchesDescending } from '../utils/calculations';
@@ -4068,8 +4068,8 @@ const INITIAL_LOCAL_STATE = {
   "auditLogs": []
 };
 
-// Helper: Wrap promises with a timeout to prevent hanging UI
-function withTimeout(promise, ms = 1500) {
+// Helper: Wrap promises with a timeout to prevent hanging UI (8 seconds default for reliable mobile sync)
+function withTimeout(promise, ms = 8000) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('Network timeout')), ms);
     promise
@@ -4094,7 +4094,7 @@ function getLocalDB() {
       return INITIAL_LOCAL_STATE;
     }
     const parsed = JSON.parse(raw);
-    if (!parsed.batches || !parsed.batches.KG003) {
+    if (!parsed || typeof parsed !== 'object' || !parsed.batches) {
       localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(INITIAL_LOCAL_STATE));
       return INITIAL_LOCAL_STATE;
     }
@@ -4254,32 +4254,142 @@ export async function dbDeleteUser(uid) {
 }
 
 
-// BATCH MANAGEMENT
+// BATCH MANAGEMENT & REAL-TIME SYNC
+let realtimeSyncInitialized = false;
+const batchListeners = new Set();
+
+export function dbSubscribeToBatches(callback) {
+  if (typeof callback !== 'function') return () => {};
+  batchListeners.add(callback);
+
+  try {
+    const local = getLocalDB();
+    const localMapped = Object.values(local.batches || {}).map(b => ({
+      ...b,
+      remainingChickCount: recalculateBatchRemainingChickens(b.id, local),
+      feedStock: computeBatchFeedStock(b.id, local)
+    }));
+    callback(sortBatchesDescending(localMapped));
+  } catch (_e) {}
+
+  return () => {
+    batchListeners.delete(callback);
+  };
+}
+
+export function notifyBatchListeners() {
+  const local = getLocalDB();
+  const localMapped = Object.values(local.batches || {}).map(b => ({
+    ...b,
+    remainingChickCount: recalculateBatchRemainingChickens(b.id, local),
+    feedStock: computeBatchFeedStock(b.id, local)
+  }));
+  const sorted = sortBatchesDescending(localMapped);
+  batchListeners.forEach(cb => {
+    try { cb(sorted); } catch (e) { console.error('Listener callback error:', e); }
+  });
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('kg_batches_updated', { detail: sorted }));
+  }
+}
+
+export function initRealtimeSync() {
+  if (realtimeSyncInitialized) return;
+  realtimeSyncInitialized = true;
+
+  try {
+    onValue(ref(db, 'batches'), (snapshot) => {
+      if (snapshot.exists()) {
+        const val = snapshot.val();
+        const serverBatches = val || {};
+        const local = getLocalDB();
+        local.batches = serverBatches;
+        saveLocalDB(local);
+        notifyBatchListeners();
+      }
+    }, (err) => {
+      console.warn('Realtime batches subscription notice:', err.message);
+    });
+
+    onValue(ref(db, 'dailyRecords'), (snapshot) => {
+      if (snapshot.exists()) {
+        const val = snapshot.val();
+        const local = getLocalDB();
+        local.dailyRecords = val || {};
+        saveLocalDB(local);
+        notifyBatchListeners();
+      }
+    }, (err) => {
+      console.warn('Realtime dailyRecords subscription notice:', err.message);
+    });
+
+    onValue(ref(db, 'dispatches'), (snapshot) => {
+      if (snapshot.exists()) {
+        const val = snapshot.val();
+        const local = getLocalDB();
+        local.dispatches = val || {};
+        saveLocalDB(local);
+        notifyBatchListeners();
+      }
+    }, (err) => {
+      console.warn('Realtime dispatches subscription notice:', err.message);
+    });
+
+    onValue(ref(db, 'feedStocks'), (snapshot) => {
+      if (snapshot.exists()) {
+        const val = snapshot.val();
+        const local = getLocalDB();
+        local.feedStocks = val || {};
+        saveLocalDB(local);
+        notifyBatchListeners();
+      }
+    }, (err) => {
+      console.warn('Realtime feedStocks subscription notice:', err.message);
+    });
+  } catch (err) {
+    console.warn('Failed initializing real-time Firebase sync:', err);
+  }
+}
+
+export async function dbForceSyncAll() {
+  try {
+    const batches = await dbGetBatches();
+    notifyBatchListeners();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('kg_sync_completed', { detail: { timestamp: Date.now() } }));
+    }
+    return batches;
+  } catch (err) {
+    console.error('dbForceSyncAll failed:', err);
+    throw err;
+  }
+}
+
 export async function dbGetBatches() {
   const local = getLocalDB();
   try {
-    const [batchesSnap, dailySnap, dispatchesSnap, boxSetsSnap] = await Promise.all([
-      withTimeout(get(ref(db, 'batches'))),
-      withTimeout(get(ref(db, 'dailyRecords'))),
-      withTimeout(get(ref(db, 'dispatches'))),
-      withTimeout(get(ref(db, 'boxSets')))
+    const [batchesRes, dailyRes, dispatchesRes, boxSetsRes] = await Promise.allSettled([
+      withTimeout(get(ref(db, 'batches')), 8000),
+      withTimeout(get(ref(db, 'dailyRecords')), 8000),
+      withTimeout(get(ref(db, 'dispatches')), 8000),
+      withTimeout(get(ref(db, 'boxSets')), 8000)
     ]);
 
-    if (dailySnap.exists()) {
-      local.dailyRecords = dailySnap.val() || {};
+    if (batchesRes.status === 'fulfilled' && batchesRes.value && batchesRes.value.exists()) {
+      local.batches = batchesRes.value.val() || {};
     }
-    if (dispatchesSnap.exists()) {
-      local.dispatches = dispatchesSnap.val() || {};
+    if (dailyRes.status === 'fulfilled' && dailyRes.value && dailyRes.value.exists()) {
+      local.dailyRecords = dailyRes.value.val() || {};
     }
-    if (boxSetsSnap.exists()) {
-      local.boxSets = boxSetsSnap.val() || {};
+    if (dispatchesRes.status === 'fulfilled' && dispatchesRes.value && dispatchesRes.value.exists()) {
+      local.dispatches = dispatchesRes.value.val() || {};
     }
-    if (batchesSnap.exists()) {
-      local.batches = batchesSnap.val() || {};
+    if (boxSetsRes.status === 'fulfilled' && boxSetsRes.value && boxSetsRes.value.exists()) {
+      local.boxSets = boxSetsRes.value.val() || {};
     }
     saveLocalDB(local);
   } catch (_err) {
-    // fallback
+    // fallback to local cached database
   }
 
   const localMapped = Object.values(local.batches || {}).map(b => ({
@@ -4302,30 +4412,33 @@ export async function dbSaveBatch(batchData) {
     updatedAt: new Date().toISOString()
   };
 
-  try {
-    await withTimeout(set(ref(db, `batches/${batchId}`), record));
-  } catch (_err) {
-    // fallback
-  }
-
   local.batches[batchId] = record;
   saveLocalDB(local);
+  notifyBatchListeners();
+
+  try {
+    await withTimeout(set(ref(db, `batches/${batchId}`), record), 8000);
+  } catch (_err) {
+    console.warn('Background sync warning in dbSaveBatch:', _err);
+  }
+
   return record;
 }
 
 export async function dbDeleteBatch(batchId) {
-  try {
-    await withTimeout(remove(ref(db, `batches/${batchId}`)));
-  } catch (_err) {
-    // fallback
-  }
-
   const local = getLocalDB();
   delete local.batches[batchId];
-  delete local.dailyRecords[batchId];
-  delete local.feedStocks[batchId];
-  delete local.medicineRecords[batchId];
+  if (local.dailyRecords) delete local.dailyRecords[batchId];
+  if (local.feedStocks) delete local.feedStocks[batchId];
+  if (local.medicineRecords) delete local.medicineRecords[batchId];
   saveLocalDB(local);
+  notifyBatchListeners();
+
+  try {
+    await withTimeout(remove(ref(db, `batches/${batchId}`)), 8000);
+  } catch (_err) {
+    console.warn('Background sync warning in dbDeleteBatch:', _err);
+  }
 }
 
 // DAILY FARM RECORDS

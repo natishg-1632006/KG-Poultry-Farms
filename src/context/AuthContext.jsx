@@ -10,7 +10,7 @@ import {
 import { Capacitor } from '@capacitor/core';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { auth } from '../services/firebase';
-import { dbGetUsers, dbSaveUser, dbLogAuditEvent } from '../services/dbService';
+import { dbGetUsers, dbSaveUser, dbLogAuditEvent, initRealtimeSync } from '../services/dbService';
 import { hashPassword, verifyPassword } from '../utils/cryptoUtils';
 
 const googleProvider = new GoogleAuthProvider();
@@ -43,6 +43,7 @@ export const AuthProvider = ({ children }) => {
       if (user) {
         setCurrentUser(user);
         await loadUserProfile(user.uid, user.email);
+        initRealtimeSync();
       } else {
         // Fallback to active session stored in localStorage if demo/offline mode
         const savedSession = localStorage.getItem('kg_poultry_active_session');
@@ -50,6 +51,7 @@ export const AuthProvider = ({ children }) => {
           const parsed = JSON.parse(savedSession);
           setCurrentUser({ uid: parsed.uid, email: parsed.email });
           setUserProfile(parsed);
+          initRealtimeSync();
         } else {
           setCurrentUser(null);
           setUserProfile(null);

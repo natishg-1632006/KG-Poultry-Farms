@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { dbGetBatches, dbGetDailyRecords, dbGetFeedArrivals, dbGetDispatches } from '../services/dbService';
+import { dbGetBatches, dbGetDailyRecords, dbGetFeedArrivals, dbGetDispatches, dbSubscribeToBatches } from '../services/dbService';
 import { formatFeedStock, kgToBags, calculateActiveBatchFCR } from '../utils/calculations';
 import { KG_PER_BAG } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
@@ -23,6 +23,10 @@ export const FarmerDashboard = () => {
 
   useEffect(() => {
     loadFarmerData();
+    const unsubscribe = dbSubscribeToBatches(() => {
+      loadFarmerData();
+    });
+    return () => unsubscribe();
   }, [userProfile]);
 
   async function loadFarmerData() {
