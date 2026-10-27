@@ -86,7 +86,7 @@ export const BatchesPage = () => {
   async function loadData() {
     try {
       const [bList] = await Promise.all([dbGetBatches(), dbGetUsers()]);
-      const defaultKgFarmer = { uid: 'kg-poultry-farms', name: 'KG Poultry Farms', farmName: 'KG Main Farm' };
+      const defaultKgFarmer = { uid: 'kg-poultry-farms-user', name: 'KG Poultry Farms', farmName: 'KG Main Farm' };
       setBatches(bList);
       setFarmers([defaultKgFarmer]);
     } catch (err) {
@@ -100,20 +100,19 @@ export const BatchesPage = () => {
   const hasActiveBatch = Boolean(activeBatch);
 
   const handleOpenCreateModal = () => {
-    if (hasActiveBatch) return;
     setSelectedBatch(null);
-    const nextNum = generateBatchNumber(batches.length);
-    const nextName = generateBatchName(batches.length);
+    const nextNum = generateBatchNumber(batches);
+    const nextName = generateBatchName(batches);
     setFormData({
       batchNumber: nextNum,
       batchName: nextName,
       chickArrivalDate: new Date().toISOString().split('T')[0],
       initialChickCount: 5000,
-      assignedFarmerId: 'kg-poultry-farms',
+      assignedFarmerId: 'kg-poultry-farms-user',
       assignedFarmerName: 'KG Poultry Farms',
       vehicleNumber: '',
       driverName: '',
-      status: 'Draft'
+      status: 'Active'
     });
     setIsModalOpen(true);
   };
@@ -125,7 +124,7 @@ export const BatchesPage = () => {
       batchName: batch.batchName,
       chickArrivalDate: batch.chickArrivalDate,
       initialChickCount: batch.initialChickCount,
-      assignedFarmerId: 'kg-poultry-farms',
+      assignedFarmerId: 'kg-poultry-farms-user',
       assignedFarmerName: 'KG Poultry Farms',
       vehicleNumber: batch.vehicleNumber || '',
       driverName: batch.driverName || '',
@@ -136,7 +135,7 @@ export const BatchesPage = () => {
 
   const handleFarmerChange = (e) => {
     const farmerId = e.target.value;
-    const farmerObj = farmers.find(f => f.uid === farmerId) || { uid: 'kg-poultry-farms', name: 'KG Poultry Farms' };
+    const farmerObj = farmers.find(f => f.uid === farmerId) || { uid: 'kg-poultry-farms-user', name: 'KG Poultry Farms' };
     setFormData({
       ...formData,
       assignedFarmerId: farmerId,
@@ -155,6 +154,14 @@ export const BatchesPage = () => {
         createdAt: selectedBatch ? selectedBatch.createdAt : new Date().toISOString()
       };
 
+      // If activating this batch, mark any other currently active batch as Completed
+      if (batchData.status === 'Active') {
+        const otherActive = batches.find(b => b.id !== batchData.id && (b.status || '').toLowerCase() === 'active');
+        if (otherActive) {
+          await dbSaveBatch({ ...otherActive, status: 'Completed' });
+        }
+      }
+
       await dbSaveBatch(batchData);
       await dbLogAuditEvent(
         selectedBatch ? 'BATCH_UPDATED' : 'BATCH_CREATED',
@@ -162,7 +169,7 @@ export const BatchesPage = () => {
         currentUserProfile?.name
       );
       setIsModalOpen(false);
-      loadData();
+      await loadData();
       syncDailyDataEntryReminders().catch(() => {});
       syncFarmWeatherAndLightingAlerts().catch(() => {});
     } catch (err) {
@@ -309,18 +316,10 @@ export const BatchesPage = () => {
             <span className="hidden sm:inline">{syncing ? (language === 'ta' ? 'ஒத்திசைக்கிறது...' : 'Syncing...') : (language === 'ta' ? 'மேகக்கணி ஒத்திசைவு' : 'Sync Cloud')}</span>
           </button>
           <button
-            disabled={hasActiveBatch}
+            type="button"
             onClick={handleOpenCreateModal}
-            title={
-              hasActiveBatch
-                ? `Active Batch (${activeBatch?.batchName || activeBatch?.batchNumber}) is currently active. Complete it before creating a new batch.`
-                : t('createNewBatch')
-            }
-            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm font-black text-white shadow-sm transition-all shrink-0 whitespace-nowrap ${
-              hasActiveBatch
-                ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
-                : 'bg-emerald-600 hover:bg-emerald-700 active:scale-95 cursor-pointer'
-            }`}
+            title={t('createNewBatch')}
+            className="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm font-black text-white shadow-sm transition-all shrink-0 whitespace-nowrap bg-emerald-600 hover:bg-emerald-700 active:scale-95 cursor-pointer"
           >
             <Plus className="h-4 w-4 shrink-0" />
             <span>{t('createNewBatch')}</span>

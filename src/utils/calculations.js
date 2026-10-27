@@ -196,21 +196,42 @@ export function deductFeedStock(currentStock = {}, specifiedFeedType = null, con
 
 /**
  * Generate automatic Batch Number (KG001, KG002...)
- * @param {number} count Current total batch count
+ * Accepts either an existing batches array or a numeric count
+ * Always guarantees the next number is strictly greater than the maximum existing batch number
+ * @param {Array|number} input Batches array or current count
  * @returns {string}
  */
-export function generateBatchNumber(count = 0) {
-  const nextNum = Number(count) + 1;
+export function generateBatchNumber(input = 0) {
+  if (Array.isArray(input)) {
+    let maxNum = 0;
+    for (const b of input) {
+      const num = parseInt((b.batchNumber || b.id || '').replace(/\D/g, ''), 10) || 0;
+      if (num > maxNum) maxNum = num;
+    }
+    const nextNum = maxNum + 1;
+    return `KG${String(nextNum).padStart(3, '0')}`;
+  }
+  const nextNum = Number(input) + 1;
   return `KG${String(nextNum).padStart(3, '0')}`;
 }
 
 /**
  * Generate automatic Batch Name (KgPoultryBatch-1...)
- * @param {number} count Current total batch count
+ * Accepts either an existing batches array or a numeric count
+ * @param {Array|number} input Batches array or current count
  * @returns {string}
  */
-export function generateBatchName(count = 0) {
-  const nextNum = Number(count) + 1;
+export function generateBatchName(input = 0) {
+  if (Array.isArray(input)) {
+    let maxNum = 0;
+    for (const b of input) {
+      const num = parseInt((b.batchNumber || b.id || '').replace(/\D/g, ''), 10) || 0;
+      if (num > maxNum) maxNum = num;
+    }
+    const nextNum = maxNum + 1;
+    return `KgPoultryBatch-${nextNum}`;
+  }
+  const nextNum = Number(input) + 1;
   return `KgPoultryBatch-${nextNum}`;
 }
 

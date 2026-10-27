@@ -86,6 +86,25 @@ const INITIAL_LOCAL_STATE = {
       },
       "createdAt": "2026-08-16T00:00:00.000Z"
     },
+        "KG005": {
+      "id": "KG005",
+      "batchNumber": "KG005",
+      "batchName": "KgPoultryBatch-5",
+      "chickArrivalDate": "2026-10-27",
+      "initialChickCount": 5000,
+      "remainingChickCount": 5000,
+      "assignedFarmerId": "kg-poultry-farms-user",
+      "assignedFarmerName": "KG Poultry Farms",
+      "vehicleNumber": "",
+      "driverName": "",
+      "status": "Completed",
+      "feedStock": {
+        "Pre-Starter": 0,
+        "Starter": 0,
+        "Finisher": 0
+      },
+      "createdAt": "2026-10-27T10:01:20.990Z"
+    },
     "KG006": {
       "id": "KG006",
       "batchNumber": "KG006",
@@ -4103,8 +4122,8 @@ const INITIAL_LOCAL_STATE = {
   "auditLogs": []
 };
 
-// Helper: Wrap promises with a timeout to prevent hanging UI (8 seconds default for reliable mobile sync)
-function withTimeout(promise, ms = 8000) {
+// Helper: Wrap promises with a timeout to prevent hanging UI (2.5 seconds default for snappy mobile sync)
+function withTimeout(promise, ms = 2500) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('Network timeout')), ms);
     promise
@@ -4393,7 +4412,7 @@ export function initRealtimeSync() {
         const val = snapshot.val();
         const serverBatches = val || {};
         const local = getLocalDB();
-        local.batches = serverBatches;
+        local.batches = { ...local.batches, ...serverBatches };
         saveLocalDB(local);
         notifyBatchListeners();
       }
@@ -4405,7 +4424,7 @@ export function initRealtimeSync() {
       if (snapshot.exists()) {
         const val = snapshot.val();
         const local = getLocalDB();
-        local.dailyRecords = val || {};
+        local.dailyRecords = { ...local.dailyRecords, ...(val || {}) };
         saveLocalDB(local);
         notifyBatchListeners();
       }
@@ -4417,7 +4436,7 @@ export function initRealtimeSync() {
       if (snapshot.exists()) {
         const val = snapshot.val();
         const local = getLocalDB();
-        local.dispatches = val || {};
+        local.dispatches = { ...local.dispatches, ...(val || {}) };
         saveLocalDB(local);
         notifyBatchListeners();
       }
@@ -4429,7 +4448,7 @@ export function initRealtimeSync() {
       if (snapshot.exists()) {
         const val = snapshot.val();
         const local = getLocalDB();
-        local.feedStocks = val || {};
+        local.feedStocks = { ...local.feedStocks, ...(val || {}) };
         saveLocalDB(local);
         notifyBatchListeners();
       }
@@ -4459,10 +4478,10 @@ export async function dbGetBatches() {
   const local = getLocalDB();
   try {
     const [batchesRes, dailyRes, dispatchesRes, boxSetsRes] = await Promise.allSettled([
-      withTimeout(get(ref(db, 'batches')), 8000),
-      withTimeout(get(ref(db, 'dailyRecords')), 8000),
-      withTimeout(get(ref(db, 'dispatches')), 8000),
-      withTimeout(get(ref(db, 'boxSets')), 8000)
+      withTimeout(get(ref(db, 'batches'))),
+      withTimeout(get(ref(db, 'dailyRecords'))),
+      withTimeout(get(ref(db, 'dispatches'))),
+      withTimeout(get(ref(db, 'boxSets')))
     ]);
 
     if (batchesRes.status === 'fulfilled' && batchesRes.value && batchesRes.value.exists()) {
@@ -4479,13 +4498,13 @@ export async function dbGetBatches() {
       }
     }
     if (dailyRes.status === 'fulfilled' && dailyRes.value && dailyRes.value.exists()) {
-      local.dailyRecords = dailyRes.value.val() || {};
+      local.dailyRecords = { ...local.dailyRecords, ...(dailyRes.value.val() || {}) };
     }
     if (dispatchesRes.status === 'fulfilled' && dispatchesRes.value && dispatchesRes.value.exists()) {
-      local.dispatches = dispatchesRes.value.val() || {};
+      local.dispatches = { ...local.dispatches, ...(dispatchesRes.value.val() || {}) };
     }
     if (boxSetsRes.status === 'fulfilled' && boxSetsRes.value && boxSetsRes.value.exists()) {
-      local.boxSets = boxSetsRes.value.val() || {};
+      local.boxSets = { ...local.boxSets, ...(boxSetsRes.value.val() || {}) };
     }
     saveLocalDB(local);
   } catch (_err) {
@@ -4516,11 +4535,10 @@ export async function dbSaveBatch(batchData) {
   saveLocalDB(local);
   notifyBatchListeners();
 
-  try {
-    await withTimeout(set(ref(db, `batches/${batchId}`), record), 8000);
-  } catch (_err) {
+  // Non-blocking async cloud sync
+  withTimeout(set(ref(db, `batches/${batchId}`), record), 3000).catch((_err) => {
     console.warn('Background sync warning in dbSaveBatch:', _err);
-  }
+  });
 
   return record;
 }
@@ -4534,11 +4552,10 @@ export async function dbDeleteBatch(batchId) {
   saveLocalDB(local);
   notifyBatchListeners();
 
-  try {
-    await withTimeout(remove(ref(db, `batches/${batchId}`)), 8000);
-  } catch (_err) {
+  // Non-blocking async cloud deletion
+  withTimeout(remove(ref(db, `batches/${batchId}`)), 3000).catch((_err) => {
     console.warn('Background sync warning in dbDeleteBatch:', _err);
-  }
+  });
 }
 
 // DAILY FARM RECORDS

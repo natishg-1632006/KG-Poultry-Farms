@@ -114,6 +114,18 @@ describe('Calculations Utility Tests', () => {
       expect(generateBatchName(0)).toBe('KgPoultryBatch-1');
       expect(generateBatchName(9)).toBe('KgPoultryBatch-10');
     });
+
+    it('generates next batch ID and name strictly above max existing batch in array', () => {
+      const existing = [
+        { id: 'KG001', batchNumber: 'KG001' },
+        { id: 'KG002', batchNumber: 'KG002' },
+        { id: 'KG003', batchNumber: 'KG003' },
+        { id: 'KG005', batchNumber: 'KG005' },
+        { id: 'KG006', batchNumber: 'KG006' }
+      ];
+      expect(generateBatchNumber(existing)).toBe('KG007');
+      expect(generateBatchName(existing)).toBe('KgPoultryBatch-7');
+    });
   });
 
   describe('calculateFCR and calculateActiveBatchFCR', () => {

@@ -29,23 +29,30 @@ export const FarmerDashboard = () => {
     return () => unsubscribe();
   }, [userProfile]);
 
-  async function loadFarmerData() {
+  async function loadFarmerData(targetBatchId = null) {
     try {
       const allBatches = await dbGetBatches();
       const farmerBatches = allBatches;
       setAssignedBatches(farmerBatches);
-      const currentActive = farmerBatches.length > 0 ? farmerBatches[0] : null;
-      setActiveBatch(currentActive);
 
-      if (currentActive) {
+      let selected = null;
+      if (targetBatchId) {
+        selected = farmerBatches.find(b => b.id === targetBatchId);
+      }
+      if (!selected) {
+        selected = farmerBatches.find(b => (b.status || '').toLowerCase() === 'active') || (farmerBatches.length > 0 ? farmerBatches[0] : null);
+      }
+      setActiveBatch(selected);
+
+      if (selected) {
         const [rMap, fList, allDisp] = await Promise.all([
-          dbGetDailyRecords(currentActive.id),
-          dbGetFeedArrivals(currentActive.id),
+          dbGetDailyRecords(selected.id),
+          dbGetFeedArrivals(selected.id),
           dbGetDispatches()
         ]);
         setRecords(Object.values(rMap).sort((a, b) => b.recordDate.localeCompare(a.recordDate)));
         setFeedArrivals(fList || []);
-        setDispatches((allDisp || []).filter(d => d.batchId === currentActive.id));
+        setDispatches((allDisp || []).filter(d => d.batchId === selected.id));
       }
     } catch (err) {
       console.error('Failed loading farmer dashboard data:', err);
@@ -161,10 +168,28 @@ export const FarmerDashboard = () => {
         <div>
           <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900">{t('farmerPortal')}</h1>
         </div>
-        {activeBatch && (
-          <div className="flex items-center gap-1.5 sm:gap-2 rounded-xl bg-emerald-50 border border-emerald-200/80 px-2.5 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-bold text-emerald-900 shadow-xs shrink-0">
-            <span>{t('batchNumber')}: {activeBatch.batchNumber} • <strong className="text-emerald-700">Day {flockAgeDays}</strong></span>
-            <Badge variant={activeBatch.status}>{activeBatch.status}</Badge>
+        {assignedBatches.length > 0 && (
+          <div className="flex items-center gap-1.5 sm:gap-2 rounded-xl bg-emerald-50 border border-emerald-200/80 p-1.5 sm:px-3 sm:py-1.5 text-[11px] sm:text-xs font-bold text-emerald-900 shadow-xs shrink-0">
+            <label className="text-[11px] font-black uppercase text-emerald-800 tracking-wider hidden sm:inline">{t('batchNumber')}:</label>
+            <select
+              value={activeBatch?.id || ''}
+              onChange={(e) => loadFarmerData(e.target.value)}
+              className="rounded-lg border border-emerald-300 bg-white py-1 px-2 text-xs font-black text-emerald-950 focus:border-emerald-600 focus:outline-hidden cursor-pointer shadow-2xs"
+            >
+              {assignedBatches.map(b => (
+                <option key={b.id} value={b.id}>
+                  {b.batchNumber} {b.batchName ? '• ' + b.batchName : ''} ({b.status})
+                </option>
+              ))}
+            </select>
+            {activeBatch && (
+              <span className="font-extrabold text-emerald-700 shrink-0">
+                Day {flockAgeDays}
+              </span>
+            )}
+            {activeBatch && (
+              <Badge variant={activeBatch.status}>{activeBatch.status}</Badge>
+            )}
           </div>
         )}
       </div>
