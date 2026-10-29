@@ -8,7 +8,7 @@ import { KG_PER_BAG } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
 import { Badge } from '../components/common/Badge';
 import { WeatherWidget } from '../components/common/WeatherWidget';
-import { ClipboardList, Wheat, Syringe, Truck, Activity, ArrowRight, Layers, AlertCircle, Scale, Calendar } from 'lucide-react';
+import { ClipboardList, Wheat, Syringe, Truck, Activity, ArrowRight, Layers, AlertCircle, Scale, Calendar, ChevronDown } from 'lucide-react';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
 export const FarmerDashboard = () => {
@@ -39,9 +39,18 @@ export const FarmerDashboard = () => {
       }
     });
 
+    const handleRecordUpdated = () => {
+      if (isMounted) {
+        loadFarmerData();
+      }
+    };
+
+    window.addEventListener('kg_records_updated', handleRecordUpdated);
+
     return () => {
       isMounted = false;
       unsubscribe();
+      window.removeEventListener('kg_records_updated', handleRecordUpdated);
     };
   }, [userProfile]);
 
@@ -192,37 +201,41 @@ export const FarmerDashboard = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+        <div className="flex items-center justify-between">
           <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900">{t('farmerPortal')}</h1>
         </div>
+
         {/* If Active Batch exists: Show exact badge just like before, NO dropdown! */}
         {hasLiveActiveBatch && activeBatch && (
-          <div className="flex items-center gap-1.5 sm:gap-2 rounded-xl bg-emerald-50 border border-emerald-200/80 px-2.5 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-bold text-emerald-900 shadow-xs shrink-0">
-            <span>{t('batchNumber')}: {activeBatch.batchNumber} • <strong className="text-emerald-700">Day {flockAgeDays}</strong></span>
-            <Badge variant={activeBatch.status}>{activeBatch.status}</Badge>
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 rounded-xl bg-emerald-50 border border-emerald-200/80 px-2.5 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-bold text-emerald-900 shadow-2xs self-start sm:self-auto shrink-0">
+            <span>{t('batchNumber')}: <strong className="text-emerald-800 font-extrabold">{activeBatch.batchNumber}</strong> • Day {flockAgeDays}</span>
+            <Badge variant={activeBatch.status} className="text-[10px] px-1.5 py-0.5">{activeBatch.status}</Badge>
           </div>
         )}
 
-        {/* If NO Active Batch exists: Show a beautifully designed batch selector dropdown */}
+        {/* If NO Active Batch exists: Show a beautifully styled, compact, mobile-friendly batch selector pill */}
         {!hasLiveActiveBatch && assignedBatches.length > 0 && (
-          <div className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 py-1.5 px-3 text-xs font-bold text-slate-800 shadow-xs">
-            <span className="text-[11px] font-black uppercase text-slate-500 tracking-wider hidden sm:inline">
-              {language === 'ta' ? 'தொகுதி தேர்வு' : 'Batch'}:
-            </span>
-            <select
-              value={activeBatch?.id || ''}
-              onChange={(e) => loadFarmerData(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-slate-50 py-1 px-2.5 text-xs font-bold text-slate-900 focus:border-emerald-600 focus:bg-white focus:outline-hidden cursor-pointer shadow-2xs"
-            >
-              {assignedBatches.map(b => (
-                <option key={b.id} value={b.id}>
-                  {b.batchNumber} {b.batchName ? '• ' + b.batchName : ''} ({b.status === 'Completed' ? (language === 'ta' ? 'முடிந்தது' : 'Completed') : b.status})
-                </option>
-              ))}
-            </select>
+          <div className="inline-flex items-center gap-1.5 self-start sm:self-auto max-w-full rounded-xl bg-white border border-slate-200/90 py-1 px-2.5 shadow-2xs">
+            <Layers className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+            <div className="relative flex items-center min-w-0">
+              <select
+                value={activeBatch?.id || ''}
+                onChange={(e) => loadFarmerData(e.target.value)}
+                className="appearance-none bg-transparent pr-5 pl-0 py-0.5 text-xs font-extrabold text-slate-800 focus:outline-hidden cursor-pointer max-w-[185px] sm:max-w-xs truncate"
+              >
+                {assignedBatches.map(b => (
+                  <option key={b.id} value={b.id} className="text-slate-900 font-semibold bg-white">
+                    {b.batchNumber} {b.batchName ? `• ${b.batchName}` : ''}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-0 h-3.5 w-3.5 text-slate-400" />
+            </div>
             {activeBatch && (
-              <Badge variant={activeBatch.status}>{activeBatch.status}</Badge>
+              <Badge variant={activeBatch.status} className="shrink-0 text-[10px] px-1.5 py-0.5">
+                {activeBatch.status === 'Completed' ? (language === 'ta' ? 'முடிந்தது' : 'Done') : activeBatch.status}
+              </Badge>
             )}
           </div>
         )}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { dbGetBatches, dbGetDailyRecords, dbGetCompanyTargets, dbGetDispatches, dbGetFeedArrivals } from '../services/dbService';
+import { dbGetBatches, dbGetDailyRecords, dbGetCompanyTargets, dbGetDispatches, dbGetFeedArrivals, dbSubscribeToBatches } from '../services/dbService';
 import { calculateDayOfBatch, calculateActiveBatchFCR } from '../utils/calculations';
 import {
   ResponsiveContainer,
@@ -16,7 +16,7 @@ import {
   Legend,
   Line
 } from 'recharts';
-import { BarChart3, TrendingUp, Wheat, Activity, Bird, Scale, Layers } from 'lucide-react';
+import { BarChart3, TrendingUp, Wheat, Activity, Bird, Scale, Layers, RotateCw } from 'lucide-react';
 import CustomSelect from '../components/common/CustomSelect';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
@@ -64,62 +64,97 @@ export const ReportsPage = () => {
   const [allFeedArrivalsMap, setAllFeedArrivalsMap] = useState({});
   const [viewMode, setViewMode] = useState('single'); // 'single' | 'comparison'
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    loadData();
+    let isMounted = true;
+    loadData(true);
+
+    const handleDataUpdated = () => {
+      if (isMounted) {
+        loadData(false);
+      }
+    };
+
+    const unsubscribe = dbSubscribeToBatches((updatedBatches) => {
+      if (!isMounted) return;
+      if (Array.isArray(updatedBatches) && updatedBatches.length > 0) {
+        setBatches(updatedBatches);
+      }
+    });
+
+    window.addEventListener('kg_records_updated', handleDataUpdated);
+    window.addEventListener('kg_batches_updated', handleDataUpdated);
+    window.addEventListener('kg_sync_completed', handleDataUpdated);
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+      window.removeEventListener('kg_records_updated', handleDataUpdated);
+      window.removeEventListener('kg_batches_updated', handleDataUpdated);
+      window.removeEventListener('kg_sync_completed', handleDataUpdated);
+    };
   }, [userProfile]);
 
   useEffect(() => {
     if (selectedBatchId) {
-      if (allDailyRecordsMap[selectedBatchId]) {
-        setDailyRecords(allDailyRecordsMap[selectedBatchId] || []);
-        setFeedArrivals(allFeedArrivalsMap[selectedBatchId] || []);
-      } else {
-        loadBatchRecords(selectedBatchId);
-      }
+      loadBatchRecords(selectedBatchId);
     }
-  }, [selectedBatchId, allDailyRecordsMap, allFeedArrivalsMap]);
+  }, [selectedBatchId]);
 
-  async function loadData() {
+  async function loadData(showSpinner = true) {
     try {
-      setLoading(true);
+      if (showSpinner) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
+
       const [bList, tObj, dList] = await Promise.all([
         dbGetBatches(),
         dbGetCompanyTargets(),
         dbGetDispatches()
       ]);
 
-      const accessible = bList;
+      const accessible = Array.isArray(bList) ? bList : [];
       setBatches(accessible);
       setTargets(tObj);
-      setDispatches(dList);
+      setDispatches(Array.isArray(dList) ? dList : []);
 
       // Preload daily records and feed arrivals for all batches
       const dailyMap = {};
       const feedMap = {};
       await Promise.all(
         accessible.map(async (b) => {
-          const [m, f] = await Promise.all([
-            dbGetDailyRecords(b.id),
-            dbGetFeedArrivals(b.id)
-          ]);
-          dailyMap[b.id] = Object.values(m || {}).sort((x, y) => x.recordDate.localeCompare(y.recordDate));
-          feedMap[b.id] = f || [];
+          try {
+            const [m, f] = await Promise.all([
+              dbGetDailyRecords(b.id),
+              dbGetFeedArrivals(b.id)
+            ]);
+            dailyMap[b.id] = Object.values(m || {}).sort((x, y) => (x?.recordDate || '').localeCompare(y?.recordDate || ''));
+            feedMap[b.id] = Array.isArray(f) ? f : [];
+          } catch (_batchErr) {
+            dailyMap[b.id] = [];
+            feedMap[b.id] = [];
+          }
         })
       );
       setAllDailyRecordsMap(dailyMap);
       setAllFeedArrivalsMap(feedMap);
 
       if (accessible.length > 0) {
-        const defaultBatch = accessible[0];
-        setSelectedBatchId(defaultBatch.id);
-        setDailyRecords(dailyMap[defaultBatch.id] || []);
-        setFeedArrivals(feedMap[defaultBatch.id] || []);
+        setSelectedBatchId(prev => {
+          const targetId = (prev && accessible.some(b => b.id === prev)) ? prev : accessible[0].id;
+          setDailyRecords(dailyMap[targetId] || []);
+          setFeedArrivals(feedMap[targetId] || []);
+          return targetId;
+        });
       }
     } catch (err) {
       console.error('Failed loading report data:', err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }
 
@@ -129,15 +164,14 @@ export const ReportsPage = () => {
         dbGetDailyRecords(bId),
         dbGetFeedArrivals(bId)
       ]);
-      const sortedRecs = Object.values(map || {}).sort((a, b) => a.recordDate.localeCompare(b.recordDate));
+      const sortedRecs = Object.values(map || {}).sort((a, b) => (a?.recordDate || '').localeCompare(b?.recordDate || ''));
+      const feeds = Array.isArray(fList) ? fList : [];
       setDailyRecords(sortedRecs);
-      setFeedArrivals(fList || []);
+      setFeedArrivals(feeds);
       setAllDailyRecordsMap(prev => ({ ...prev, [bId]: sortedRecs }));
-      setAllFeedArrivalsMap(prev => ({ ...prev, [bId]: fList || [] }));
+      setAllFeedArrivalsMap(prev => ({ ...prev, [bId]: feeds }));
     } catch (err) {
       console.error('Failed loading daily records for reports:', err);
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -343,6 +377,16 @@ export const ReportsPage = () => {
               {language === 'ta' ? 'அறிக்கைகள் & பகுப்பாய்வு' : 'Reports & Analytics'}
             </h1>
           </div>
+          <button
+            type="button"
+            onClick={() => loadData(false)}
+            disabled={refreshing || loading}
+            title={language === 'ta' ? 'புதுப்பி' : 'Refresh'}
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition active:scale-95 disabled:opacity-50 cursor-pointer"
+          >
+            <RotateCw className={`h-3.5 w-3.5 text-emerald-600 ${refreshing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{language === 'ta' ? 'புதுப்பி' : 'Refresh'}</span>
+          </button>
         </div>
 
         {/* View Toggle Buttons - Full Width */}

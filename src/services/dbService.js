@@ -58,11 +58,18 @@ function withTimeout(promise, ms = DEFAULT_TIMEOUT_MS) {
 export async function cloudGet(path, timeoutMs = DEFAULT_TIMEOUT_MS) {
   const cleanPath = path.startsWith('/') ? path.slice(1) : path;
 
-  // 1. Direct HTTPS REST API (works instantaneously on any mobile network, Android WebView, and offline reconnection)
+  // 1. Direct HTTPS REST API with cache-busting (never returns stale browser/WebView cache)
   if (!IS_TEST_ENV && typeof fetch === 'function') {
     try {
-      const url = `${FIREBASE_REST_BASE}/${cleanPath}.json`;
-      const response = await fetch(url, { signal: AbortSignal.timeout(4000) });
+      const url = `${FIREBASE_REST_BASE}/${cleanPath}.json?_t=${Date.now()}`;
+      const response = await fetch(url, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        },
+        signal: AbortSignal.timeout(4000)
+      });
       if (response.ok) {
         const val = await response.json();
         return {
@@ -603,6 +610,10 @@ export async function dbSaveBatch(batchData) {
   saveLocalDB(local);
   notifyBatchListeners();
 
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { batchId } }));
+  }
+
   // Async cloud sync with REST fallback
   cloudSet(`batches/${batchId}`, record).catch((err) => {
     console.warn('Background sync warning in dbSaveBatch:', err);
@@ -612,6 +623,7 @@ export async function dbSaveBatch(batchData) {
 }
 
 export async function dbDeleteBatch(batchId) {
+  if (!batchId) return false;
   const local = getLocalDB();
 
   // 1. Local cascade: Delete batch
@@ -639,14 +651,18 @@ export async function dbDeleteBatch(batchId) {
   }
 
   // 6. Local cascade: Delete invoices for this batch or its dispatches
+  const deletedInvoiceIds = [];
   if (local.invoices) {
     if (Array.isArray(local.invoices)) {
-      local.invoices = local.invoices.filter(inv =>
-        inv.batchId !== batchId && !deletedDispatchIds.includes(inv.dispatchId)
-      );
+      local.invoices = local.invoices.filter(inv => {
+        const matches = inv && (inv.batchId === batchId || deletedDispatchIds.includes(inv.dispatchId));
+        if (matches && inv.id) deletedInvoiceIds.push(inv.id);
+        return !matches;
+      });
     } else if (typeof local.invoices === 'object') {
       for (const [invId, inv] of Object.entries(local.invoices)) {
         if (inv && (inv.batchId === batchId || deletedDispatchIds.includes(inv.dispatchId))) {
+          deletedInvoiceIds.push(invId);
           delete local.invoices[invId];
         }
       }
@@ -665,49 +681,70 @@ export async function dbDeleteBatch(batchId) {
   saveLocalDB(local);
   notifyBatchListeners();
 
-  // 8. Cloud cascade: Delete all batch records, daily records, feed stocks, medicine, dispatches, boxSets & invoices
-  const cloudCascade = async () => {
+  // 8. CLOUD CASCADE: Reliably delete ALL data from the Firebase Realtime Database
+  try {
+    const deleteOps = [
+      cloudRemove(`batches/${batchId}`),
+      cloudRemove(`dailyRecords/${batchId}`),
+      cloudRemove(`feedStocks/${batchId}`),
+      cloudRemove(`medicineRecords/${batchId}`)
+    ];
+
+    // Find and delete matching dispatches and boxSets in cloud
     try {
-      const updates = {};
-      updates[`batches/${batchId}`] = null;
-      updates[`dailyRecords/${batchId}`] = null;
-      updates[`feedStocks/${batchId}`] = null;
-      updates[`medicineRecords/${batchId}`] = null;
-
-      // Also clean up matching dispatches and boxSets in cloud
-      try {
-        const dispSnap = await cloudGet('dispatches');
-        if (dispSnap.exists()) {
-          const cloudDispatches = dispSnap.val() || {};
-          for (const [dispId, disp] of Object.entries(cloudDispatches)) {
-            if (disp && disp.batchId === batchId) {
-              updates[`dispatches/${dispId}`] = null;
-              updates[`boxSets/${dispId}`] = null;
-            }
+      const dispSnap = await cloudGet('dispatches');
+      if (dispSnap.exists()) {
+        const cloudDispatches = dispSnap.val() || {};
+        for (const [dispId, disp] of Object.entries(cloudDispatches)) {
+          if (disp && disp.batchId === batchId) {
+            deleteOps.push(cloudRemove(`dispatches/${dispId}`));
+            deleteOps.push(cloudRemove(`boxSets/${dispId}`));
+            if (!deletedDispatchIds.includes(dispId)) deletedDispatchIds.push(dispId);
           }
         }
-      } catch (_e) {}
+      }
+    } catch (_e) {}
 
-      // Also clean up matching invoices in cloud
-      try {
-        const invSnap = await cloudGet('invoices');
-        if (invSnap.exists()) {
-          const cloudInvoices = invSnap.val() || {};
-          for (const [invId, inv] of Object.entries(cloudInvoices)) {
-            if (inv && (inv.batchId === batchId || deletedDispatchIds.includes(inv.dispatchId))) {
-              updates[`invoices/${invId}`] = null;
-            }
+    // Find and delete matching invoices in cloud
+    try {
+      const invSnap = await cloudGet('invoices');
+      if (invSnap.exists()) {
+        const cloudInvoices = invSnap.val() || {};
+        for (const [invId, inv] of Object.entries(cloudInvoices)) {
+          if (inv && (inv.batchId === batchId || deletedDispatchIds.includes(inv.dispatchId))) {
+            deleteOps.push(cloudRemove(`invoices/${invId}`));
           }
         }
-      } catch (_e) {}
+      }
+    } catch (_e) {}
 
-      await cloudUpdate('', updates);
-    } catch (err) {
-      console.warn('Background cloud cascade deletion notice:', err);
-    }
-  };
+    // Update assignedBatches for users in cloud
+    try {
+      const userSnap = await cloudGet('users');
+      if (userSnap.exists()) {
+        const cloudUsers = userSnap.val() || {};
+        for (const [uid, u] of Object.entries(cloudUsers)) {
+          if (u && Array.isArray(u.assignedBatches) && u.assignedBatches.includes(batchId)) {
+            const updated = u.assignedBatches.filter(b => b !== batchId);
+            deleteOps.push(cloudSet(`users/${uid}/assignedBatches`, updated));
+          }
+        }
+      }
+    } catch (_e) {}
 
-  cloudCascade();
+    // Await ALL deletions so cloud database is 100% clean BEFORE returning!
+    await Promise.allSettled(deleteOps);
+  } catch (err) {
+    console.warn('Cloud cascade deletion notice:', err);
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('kg_batches_updated'));
+    window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { batchId, deleted: true } }));
+    window.dispatchEvent(new CustomEvent('kg_sync_completed', { detail: { timestamp: Date.now() } }));
+  }
+
+  return true;
 }
 
 // DAILY FARM RECORDS
@@ -718,9 +755,10 @@ export async function dbGetDailyRecords(batchId) {
     if (snap.exists()) {
       const data = snap.val() || {};
       if (!local.dailyRecords) local.dailyRecords = {};
-      local.dailyRecords[batchId] = data;
+      // Deep merge with existing local records so freshly saved edits are never dropped
+      local.dailyRecords[batchId] = { ...(local.dailyRecords[batchId] || {}), ...data };
       saveLocalDB(local);
-      return data;
+      return local.dailyRecords[batchId];
     }
   } catch (err) {
     console.error(`dbGetDailyRecords error fetching for batch ${batchId}:`, err);
@@ -737,21 +775,23 @@ export async function dbSaveDailyRecord(batchId, recordDate, recordData) {
   };
 
   const local = getLocalDB();
+  if (!local.dailyRecords) local.dailyRecords = {};
   if (!local.dailyRecords[batchId]) {
     local.dailyRecords[batchId] = {};
   }
   local.dailyRecords[batchId][recordDate] = record;
 
   let remaining = null;
-  if (local.batches[batchId]) {
+  if (local.batches && local.batches[batchId]) {
     remaining = recalculateBatchRemainingChickens(batchId, local);
     local.batches[batchId].feedStock = computeBatchFeedStock(batchId, local);
   }
   saveLocalDB(local);
+  notifyBatchListeners();
 
   try {
     await cloudSet(`dailyRecords/${batchId}/${recordDate}`, record);
-    if (remaining !== null && local.batches[batchId]) {
+    if (remaining !== null && local.batches?.[batchId]) {
       await cloudSet(`batches/${batchId}/remainingChickCount`, remaining);
       await cloudSet(`batches/${batchId}/feedStock`, local.batches[batchId].feedStock);
     }
@@ -759,30 +799,41 @@ export async function dbSaveDailyRecord(batchId, recordDate, recordData) {
     console.warn('dbSaveDailyRecord cloud sync warning:', err);
   }
 
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { batchId, recordDate } }));
+    window.dispatchEvent(new CustomEvent('kg_batches_updated'));
+  }
+
   return record;
 }
 
 export async function dbDeleteDailyRecord(batchId, recordDate) {
   const local = getLocalDB();
-  if (local.dailyRecords[batchId]) {
+  if (local.dailyRecords?.[batchId]) {
     delete local.dailyRecords[batchId][recordDate];
   }
 
   let remaining = null;
-  if (local.batches[batchId]) {
+  if (local.batches?.[batchId]) {
     remaining = recalculateBatchRemainingChickens(batchId, local);
     local.batches[batchId].feedStock = computeBatchFeedStock(batchId, local);
   }
   saveLocalDB(local);
+  notifyBatchListeners();
 
   try {
     await cloudRemove(`dailyRecords/${batchId}/${recordDate}`);
-    if (remaining !== null && local.batches[batchId]) {
+    if (remaining !== null && local.batches?.[batchId]) {
       await cloudSet(`batches/${batchId}/remainingChickCount`, remaining);
       await cloudSet(`batches/${batchId}/feedStock`, local.batches[batchId].feedStock);
     }
   } catch (err) {
     console.warn('dbDeleteDailyRecord cloud sync warning:', err);
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { batchId, recordDate, deleted: true } }));
+    window.dispatchEvent(new CustomEvent('kg_batches_updated'));
   }
 }
 
@@ -796,7 +847,7 @@ export async function dbGetFeedArrivals(batchId) {
       const list = (Array.isArray(val) ? val : Object.values(val)).filter(Boolean);
       if (!local.feedStocks) local.feedStocks = {};
       local.feedStocks[batchId] = list;
-      if (local.batches[batchId]) {
+      if (local.batches && local.batches[batchId]) {
         local.batches[batchId].feedStock = computeBatchFeedStock(batchId, local);
       }
       saveLocalDB(local);
@@ -818,6 +869,7 @@ export async function dbAddFeedArrival(batchId, feedData) {
   };
 
   const local = getLocalDB();
+  if (!local.feedStocks) local.feedStocks = {};
   if (!local.feedStocks[batchId]) {
     local.feedStocks[batchId] = [];
   }
@@ -829,18 +881,24 @@ export async function dbAddFeedArrival(batchId, feedData) {
   }
 
   const calculatedStock = computeBatchFeedStock(batchId, local);
-  if (local.batches[batchId]) {
+  if (local.batches && local.batches[batchId]) {
     local.batches[batchId].feedStock = calculatedStock;
   }
   saveLocalDB(local);
+  notifyBatchListeners();
 
   try {
     await cloudSet(`feedStocks/${batchId}/${feedId}`, record);
-    if (local.batches[batchId]) {
+    if (local.batches?.[batchId]) {
       await cloudSet(`batches/${batchId}/feedStock`, calculatedStock);
     }
   } catch (err) {
     console.warn('dbAddFeedArrival cloud sync warning:', err);
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { batchId, feedId } }));
+    window.dispatchEvent(new CustomEvent('kg_batches_updated'));
   }
 
   return record;
@@ -848,37 +906,49 @@ export async function dbAddFeedArrival(batchId, feedData) {
 
 export async function dbDeleteFeedArrival(batchId, feedId) {
   const local = getLocalDB();
-  if (local.feedStocks[batchId]) {
+  if (local.feedStocks?.[batchId]) {
     local.feedStocks[batchId] = local.feedStocks[batchId].filter(f => f.id !== feedId);
   }
 
   const calculatedStock = computeBatchFeedStock(batchId, local);
-  if (local.batches[batchId]) {
+  if (local.batches && local.batches[batchId]) {
     local.batches[batchId].feedStock = calculatedStock;
   }
   saveLocalDB(local);
+  notifyBatchListeners();
 
   try {
     await cloudRemove(`feedStocks/${batchId}/${feedId}`);
-    if (local.batches[batchId]) {
+    if (local.batches?.[batchId]) {
       await cloudSet(`batches/${batchId}/feedStock`, calculatedStock);
     }
   } catch (err) {
     console.warn('dbDeleteFeedArrival cloud sync warning:', err);
   }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { batchId, feedId, deleted: true } }));
+    window.dispatchEvent(new CustomEvent('kg_batches_updated'));
+  }
 }
 
 export async function dbUpdateBatchFeedStockPool(batchId, updatedStock) {
+  const local = getLocalDB();
+  if (local.batches && local.batches[batchId]) {
+    local.batches[batchId].feedStock = updatedStock;
+    saveLocalDB(local);
+  }
+  notifyBatchListeners();
+
   try {
-    await cloudUpdate(`batches/${batchId}/feedStock`, updatedStock);
+    await cloudSet(`batches/${batchId}/feedStock`, updatedStock);
   } catch (err) {
     console.warn('dbUpdateBatchFeedStockPool cloud sync warning:', err);
   }
 
-  const local = getLocalDB();
-  if (local.batches[batchId]) {
-    local.batches[batchId].feedStock = updatedStock;
-    saveLocalDB(local);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { batchId } }));
+    window.dispatchEvent(new CustomEvent('kg_batches_updated'));
   }
 }
 
@@ -1071,32 +1141,39 @@ export async function dbDeleteInvoiceByDispatchId(dispatchId) {
 
 export async function dbDeleteDispatch(dispatchId) {
   const localBefore = getLocalDB();
-  const batchId = localBefore.dispatches[dispatchId]?.batchId;
+  const batchId = localBefore.dispatches?.[dispatchId]?.batchId;
 
   const local = getLocalDB();
-  delete local.dispatches[dispatchId];
-  delete local.boxSets[dispatchId];
+  if (local.dispatches) delete local.dispatches[dispatchId];
+  if (local.boxSets) delete local.boxSets[dispatchId];
   if (local.invoices && Array.isArray(local.invoices)) {
     local.invoices = local.invoices.filter(inv => inv.dispatchId !== dispatchId && inv.id !== dispatchId);
   }
 
   let remaining = null;
-  if (batchId && local.batches[batchId]) {
+  if (batchId && local.batches?.[batchId]) {
     remaining = recalculateBatchRemainingChickens(batchId, local);
   }
   saveLocalDB(local);
+  notifyBatchListeners();
 
   try {
-    const updates = {};
-    updates[`dispatches/${dispatchId}`] = null;
-    updates[`boxSets/${dispatchId}`] = null;
+    const ops = [
+      cloudRemove(`dispatches/${dispatchId}`),
+      cloudRemove(`boxSets/${dispatchId}`),
+      dbDeleteInvoiceByDispatchId(dispatchId)
+    ];
     if (batchId && remaining !== null) {
-      updates[`batches/${batchId}/remainingChickCount`] = remaining;
+      ops.push(cloudSet(`batches/${batchId}/remainingChickCount`, remaining));
     }
-    await cloudUpdate('', updates);
-    await dbDeleteInvoiceByDispatchId(dispatchId);
+    await Promise.allSettled(ops);
   } catch (err) {
     console.warn('dbDeleteDispatch cloud sync warning:', err);
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { dispatchId, deleted: true } }));
+    window.dispatchEvent(new CustomEvent('kg_batches_updated'));
   }
 }
 
@@ -1258,6 +1335,10 @@ export async function dbSaveCompanyTargets(targets) {
     await cloudSet('targets', targets);
   } catch (err) {
     console.warn('dbSaveCompanyTargets cloud sync warning:', err);
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { targetsUpdated: true } }));
   }
 }
 
