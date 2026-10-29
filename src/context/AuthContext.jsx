@@ -39,6 +39,7 @@ export const AuthProvider = ({ children }) => {
 
   // Sync auth state and load user profile
   useEffect(() => {
+    initRealtimeSync();
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setCurrentUser(user);
@@ -155,6 +156,7 @@ export const AuthProvider = ({ children }) => {
     setCurrentUser({ uid: safeProfile.uid, email: safeProfile.email });
     setUserProfile(safeProfile);
     localStorage.setItem('kg_poultry_active_session', JSON.stringify(safeProfile));
+    initRealtimeSync();
     dbLogAuditEvent('LOGIN', `User ${safeProfile.email} logged in`, safeProfile.name || safeProfile.email);
     return safeProfile;
   };

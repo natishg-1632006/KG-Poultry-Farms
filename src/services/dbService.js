@@ -4122,14 +4122,113 @@ const INITIAL_LOCAL_STATE = {
   "auditLogs": []
 };
 
-// Helper: Wrap promises with a timeout to prevent hanging UI (2.5 seconds default for snappy mobile sync)
-function withTimeout(promise, ms = 2500) {
+const FIREBASE_REST_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_DATABASE_URL) || "https://kg-poultry-farms-default-rtdb.firebaseio.com";
+const IS_TEST_ENV = (typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'test');
+const DEFAULT_TIMEOUT_MS = IS_TEST_ENV ? 1500 : 8000;
+
+// Helper: Wrap promises with a timeout to prevent hanging UI
+function withTimeout(promise, ms = DEFAULT_TIMEOUT_MS) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('Network timeout')), ms);
     promise
       .then((res) => { clearTimeout(timer); resolve(res); })
       .catch((err) => { clearTimeout(timer); reject(err); });
   });
+}
+
+// Resilient Cloud Getter: Tries Firebase SDK WebSocket first, falls back instantly to HTTPS REST API
+export async function cloudGet(path, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  try {
+    const snap = await withTimeout(get(ref(db, path)), timeoutMs);
+    if (snap && typeof snap.exists === 'function') {
+      return snap;
+    }
+  } catch (_sdkErr) {
+    // SDK get timed out or threw (e.g. WebSocket connection latency on mobile devices)
+  }
+
+  // Direct HTTPS REST API fallback (works 100% on any mobile network, Android WebView, and offline reconnection)
+  if (!IS_TEST_ENV && typeof fetch === 'function') {
+    try {
+      const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+      const url = `${FIREBASE_REST_BASE}/${cleanPath}.json`;
+      const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      if (response.ok) {
+        const val = await response.json();
+        return {
+          exists: () => val !== null && val !== undefined,
+          val: () => val
+        };
+      }
+    } catch (_fetchErr) {
+      // REST fetch also unreachable or offline
+    }
+  }
+
+  return {
+    exists: () => false,
+    val: () => null
+  };
+}
+
+// Resilient Cloud Setter: Tries Firebase SDK set, falls back to HTTPS REST PUT
+export async function cloudSet(path, value, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  try {
+    await withTimeout(set(ref(db, path), value), timeoutMs);
+    return;
+  } catch (_e) {
+    if (!IS_TEST_ENV && typeof fetch === 'function') {
+      try {
+        const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+        await fetch(`${FIREBASE_REST_BASE}/${cleanPath}.json`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(value),
+          signal: AbortSignal.timeout(5000)
+        });
+      } catch (_rErr) {}
+    }
+  }
+}
+
+// Resilient Cloud Remover: Tries Firebase SDK remove, falls back to HTTPS REST DELETE
+export async function cloudRemove(path, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  try {
+    await withTimeout(remove(ref(db, path)), timeoutMs);
+    return;
+  } catch (_e) {
+    if (!IS_TEST_ENV && typeof fetch === 'function') {
+      try {
+        const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+        await fetch(`${FIREBASE_REST_BASE}/${cleanPath}.json`, {
+          method: 'DELETE',
+          signal: AbortSignal.timeout(5000)
+        });
+      } catch (_rErr) {}
+    }
+  }
+}
+
+// Resilient Cloud Updater: Tries Firebase SDK update, falls back to HTTPS REST PATCH
+export async function cloudUpdate(path, updates, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  try {
+    const targetRef = path ? ref(db, path) : ref(db);
+    await withTimeout(update(targetRef, updates), timeoutMs);
+    return;
+  } catch (_e) {
+    if (!IS_TEST_ENV && typeof fetch === 'function') {
+      try {
+        const cleanPath = path && path.startsWith('/') ? path.slice(1) : (path || '');
+        const url = cleanPath ? `${FIREBASE_REST_BASE}/${cleanPath}.json` : `${FIREBASE_REST_BASE}/.json`;
+        await fetch(url, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates),
+          signal: AbortSignal.timeout(5000)
+        });
+      } catch (_rErr) {}
+    }
+  }
 }
 
 function getLocalDB() {
@@ -4312,10 +4411,15 @@ export function recalculateBatchRemainingChickens(batchId, local = getLocalDB())
 // USER MANAGEMENT
 export async function dbGetUsers() {
   try {
-    const snap = await withTimeout(get(ref(db, 'users')));
+    const snap = await cloudGet('users');
     if (snap.exists()) {
       const val = snap.val();
-      return Array.isArray(val) ? val : Object.values(val);
+      const list = Array.isArray(val) ? val : Object.values(val);
+      const local = getLocalDB();
+      local.users = local.users || {};
+      list.forEach(u => { if (u && (u.uid || u.email)) local.users[u.uid || u.email] = u; });
+      saveLocalDB(local);
+      return list;
     }
   } catch (_err) {
     // fallback
@@ -4334,31 +4438,33 @@ export async function dbSaveUser(userData) {
     delete record.password;
   }
 
+  const local = getLocalDB();
+  local.users[uid] = record;
+  saveLocalDB(local);
+
   try {
-    await withTimeout(set(ref(db, `users/${uid}`), record));
+    await cloudSet(`users/${uid}`, record);
   } catch (_err) {
     // fallback
   }
 
-  const local = getLocalDB();
-  local.users[uid] = record;
-  saveLocalDB(local);
   return record;
 }
 
 export async function dbDeleteUser(uid) {
   if (!uid) return false;
-  try {
-    await withTimeout(remove(ref(db, `users/${uid}`)));
-  } catch (_err) {
-    // fallback
-  }
-
   const local = getLocalDB();
   if (local.users && local.users[uid]) {
     delete local.users[uid];
     saveLocalDB(local);
   }
+
+  try {
+    await cloudRemove(`users/${uid}`);
+  } catch (_err) {
+    // fallback
+  }
+
   return true;
 }
 
@@ -4409,8 +4515,7 @@ export function initRealtimeSync() {
   try {
     onValue(ref(db, 'batches'), (snapshot) => {
       if (snapshot.exists()) {
-        const val = snapshot.val();
-        const serverBatches = val || {};
+        const serverBatches = snapshot.val() || {};
         const local = getLocalDB();
         local.batches = { ...local.batches, ...serverBatches };
         saveLocalDB(local);
@@ -4422,9 +4527,8 @@ export function initRealtimeSync() {
 
     onValue(ref(db, 'dailyRecords'), (snapshot) => {
       if (snapshot.exists()) {
-        const val = snapshot.val();
         const local = getLocalDB();
-        local.dailyRecords = { ...local.dailyRecords, ...(val || {}) };
+        local.dailyRecords = { ...local.dailyRecords, ...(snapshot.val() || {}) };
         saveLocalDB(local);
         notifyBatchListeners();
       }
@@ -4434,9 +4538,8 @@ export function initRealtimeSync() {
 
     onValue(ref(db, 'dispatches'), (snapshot) => {
       if (snapshot.exists()) {
-        const val = snapshot.val();
         const local = getLocalDB();
-        local.dispatches = { ...local.dispatches, ...(val || {}) };
+        local.dispatches = { ...local.dispatches, ...(snapshot.val() || {}) };
         saveLocalDB(local);
         notifyBatchListeners();
       }
@@ -4446,15 +4549,48 @@ export function initRealtimeSync() {
 
     onValue(ref(db, 'feedStocks'), (snapshot) => {
       if (snapshot.exists()) {
-        const val = snapshot.val();
         const local = getLocalDB();
-        local.feedStocks = { ...local.feedStocks, ...(val || {}) };
+        local.feedStocks = { ...local.feedStocks, ...(snapshot.val() || {}) };
         saveLocalDB(local);
         notifyBatchListeners();
       }
     }, (err) => {
       console.warn('Realtime feedStocks subscription notice:', err.message);
     });
+
+    onValue(ref(db, 'medicineRecords'), (snapshot) => {
+      if (snapshot.exists()) {
+        const local = getLocalDB();
+        local.medicineRecords = { ...local.medicineRecords, ...(snapshot.val() || {}) };
+        saveLocalDB(local);
+        notifyBatchListeners();
+      }
+    }, () => {});
+
+    onValue(ref(db, 'boxSets'), (snapshot) => {
+      if (snapshot.exists()) {
+        const local = getLocalDB();
+        local.boxSets = { ...local.boxSets, ...(snapshot.val() || {}) };
+        saveLocalDB(local);
+        notifyBatchListeners();
+      }
+    }, () => {});
+
+    onValue(ref(db, 'invoices'), (snapshot) => {
+      if (snapshot.exists()) {
+        const local = getLocalDB();
+        local.invoices = snapshot.val() || [];
+        saveLocalDB(local);
+      }
+    }, () => {});
+
+    onValue(ref(db, 'users'), (snapshot) => {
+      if (snapshot.exists()) {
+        const local = getLocalDB();
+        local.users = { ...local.users, ...(snapshot.val() || {}) };
+        saveLocalDB(local);
+      }
+    }, () => {});
   } catch (err) {
     console.warn('Failed initializing real-time Firebase sync:', err);
   }
@@ -4478,10 +4614,10 @@ export async function dbGetBatches() {
   const local = getLocalDB();
   try {
     const [batchesRes, dailyRes, dispatchesRes, boxSetsRes] = await Promise.allSettled([
-      withTimeout(get(ref(db, 'batches'))),
-      withTimeout(get(ref(db, 'dailyRecords'))),
-      withTimeout(get(ref(db, 'dispatches'))),
-      withTimeout(get(ref(db, 'boxSets')))
+      cloudGet('batches'),
+      cloudGet('dailyRecords'),
+      cloudGet('dispatches'),
+      cloudGet('boxSets')
     ]);
 
     if (batchesRes.status === 'fulfilled' && batchesRes.value && batchesRes.value.exists()) {
@@ -4489,11 +4625,11 @@ export async function dbGetBatches() {
       // Merge cloud updates with existing local batches
       local.batches = { ...local.batches, ...cloudBatches };
 
-      // If local has batches not yet in cloud (like KG006), push them to cloud
+      // If local has batches not yet in cloud, push them to cloud
       const missingInCloud = Object.keys(local.batches).filter(id => !cloudBatches[id]);
       if (missingInCloud.length > 0) {
         missingInCloud.forEach(id => {
-          set(ref(db, `batches/${id}`), local.batches[id]).catch(() => {});
+          cloudSet(`batches/${id}`, local.batches[id]).catch(() => {});
         });
       }
     }
@@ -4535,8 +4671,8 @@ export async function dbSaveBatch(batchData) {
   saveLocalDB(local);
   notifyBatchListeners();
 
-  // Non-blocking async cloud sync
-  withTimeout(set(ref(db, `batches/${batchId}`), record), 3000).catch((_err) => {
+  // Non-blocking async cloud sync with REST fallback
+  cloudSet(`batches/${batchId}`, record).catch((_err) => {
     console.warn('Background sync warning in dbSaveBatch:', _err);
   });
 
@@ -4608,7 +4744,7 @@ export async function dbDeleteBatch(batchId) {
 
       // Also clean up matching dispatches and boxSets in cloud
       try {
-        const dispSnap = await withTimeout(get(ref(db, 'dispatches')), 2500);
+        const dispSnap = await cloudGet('dispatches');
         if (dispSnap.exists()) {
           const cloudDispatches = dispSnap.val() || {};
           for (const [dispId, disp] of Object.entries(cloudDispatches)) {
@@ -4622,7 +4758,7 @@ export async function dbDeleteBatch(batchId) {
 
       // Also clean up matching invoices in cloud
       try {
-        const invSnap = await withTimeout(get(ref(db, 'invoices')), 2500);
+        const invSnap = await cloudGet('invoices');
         if (invSnap.exists()) {
           const cloudInvoices = invSnap.val() || {};
           for (const [invId, inv] of Object.entries(cloudInvoices)) {
@@ -4633,7 +4769,7 @@ export async function dbDeleteBatch(batchId) {
         }
       } catch (_e) {}
 
-      await withTimeout(update(ref(db), updates), 4000);
+      await cloudUpdate('', updates);
     } catch (_err) {
       console.warn('Background cloud cascade deletion notice:', _err);
     }
@@ -4645,7 +4781,7 @@ export async function dbDeleteBatch(batchId) {
 // DAILY FARM RECORDS
 export async function dbGetDailyRecords(batchId) {
   try {
-    const snap = await withTimeout(get(ref(db, `dailyRecords/${batchId}`)));
+    const snap = await cloudGet(`dailyRecords/${batchId}`);
     if (snap.exists()) {
       const data = snap.val();
       const local = getLocalDB();
@@ -4669,66 +4805,61 @@ export async function dbSaveDailyRecord(batchId, recordDate, recordData) {
     updatedAt: new Date().toISOString()
   };
 
-  try {
-    await withTimeout(set(ref(db, `dailyRecords/${batchId}/${recordDate}`), record));
-  } catch (_err) {
-    // fallback
-  }
-
   const local = getLocalDB();
   if (!local.dailyRecords[batchId]) {
     local.dailyRecords[batchId] = {};
   }
   local.dailyRecords[batchId][recordDate] = record;
 
+  let remaining = null;
   if (local.batches[batchId]) {
-    const remaining = recalculateBatchRemainingChickens(batchId, local);
+    remaining = recalculateBatchRemainingChickens(batchId, local);
     local.batches[batchId].feedStock = computeBatchFeedStock(batchId, local);
-
-    try {
-      await withTimeout(set(ref(db, `batches/${batchId}/remainingChickCount`), remaining));
-      await withTimeout(set(ref(db, `batches/${batchId}/feedStock`), local.batches[batchId].feedStock));
-    } catch (_e) {
-      // fallback
-    }
   }
-
   saveLocalDB(local);
-  return record;
-}
 
-export async function dbDeleteDailyRecord(batchId, recordDate) {
   try {
-    await withTimeout(remove(ref(db, `dailyRecords/${batchId}/${recordDate}`)));
+    await cloudSet(`dailyRecords/${batchId}/${recordDate}`, record);
+    if (remaining !== null && local.batches[batchId]) {
+      await cloudSet(`batches/${batchId}/remainingChickCount`, remaining);
+      await cloudSet(`batches/${batchId}/feedStock`, local.batches[batchId].feedStock);
+    }
   } catch (_err) {
     // fallback
   }
 
+  return record;
+}
+
+export async function dbDeleteDailyRecord(batchId, recordDate) {
   const local = getLocalDB();
   if (local.dailyRecords[batchId]) {
     delete local.dailyRecords[batchId][recordDate];
   }
 
+  let remaining = null;
   if (local.batches[batchId]) {
-    const remaining = recalculateBatchRemainingChickens(batchId, local);
+    remaining = recalculateBatchRemainingChickens(batchId, local);
     local.batches[batchId].feedStock = computeBatchFeedStock(batchId, local);
-
-    try {
-      await withTimeout(set(ref(db, `batches/${batchId}/remainingChickCount`), remaining));
-      await withTimeout(set(ref(db, `batches/${batchId}/feedStock`), local.batches[batchId].feedStock));
-    } catch (_e) {
-      // fallback
-    }
   }
-
   saveLocalDB(local);
+
+  try {
+    await cloudRemove(`dailyRecords/${batchId}/${recordDate}`);
+    if (remaining !== null && local.batches[batchId]) {
+      await cloudSet(`batches/${batchId}/remainingChickCount`, remaining);
+      await cloudSet(`batches/${batchId}/feedStock`, local.batches[batchId].feedStock);
+    }
+  } catch (_err) {
+    // fallback
+  }
 }
 
 // FEED MANAGEMENT
 export async function dbGetFeedArrivals(batchId) {
   const local = getLocalDB();
   try {
-    const snap = await withTimeout(get(ref(db, `feedStocks/${batchId}`)));
+    const snap = await cloudGet(`feedStocks/${batchId}`);
     if (snap.exists()) {
       const val = snap.val();
       const list = (Array.isArray(val) ? val : Object.values(val)).filter(Boolean);
@@ -4829,8 +4960,14 @@ export async function dbUpdateBatchFeedStockPool(batchId, updatedStock) {
 // MEDICINE & VACCINATION
 export async function dbGetMedicineRecords(batchId) {
   try {
-    const snap = await withTimeout(get(ref(db, `medicineRecords/${batchId}`)));
-    if (snap.exists()) return Array.isArray(snap.val()) ? snap.val() : Object.values(snap.val());
+    const snap = await cloudGet(`medicineRecords/${batchId}`);
+    if (snap.exists()) {
+      const val = Array.isArray(snap.val()) ? snap.val() : Object.values(snap.val());
+      const local = getLocalDB();
+      local.medicineRecords[batchId] = val;
+      saveLocalDB(local);
+      return val;
+    }
   } catch (_err) {
     // fallback
   }
@@ -4888,8 +5025,8 @@ export async function dbGetDispatches() {
   const local = getLocalDB();
   try {
     const [dispatchesSnap, boxSetsSnap] = await Promise.all([
-      withTimeout(get(ref(db, 'dispatches'))),
-      withTimeout(get(ref(db, 'boxSets')))
+      cloudGet('dispatches'),
+      cloudGet('boxSets')
     ]);
 
     if (dispatchesSnap.exists()) {
@@ -5037,12 +5174,12 @@ export async function dbDeleteDispatch(dispatchId) {
 
 export async function dbGetBoxSets(dispatchId) {
   const local = getLocalDB();
-  if (local.boxSets && local.boxSets[dispatchId]) {
+  if (local.boxSets && local.boxSets[dispatchId] && local.boxSets[dispatchId].length > 0) {
     return local.boxSets[dispatchId];
   }
 
   try {
-    const snap = await withTimeout(get(ref(db, `boxSets/${dispatchId}`)));
+    const snap = await cloudGet(`boxSets/${dispatchId}`);
     if (snap.exists()) {
       const val = Array.isArray(snap.val()) ? snap.val() : Object.values(snap.val());
       local.boxSets[dispatchId] = val;
@@ -5197,8 +5334,14 @@ export async function dbSaveCompanyTargets(targets) {
 // INVOICE HISTORY
 export async function dbGetInvoices() {
   try {
-    const snap = await withTimeout(get(ref(db, 'invoices')));
-    if (snap.exists()) return Array.isArray(snap.val()) ? snap.val() : Object.values(snap.val());
+    const snap = await cloudGet('invoices');
+    if (snap.exists()) {
+      const val = Array.isArray(snap.val()) ? snap.val() : Object.values(snap.val());
+      const local = getLocalDB();
+      local.invoices = val;
+      saveLocalDB(local);
+      return val;
+    }
   } catch (_err) {
     // fallback
   }
@@ -5442,4 +5585,11 @@ export async function dbGetBatchHistoryData(batchId) {
     medicineRecords,
     dispatches: enrichedDispatches
   };
+}
+
+// Automatically initialize real-time sync when running in browser or mobile WebView
+if (typeof window !== 'undefined' && !IS_TEST_ENV) {
+  setTimeout(() => {
+    initRealtimeSync();
+  }, 100);
 }

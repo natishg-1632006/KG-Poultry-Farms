@@ -36,7 +36,8 @@ vi.mock('firebase/auth', () => ({
 vi.mock('../services/dbService', () => ({
   dbGetUsers: vi.fn().mockImplementation(async () => [currentMockUser]),
   dbSaveUser: vi.fn().mockResolvedValue({}),
-  dbLogAuditEvent: vi.fn().mockResolvedValue({})
+  dbLogAuditEvent: vi.fn().mockResolvedValue({}),
+  initRealtimeSync: vi.fn()
 }));
 
 // Mock firebase service
