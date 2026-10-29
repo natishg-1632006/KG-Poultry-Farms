@@ -22,17 +22,33 @@ export const FarmerDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
     loadFarmerData();
-    const unsubscribe = dbSubscribeToBatches(() => {
-      loadFarmerData();
+
+    const unsubscribe = dbSubscribeToBatches((updatedBatches) => {
+      if (!isMounted) return;
+      if (Array.isArray(updatedBatches) && updatedBatches.length > 0) {
+        setAssignedBatches(updatedBatches);
+        setActiveBatch(prev => {
+          if (prev && updatedBatches.some(b => b.id === prev.id)) {
+            return updatedBatches.find(b => b.id === prev.id);
+          }
+          const liveActive = updatedBatches.find(b => (b.status || '').toLowerCase() === 'active');
+          return liveActive || updatedBatches[0];
+        });
+      }
     });
-    return () => unsubscribe();
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, [userProfile]);
 
   async function loadFarmerData(targetBatchId = null) {
     try {
       const allBatches = await dbGetBatches();
-      const farmerBatches = allBatches;
+      const farmerBatches = Array.isArray(allBatches) ? allBatches : [];
       setAssignedBatches(farmerBatches);
 
       let selected = null;
@@ -48,14 +64,19 @@ export const FarmerDashboard = () => {
       setActiveBatch(selected);
 
       if (selected) {
-        const [rMap, fList, allDisp] = await Promise.all([
-          dbGetDailyRecords(selected.id),
-          dbGetFeedArrivals(selected.id),
-          dbGetDispatches()
-        ]);
-        setRecords(Object.values(rMap).sort((a, b) => b.recordDate.localeCompare(a.recordDate)));
-        setFeedArrivals(fList || []);
-        setDispatches((allDisp || []).filter(d => d.batchId === selected.id));
+        try {
+          const [rMap, fList, allDisp] = await Promise.all([
+            dbGetDailyRecords(selected.id),
+            dbGetFeedArrivals(selected.id),
+            dbGetDispatches()
+          ]);
+          const recordsArr = rMap && typeof rMap === 'object' ? Object.values(rMap) : [];
+          setRecords(recordsArr.sort((a, b) => (b?.recordDate || '').localeCompare(a?.recordDate || '')));
+          setFeedArrivals(Array.isArray(fList) ? fList : []);
+          setDispatches((Array.isArray(allDisp) ? allDisp : []).filter(d => d && d.batchId === selected.id));
+        } catch (subErr) {
+          console.warn('Sub-collection load notice:', subErr);
+        }
       }
     } catch (err) {
       console.error('Failed loading farmer dashboard data:', err);
@@ -69,7 +90,7 @@ export const FarmerDashboard = () => {
   }
 
   const initialChicks = activeBatch ? Number(activeBatch.initialChickCount || 0) : 0;
-  const totalMortality = records.reduce((acc, r) => acc + Number(r.mortalityCount || 0), 0);
+  const totalMortality = (records || []).reduce((acc, r) => acc + Number(r?.mortalityCount || 0), 0);
   const remainingChicks = activeBatch && activeBatch.remainingChickCount !== undefined
     ? Number(activeBatch.remainingChickCount)
     : Math.max(0, initialChicks - totalMortality);
@@ -77,12 +98,13 @@ export const FarmerDashboard = () => {
   let totalDispatchedBirds = 0;
   let totalDispatchedWeight = 0;
 
-  for (const d of dispatches) {
+  for (const d of (dispatches || [])) {
+    if (!d) continue;
     const setsRaw = d.boxSets || [];
-    const sets = Array.isArray(setsRaw) ? setsRaw : Object.values(setsRaw);
-    const loadedSets = sets.filter(s => Number(s.loadedWeight) > 0 || Number(s.totalChickenWeight) > 0);
-    const setBirds = loadedSets.reduce((sum, s) => sum + Number(s.chickenCount || 0), 0);
-    const setWeight = loadedSets.reduce((sum, s) => sum + Number(s.totalChickenWeight || 0), 0);
+    const sets = Array.isArray(setsRaw) ? setsRaw : Object.values(setsRaw || {});
+    const loadedSets = sets.filter(s => Number(s?.loadedWeight) > 0 || Number(s?.totalChickenWeight) > 0);
+    const setBirds = loadedSets.reduce((sum, s) => sum + Number(s?.chickenCount || 0), 0);
+    const setWeight = loadedSets.reduce((sum, s) => sum + Number(s?.totalChickenWeight || 0), 0);
 
     const birds = setBirds > 0 ? setBirds : Number(d.birdsCount || d.totalBirds || d.totalChickens || 0);
     const weight = setWeight > 0 ? setWeight : Number(d.totalWeight || d.netWeight || 0);
@@ -91,12 +113,13 @@ export const FarmerDashboard = () => {
     totalDispatchedWeight += weight;
   }
 
-  const rawConsumedBags = records.reduce((acc, r) => {
-    const bags = r.feedConsumptionBags || kgToBags(r.feedConsumption || 0, KG_PER_BAG);
+  const rawConsumedBags = (records || []).reduce((acc, r) => {
+    const bags = r?.feedConsumptionBags || kgToBags(r?.feedConsumption || 0, KG_PER_BAG);
     return acc + Number(bags || 0);
   }, 0);
 
-  const totalFeedArrivedBags = feedArrivals.reduce((acc, f) => {
+  const totalFeedArrivedBags = (feedArrivals || []).reduce((acc, f) => {
+    if (!f) return acc;
     const isReturn = f.transactionType === 'Return';
     const totalKg = Number(f.quantityReceivedKg ?? f.quantityReceived ?? ((Number(f.bagsReceived || 0) * KG_PER_BAG) + Number(f.additionalKg || 0)));
     const bags = totalKg / KG_PER_BAG;
