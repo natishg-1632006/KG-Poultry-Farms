@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { dbGetBatches, dbGetMedicineRecords, dbAddMedicineRecord, dbDeleteMedicineRecord, dbLogAuditEvent } from '../services/dbService';
@@ -54,8 +54,29 @@ export const MedicinePage = () => {
   const [vaccinatorsList, setVaccinatorsList] = useState(['']);
   const [viewingRecordDetail, setViewingRecordDetail] = useState(null);
 
+  const selectedBatchIdRef = useRef(selectedBatchId);
+  selectedBatchIdRef.current = selectedBatchId;
+
   useEffect(() => {
+    let isMounted = true;
     loadBatches();
+
+    const handleDataUpdated = () => {
+      if (isMounted && selectedBatchIdRef.current) {
+        loadRecords(selectedBatchIdRef.current);
+      }
+    };
+
+    window.addEventListener('kg_records_updated', handleDataUpdated);
+    window.addEventListener('kg_batches_updated', handleDataUpdated);
+    window.addEventListener('kg_sync_completed', handleDataUpdated);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('kg_records_updated', handleDataUpdated);
+      window.removeEventListener('kg_batches_updated', handleDataUpdated);
+      window.removeEventListener('kg_sync_completed', handleDataUpdated);
+    };
   }, [userProfile]);
 
   useEffect(() => {

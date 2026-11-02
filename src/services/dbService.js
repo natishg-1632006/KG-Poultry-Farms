@@ -267,6 +267,22 @@ function getLocalDB() {
     parsed.invoices = parsed.invoices || [];
     parsed.auditLogs = parsed.auditLogs || [];
 
+    // Defensive normalization: ensure feedStocks and medicineRecords per-batch values are always Arrays
+    if (parsed.medicineRecords && typeof parsed.medicineRecords === 'object') {
+      for (const [bId, val] of Object.entries(parsed.medicineRecords)) {
+        if (val && !Array.isArray(val) && typeof val === 'object') {
+          parsed.medicineRecords[bId] = Object.values(val).filter(Boolean);
+        }
+      }
+    }
+    if (parsed.feedStocks && typeof parsed.feedStocks === 'object') {
+      for (const [bId, val] of Object.entries(parsed.feedStocks)) {
+        if (val && !Array.isArray(val) && typeof val === 'object') {
+          parsed.feedStocks[bId] = Object.values(val).filter(Boolean);
+        }
+      }
+    }
+
     if (IS_TEST_ENV && Object.keys(parsed.batches).length === 0) {
       parsed.batches.KG006 = TEST_SEED_KG006;
     }
@@ -558,7 +574,13 @@ export function initRealtimeSync() {
     onValue(ref(db, 'feedStocks'), (snapshot) => {
       if (snapshot.exists()) {
         const local = getLocalDB();
-        local.feedStocks = { ...local.feedStocks, ...(snapshot.val() || {}) };
+        const incoming = snapshot.val() || {};
+        local.feedStocks = local.feedStocks || {};
+        for (const [bId, val] of Object.entries(incoming)) {
+          if (val) {
+            local.feedStocks[bId] = (Array.isArray(val) ? val : Object.values(val)).filter(Boolean);
+          }
+        }
         saveLocalDB(local);
         notifyBatchListeners();
       }
@@ -569,7 +591,13 @@ export function initRealtimeSync() {
     onValue(ref(db, 'medicineRecords'), (snapshot) => {
       if (snapshot.exists()) {
         const local = getLocalDB();
-        local.medicineRecords = { ...local.medicineRecords, ...(snapshot.val() || {}) };
+        const incoming = snapshot.val() || {};
+        local.medicineRecords = local.medicineRecords || {};
+        for (const [bId, val] of Object.entries(incoming)) {
+          if (val) {
+            local.medicineRecords[bId] = (Array.isArray(val) ? val : Object.values(val)).filter(Boolean);
+          }
+        }
         saveLocalDB(local);
         notifyBatchListeners();
       }
@@ -1008,15 +1036,18 @@ export async function dbAddFeedArrival(batchId, feedData) {
 
   const local = getLocalDB();
   if (!local.feedStocks) local.feedStocks = {};
-  if (!local.feedStocks[batchId]) {
-    local.feedStocks[batchId] = [];
-  }
-  const idx = local.feedStocks[batchId].findIndex(f => f.id === feedId);
+  const rawList = local.feedStocks[batchId];
+  const list = Array.isArray(rawList)
+    ? [...rawList]
+    : (rawList && typeof rawList === 'object' ? Object.values(rawList).filter(Boolean) : []);
+
+  const idx = list.findIndex(f => f && f.id === feedId);
   if (idx >= 0) {
-    local.feedStocks[batchId][idx] = record;
+    list[idx] = record;
   } else {
-    local.feedStocks[batchId].push(record);
+    list.push(record);
   }
+  local.feedStocks[batchId] = list;
 
   const calculatedStock = computeBatchFeedStock(batchId, local);
   if (local.batches && local.batches[batchId]) {
@@ -1043,7 +1074,11 @@ export async function dbAddFeedArrival(batchId, feedData) {
 export async function dbDeleteFeedArrival(batchId, feedId) {
   const local = getLocalDB();
   if (local.feedStocks?.[batchId]) {
-    local.feedStocks[batchId] = local.feedStocks[batchId].filter(f => f.id !== feedId);
+    const rawList = local.feedStocks[batchId];
+    const list = Array.isArray(rawList)
+      ? rawList
+      : (rawList && typeof rawList === 'object' ? Object.values(rawList).filter(Boolean) : []);
+    local.feedStocks[batchId] = list.filter(f => f && f.id !== feedId);
   }
 
   const calculatedStock = computeBatchFeedStock(batchId, local);
@@ -1087,15 +1122,18 @@ export async function dbUpdateBatchFeedStockPool(batchId, updatedStock) {
 // MEDICINE & VACCINATION (Local-First SWR & Optimistic Updates)
 export async function dbGetMedicineRecords(batchId, forceCloud = false) {
   const local = getLocalDB();
-  const cached = local?.medicineRecords?.[batchId];
-  const hasCache = Array.isArray(cached) && cached.length > 0;
+  const rawCached = local?.medicineRecords?.[batchId];
+  const cached = Array.isArray(rawCached)
+    ? rawCached
+    : (rawCached && typeof rawCached === 'object' ? Object.values(rawCached).filter(Boolean) : []);
+  const hasCache = cached.length > 0;
 
   const syncFromCloud = async () => {
     try {
       const snap = await cloudGet(`medicineRecords/${batchId}`);
       if (snap.exists()) {
         const val = snap.val();
-        const list = Array.isArray(val) ? val : Object.values(val || {});
+        const list = (Array.isArray(val) ? val : Object.values(val || {})).filter(Boolean);
         const freshLocal = getLocalDB();
         if (!freshLocal.medicineRecords) freshLocal.medicineRecords = {};
         freshLocal.medicineRecords[batchId] = list;
@@ -1105,7 +1143,10 @@ export async function dbGetMedicineRecords(batchId, forceCloud = false) {
     } catch (err) {
       console.error(`dbGetMedicineRecords error fetching for batch ${batchId}:`, err);
     }
-    return getLocalDB()?.medicineRecords?.[batchId] || [];
+    const fallbackRaw = getLocalDB()?.medicineRecords?.[batchId];
+    return Array.isArray(fallbackRaw)
+      ? fallbackRaw
+      : (fallbackRaw && typeof fallbackRaw === 'object' ? Object.values(fallbackRaw).filter(Boolean) : []);
   };
 
   if (hasCache && !forceCloud) {
@@ -1127,15 +1168,18 @@ export async function dbAddMedicineRecord(batchId, recordData) {
 
   const local = getLocalDB();
   if (!local.medicineRecords) local.medicineRecords = {};
-  if (!local.medicineRecords[batchId]) {
-    local.medicineRecords[batchId] = [];
-  }
-  const idx = local.medicineRecords[batchId].findIndex(m => m.id === recordId);
+  const rawList = local.medicineRecords[batchId];
+  const list = Array.isArray(rawList)
+    ? [...rawList]
+    : (rawList && typeof rawList === 'object' ? Object.values(rawList).filter(Boolean) : []);
+
+  const idx = list.findIndex(m => m && m.id === recordId);
   if (idx >= 0) {
-    local.medicineRecords[batchId][idx] = record;
+    list[idx] = record;
   } else {
-    local.medicineRecords[batchId].push(record);
+    list.push(record);
   }
+  local.medicineRecords[batchId] = list;
   saveLocalDB(local);
 
   if (typeof window !== 'undefined') {
@@ -1152,7 +1196,11 @@ export async function dbAddMedicineRecord(batchId, recordData) {
 export async function dbDeleteMedicineRecord(batchId, recordId) {
   const local = getLocalDB();
   if (local.medicineRecords?.[batchId]) {
-    local.medicineRecords[batchId] = local.medicineRecords[batchId].filter(m => m.id !== recordId);
+    const rawList = local.medicineRecords[batchId];
+    const list = Array.isArray(rawList)
+      ? rawList
+      : (rawList && typeof rawList === 'object' ? Object.values(rawList).filter(Boolean) : []);
+    local.medicineRecords[batchId] = list.filter(m => m && m.id !== recordId);
   }
   saveLocalDB(local);
 

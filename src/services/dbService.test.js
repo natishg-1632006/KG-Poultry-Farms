@@ -10,7 +10,10 @@ import {
   dbAddFeedArrival,
   dbDeleteFeedArrival,
   dbSaveDispatch,
-  dbDeleteDispatch
+  dbDeleteDispatch,
+  dbAddMedicineRecord,
+  dbDeleteMedicineRecord,
+  dbGetMedicineRecords
 } from './dbService';
 
 describe('dbService Real-Time Synchronization', () => {
@@ -325,6 +328,56 @@ describe('dbService Real-Time Synchronization', () => {
     batches = await dbGetBatches();
     batch = batches.find(b => b.id === testBatchId);
     expect(batch.feedStock['Starter']).toBe(0);
+
+    // Cleanup
+    await dbDeleteBatch(testBatchId);
+  });
+
+  it('handles dbAddMedicineRecord and dbDeleteMedicineRecord safely even when stored data is an object map', async () => {
+    const testBatchId = 'KG-MED-TEST';
+    await dbSaveBatch({
+      id: testBatchId,
+      batchNumber: testBatchId,
+      status: 'Active',
+      initialChickCount: 3000
+    });
+
+    // Simulate Firebase Realtime DB returning an object map rather than an array for medicineRecords
+    const raw = localStorage.getItem('kg_poultry_local_db_v8') || '{}';
+    const db = JSON.parse(raw);
+    db.medicineRecords = db.medicineRecords || {};
+    db.medicineRecords[testBatchId] = {
+      'med-existing-1': {
+        id: 'med-existing-1',
+        medicineName: 'Existing Vitamin A',
+        medicineQuantity: '500',
+        medicineUnit: 'ml',
+        date: '2026-10-20'
+      }
+    };
+    localStorage.setItem('kg_poultry_local_db_v8', JSON.stringify(db));
+
+    // Adding another medicine record should NOT throw "findIndex is not a function"
+    const newRecord = await dbAddMedicineRecord(testBatchId, {
+      medicineName: 'Antibiotic B',
+      medicineQuantity: '200',
+      medicineUnit: 'ml',
+      date: '2026-10-21'
+    });
+
+    expect(newRecord).toBeDefined();
+    expect(newRecord.medicineName).toBe('Antibiotic B');
+
+    // Retrieve medicine records
+    const list = await dbGetMedicineRecords(testBatchId);
+    expect(Array.isArray(list)).toBe(true);
+    expect(list.length).toBe(2);
+
+    // Delete one medicine record
+    await dbDeleteMedicineRecord(testBatchId, 'med-existing-1');
+    const updatedList = await dbGetMedicineRecords(testBatchId);
+    expect(updatedList.length).toBe(1);
+    expect(updatedList[0].medicineName).toBe('Antibiotic B');
 
     // Cleanup
     await dbDeleteBatch(testBatchId);
