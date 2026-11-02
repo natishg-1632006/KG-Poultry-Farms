@@ -681,6 +681,19 @@ export async function dbSaveBatch(batchData) {
     updatedAt: new Date().toISOString()
   };
 
+  // If activating or reopening this batch, mark any other currently active batch as Completed
+  if ((record.status || '').toLowerCase() === 'active') {
+    for (const [bKey, bVal] of Object.entries(local.batches || {})) {
+      if (bKey !== batchId && bVal && (bVal.status || '').toLowerCase() === 'active') {
+        const completedBatch = { ...bVal, status: 'Completed', updatedAt: new Date().toISOString() };
+        local.batches[bKey] = completedBatch;
+        queueCloudTask(async () => {
+          await cloudSet(`batches/${bKey}/status`, 'Completed');
+        });
+      }
+    }
+  }
+
   local.batches[batchId] = record;
   saveLocalDB(local);
   notifyBatchListeners();

@@ -81,7 +81,8 @@ export const DailyRecordsPage = () => {
       let accessible = all;
       setBatches(accessible);
       if (accessible.length > 0) {
-        const defaultBatch = accessible[0];
+        const activeBatch = accessible.find(b => (b.status || '').toLowerCase() === 'active');
+        const defaultBatch = activeBatch || accessible[0];
         setSelectedBatchId(defaultBatch.id);
         await loadRecordsForBatch(defaultBatch.id);
       } else {

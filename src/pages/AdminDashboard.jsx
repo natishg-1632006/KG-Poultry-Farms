@@ -36,7 +36,7 @@ export const AdminDashboard = () => {
         setLogs(lList);
 
         if (bList.length > 0) {
-          const currentActive = bList[0];
+          const currentActive = bList.find(b => (b.status || '').toLowerCase() === 'active') || bList[0];
           const rawDailyMap = await dbGetDailyRecords(currentActive.id);
           const dailyRecords = Object.values(rawDailyMap || {}).sort((a, b) => b.recordDate.localeCompare(a.recordDate));
           const totalFeedConsumedKg = dailyRecords.reduce((sum, r) => sum + Number(r.feedConsumption || 0), 0);

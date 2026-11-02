@@ -85,15 +85,18 @@ export const LoginPage = () => {
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
               Registered Email
             </label>
-            <div className="relative">
-              <Mail className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+            <div className="relative flex items-center">
+              <span className="pointer-events-none absolute left-3.5 z-10 flex items-center text-slate-400">
+                <Mail className="h-4 w-4" />
+              </span>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter registered email"
-                className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-4 text-sm font-medium text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 transition-all bg-white"
+                className="w-full rounded-xl border border-slate-200 py-2.5 pr-4 text-sm font-medium text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 transition-all bg-white"
+                style={{ paddingLeft: '2.75rem' }}
               />
             </div>
           </div>
@@ -102,20 +105,23 @@ export const LoginPage = () => {
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">
               Password
             </label>
-            <div className="relative">
-              <KeyRound className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+            <div className="relative flex items-center">
+              <span className="pointer-events-none absolute left-3.5 z-10 flex items-center text-slate-400">
+                <KeyRound className="h-4 w-4" />
+              </span>
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-10 text-sm font-medium text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 transition-all bg-white"
+                placeholder="Enter your password"
+                className="w-full rounded-xl border border-slate-200 py-2.5 pr-11 text-sm font-medium text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 transition-all bg-white"
+                style={{ paddingLeft: '2.75rem' }}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+                className="absolute right-3.5 z-10 text-slate-400 hover:text-slate-600 p-1 flex items-center cursor-pointer"
                 tabIndex={-1}
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

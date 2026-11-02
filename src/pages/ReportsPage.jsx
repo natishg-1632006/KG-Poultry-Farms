@@ -144,7 +144,9 @@ export const ReportsPage = () => {
 
       if (accessible.length > 0) {
         setSelectedBatchId(prev => {
-          const targetId = (prev && accessible.some(b => b.id === prev)) ? prev : accessible[0].id;
+          const activeBatch = accessible.find(b => (b.status || '').toLowerCase() === 'active');
+          const fallback = activeBatch ? activeBatch.id : accessible[0].id;
+          const targetId = (prev && accessible.some(b => b.id === prev)) ? prev : fallback;
           setDailyRecords(dailyMap[targetId] || []);
           setFeedArrivals(feedMap[targetId] || []);
           return targetId;

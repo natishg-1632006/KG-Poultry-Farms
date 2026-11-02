@@ -179,6 +179,13 @@ export const BatchesPage = () => {
 
   const handleChangeStatus = async (batch, newStatus) => {
     try {
+      // If reopening or activating this batch, mark any other currently active batch as Completed
+      if (newStatus === 'Active') {
+        const otherActive = batches.find(b => b.id !== batch.id && (b.status || '').toLowerCase() === 'active');
+        if (otherActive) {
+          await dbSaveBatch({ ...otherActive, status: 'Completed' });
+        }
+      }
       const updated = { ...batch, status: newStatus };
       await dbSaveBatch(updated);
       await dbLogAuditEvent(
@@ -186,7 +193,7 @@ export const BatchesPage = () => {
         `Changed batch ${batch.batchNumber} status from ${batch.status} to ${newStatus}`,
         currentUserProfile?.name
       );
-      loadData();
+      await loadData();
       syncDailyDataEntryReminders().catch(() => {});
       syncFarmWeatherAndLightingAlerts().catch(() => {});
     } catch (err) {

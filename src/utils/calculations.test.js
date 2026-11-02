@@ -9,7 +9,8 @@ import {
   generateBatchNumber,
   generateBatchName,
   calculateFCR,
-  calculateActiveBatchFCR
+  calculateActiveBatchFCR,
+  sortBatchesDescending
 } from './calculations';
 
 describe('Calculations Utility Tests', () => {
@@ -147,6 +148,29 @@ describe('Calculations Utility Tests', () => {
 
       // Completed batch with dispatches: 13,860 kg feed / 8300 kg dispatched = 13860 / 8300 = 1.67
       expect(calculateActiveBatchFCR(13860, 2230, 0, 8300, true)).toBe(1.67);
+    });
+  });
+
+  describe('sortBatchesDescending', () => {
+    it('always prioritizes active batches first over completed batches regardless of batch number', () => {
+      const batch5Active = { id: 'b5', batchNumber: 'KG005', status: 'Active', createdAt: '2026-10-01' };
+      const batch6Completed = { id: 'b6', batchNumber: 'KG006', status: 'Completed', createdAt: '2026-10-15' };
+      const batch4Completed = { id: 'b4', batchNumber: 'KG004', status: 'Completed', createdAt: '2026-09-15' };
+
+      const sorted = sortBatchesDescending([batch6Completed, batch4Completed, batch5Active]);
+      expect(sorted[0].id).toBe('b5');
+      expect(sorted[0].status).toBe('Active');
+      expect(sorted[1].id).toBe('b6');
+      expect(sorted[2].id).toBe('b4');
+    });
+
+    it('sorts by highest batch number descending within the same status', () => {
+      const batch6 = { id: 'b6', batchNumber: 'KG006', status: 'Completed' };
+      const batch4 = { id: 'b4', batchNumber: 'KG004', status: 'Completed' };
+      const batch2 = { id: 'b2', batchNumber: 'KG002', status: 'Completed' };
+
+      const sorted = sortBatchesDescending([batch2, batch6, batch4]);
+      expect(sorted.map(b => b.id)).toEqual(['b6', 'b4', 'b2']);
     });
   });
 });

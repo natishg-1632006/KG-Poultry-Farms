@@ -294,19 +294,25 @@ export function calculateActiveBatchFCR(
 /**
  * Sorts batches deterministically descending:
  * 1. Active batches first
- * 2. Newest creation/arrival date first
- * 3. Highest numerical batch number first
+ * 2. Highest numerical batch number first
+ * 3. Newest creation/arrival date first
  * @param {Array} batches
  * @returns {Array} sorted batches array
  */
 export function sortBatchesDescending(batches = []) {
   return [...batches].sort((a, b) => {
-    // 1. Highest numerical batch number first (e.g. KG003 > KG002 > KG001)
+    // 1. Active batches ALWAYS come first
+    const aActive = (a.status || '').toLowerCase() === 'active';
+    const bActive = (b.status || '').toLowerCase() === 'active';
+    if (aActive && !bActive) return -1;
+    if (!aActive && bActive) return 1;
+
+    // 2. Highest numerical batch number first (e.g. KG006 > KG005)
     const numA = parseInt((a.batchNumber || a.id || '').replace(/\D/g, ''), 10) || 0;
     const numB = parseInt((b.batchNumber || b.id || '').replace(/\D/g, ''), 10) || 0;
     if (numA !== numB) return numB - numA;
 
-    // 2. Newest creation / arrival date first
+    // 3. Newest creation / arrival date first
     const dateA = new Date(a.createdAt || a.chickArrivalDate || a.startDate || a.placementDate || 0).getTime();
     const dateB = new Date(b.createdAt || b.chickArrivalDate || b.startDate || b.placementDate || 0).getTime();
     if (dateA !== dateB) return dateB - dateA;
