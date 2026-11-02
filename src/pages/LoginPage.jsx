@@ -95,8 +95,8 @@ export const LoginPage = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter registered email"
-                className="w-full rounded-xl border border-slate-200 py-2.5 pr-4 text-sm font-medium text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 transition-all bg-white"
-                style={{ paddingLeft: '2.75rem' }}
+                className="w-full rounded-xl border border-slate-200 py-2.5 pr-4 text-sm font-medium text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 transition-all bg-white has-icon-left"
+                style={{ paddingLeft: '3rem' }}
               />
             </div>
           </div>
@@ -115,8 +115,8 @@ export const LoginPage = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
-                className="w-full rounded-xl border border-slate-200 py-2.5 pr-11 text-sm font-medium text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 transition-all bg-white"
-                style={{ paddingLeft: '2.75rem' }}
+                className="w-full rounded-xl border border-slate-200 py-2.5 pr-11 text-sm font-medium text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 transition-all bg-white has-icon-left has-icon-right"
+                style={{ paddingLeft: '3rem' }}
               />
               <button
                 type="button"

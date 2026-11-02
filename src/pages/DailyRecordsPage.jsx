@@ -7,7 +7,7 @@ import { KG_PER_BAG, FEED_CONSUMPTION_TARGETS, AVERAGE_WEIGHT_TARGETS } from '..
 import { StatCard } from '../components/common/StatCard';
 import { Modal } from '../components/common/Modal';
 import { ConfirmModal } from '../components/common/ConfirmModal';
-import { ClipboardList, AlertCircle, Save, CheckCircle2, Edit, Trash2, Layers, Plus, X, Calendar, Package, Scale, Target, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
+import { ClipboardList, AlertCircle, Save, CheckCircle2, Edit, Trash2, Layers, Plus, Minus, X, Calendar, Package, Scale, Target, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 import CustomSelect from '../components/common/CustomSelect';
 import CustomDatePicker from '../components/common/CustomDatePicker';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
@@ -724,16 +724,44 @@ export const DailyRecordsPage = () => {
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">{language === 'ta' ? 'இறப்பு எண்ணிக்கை *' : 'Mortality Count *'}</label>
-            <input
-              type="number"
-              required
-              min="0"
-              disabled={isReadOnly}
-              value={formData.mortalityCount}
-              onChange={(e) => setFormData({ ...formData, mortalityCount: e.target.value })}
-              placeholder={language === 'ta' ? 'எ.கா. 0' : 'e.g. 0'}
-              className="w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
-            />
+            <div className="flex items-stretch rounded-xl border border-slate-200 overflow-hidden bg-white focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/20">
+              <button
+                type="button"
+                disabled={isReadOnly || (Number(formData.mortalityCount || 0) <= 0)}
+                onClick={() => {
+                  const current = Number(formData.mortalityCount || 0);
+                  const nextVal = Math.max(0, current - 1);
+                  setFormData({ ...formData, mortalityCount: nextVal.toString() });
+                }}
+                className="flex items-center justify-center px-4 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-bold text-lg select-none"
+                aria-label="Decrease mortality"
+              >
+                <Minus className="h-4 w-4" />
+              </button>
+              <input
+                type="number"
+                required
+                min="0"
+                disabled={isReadOnly}
+                value={formData.mortalityCount}
+                onChange={(e) => setFormData({ ...formData, mortalityCount: e.target.value })}
+                placeholder={language === 'ta' ? 'எ.கா. 0' : 'e.g. 0'}
+                className="w-full text-center py-2.5 px-3 text-sm font-bold text-slate-900 border-x border-slate-200 focus:outline-none disabled:bg-slate-50"
+              />
+              <button
+                type="button"
+                disabled={isReadOnly}
+                onClick={() => {
+                  const current = Number(formData.mortalityCount || 0);
+                  const nextVal = current + 1;
+                  setFormData({ ...formData, mortalityCount: nextVal.toString() });
+                }}
+                className="flex items-center justify-center px-4 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-bold text-lg select-none"
+                aria-label="Increase mortality"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           <div>
@@ -747,16 +775,44 @@ export const DailyRecordsPage = () => {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">{language === 'ta' ? 'பயன்படுத்திய தீவனப் பைகள் *' : 'Feed Bags Used (Whole Bags) *'}</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  disabled={isReadOnly}
-                  value={formData.feedConsumptionBags}
-                  onChange={(e) => setFormData({ ...formData, feedConsumptionBags: e.target.value })}
-                  placeholder={language === 'ta' ? 'எ.கா. 2' : 'e.g. 2'}
-                  className="w-full rounded-xl border border-slate-200 py-2 px-3 text-sm font-bold text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
-                />
+                <div className="flex items-stretch rounded-xl border border-slate-200 overflow-hidden bg-white focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/20">
+                  <button
+                    type="button"
+                    disabled={isReadOnly || (Number(formData.feedConsumptionBags || 0) <= 0)}
+                    onClick={() => {
+                      const current = Number(formData.feedConsumptionBags || 0);
+                      const nextVal = Math.max(0, current - 1);
+                      setFormData({ ...formData, feedConsumptionBags: nextVal.toString() });
+                    }}
+                    className="flex items-center justify-center px-4 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-bold text-lg select-none"
+                    aria-label="Decrease feed bags"
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    disabled={isReadOnly}
+                    value={formData.feedConsumptionBags}
+                    onChange={(e) => setFormData({ ...formData, feedConsumptionBags: e.target.value })}
+                    placeholder={language === 'ta' ? 'எ.கா. 2' : 'e.g. 2'}
+                    className="w-full text-center py-2 px-3 text-sm font-bold text-slate-900 border-x border-slate-200 focus:outline-none disabled:bg-slate-50"
+                  />
+                  <button
+                    type="button"
+                    disabled={isReadOnly}
+                    onClick={() => {
+                      const current = Number(formData.feedConsumptionBags || 0);
+                      const nextVal = current + 1;
+                      setFormData({ ...formData, feedConsumptionBags: nextVal.toString() });
+                    }}
+                    className="flex items-center justify-center px-4 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-bold text-lg select-none"
+                    aria-label="Increase feed bags"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
               <div>

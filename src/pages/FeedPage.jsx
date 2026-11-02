@@ -7,7 +7,7 @@ import { KG_PER_BAG } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
 import { Modal } from '../components/common/Modal';
 import { ConfirmModal } from '../components/common/ConfirmModal';
-import { Package, Wheat, Truck, Save, CheckCircle2, Edit, Trash2, Layers, Plus, Eye, User, Calendar, FileText, RotateCcw, AlertCircle } from 'lucide-react';
+import { Package, Wheat, Truck, Save, CheckCircle2, Edit, Trash2, Layers, Plus, Minus, Eye, User, Calendar, FileText, RotateCcw, AlertCircle } from 'lucide-react';
 import CustomSelect from '../components/common/CustomSelect';
 import CustomDatePicker from '../components/common/CustomDatePicker';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
@@ -497,15 +497,42 @@ export const FeedPage = () => {
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   {formData.transactionType === 'Return' ? (language === 'ta' ? 'திரும்பப் பெற்ற பைகள்' : 'Bags Returned (Whole Bags)') : (language === 'ta' ? 'பெறப்பட்ட பைகள்' : 'Bags Received (Whole Bags)')}
                 </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={formData.bagsReceived}
-                  onChange={(e) => setFormData({ ...formData, bagsReceived: e.target.value !== '' ? Number(e.target.value) : '' })}
-                  placeholder={language === 'ta' ? 'எ.கா. 7' : 'e.g. 7'}
-                  className="w-full rounded-xl border border-slate-200 py-2.5 px-3 text-sm font-bold text-slate-900 focus:border-emerald-600"
-                />
+                <div className="flex items-stretch rounded-xl border border-slate-200 overflow-hidden bg-white focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/20">
+                  <button
+                    type="button"
+                    disabled={Number(formData.bagsReceived || 0) <= 0}
+                    onClick={() => {
+                      const current = Number(formData.bagsReceived || 0);
+                      const nextVal = Math.max(0, current - 1);
+                      setFormData({ ...formData, bagsReceived: nextVal });
+                    }}
+                    className="flex items-center justify-center px-4 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-bold text-lg select-none"
+                    aria-label="Decrease bags"
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={formData.bagsReceived}
+                    onChange={(e) => setFormData({ ...formData, bagsReceived: e.target.value !== '' ? Number(e.target.value) : '' })}
+                    placeholder={language === 'ta' ? 'எ.கா. 7' : 'e.g. 7'}
+                    className="w-full text-center py-2.5 px-3 text-sm font-bold text-slate-900 border-x border-slate-200 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const current = Number(formData.bagsReceived || 0);
+                      const nextVal = current + 1;
+                      setFormData({ ...formData, bagsReceived: nextVal });
+                    }}
+                    className="flex items-center justify-center px-4 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-bold text-lg select-none"
+                    aria-label="Increase bags"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
               <div>
