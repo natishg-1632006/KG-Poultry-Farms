@@ -166,6 +166,42 @@ export async function cloudUpdate(path, updates, timeoutMs = DEFAULT_TIMEOUT_MS)
   } catch (_e) {}
 }
 
+// Local-First Background Synchronization Queue with Offline Recovery
+const pendingSyncQueue = [];
+let isProcessingQueue = false;
+
+export function queueCloudTask(taskFn) {
+  if (typeof taskFn !== 'function') return;
+  pendingSyncQueue.push(taskFn);
+  processSyncQueue();
+}
+
+async function processSyncQueue() {
+  if (isProcessingQueue || pendingSyncQueue.length === 0) return;
+  isProcessingQueue = true;
+
+  while (pendingSyncQueue.length > 0) {
+    const task = pendingSyncQueue[0];
+    try {
+      await task();
+      pendingSyncQueue.shift(); // Remove on successful sync
+    } catch (err) {
+      console.warn('Background sync task paused (offline/network timeout):', err?.message || err);
+      break; // Pause queue processing if offline or failing
+    }
+  }
+
+  isProcessingQueue = false;
+}
+
+// Automatically resume queue when network connectivity is restored
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    processSyncQueue();
+    dbForceSyncAll().catch(() => {});
+  });
+}
+
 function getLocalDB() {
   try {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(MOCK_STORAGE_KEY) : null;
@@ -348,25 +384,36 @@ export function recalculateBatchRemainingChickens(batchId, local = getLocalDB())
   }
 }
 
-// USER MANAGEMENT
-export async function dbGetUsers() {
-  try {
-    const snap = await cloudGet('users');
-    if (snap.exists()) {
-      const val = snap.val();
-      const list = Array.isArray(val) ? val : Object.values(val);
-      const local = getLocalDB();
-      local.users = local.users || {};
-      list.forEach(u => { if (u && (u.uid || u.email)) local.users[u.uid || u.email] = u; });
-      saveLocalDB(local);
-      return list;
+// USER MANAGEMENT (Local-First SWR)
+export async function dbGetUsers(forceCloud = false) {
+  const local = getLocalDB();
+  const cached = Object.values(local?.users || {});
+  const hasCache = cached.length > 0;
+
+  const syncFromCloud = async () => {
+    try {
+      const snap = await cloudGet('users');
+      if (snap.exists()) {
+        const val = snap.val();
+        const list = Array.isArray(val) ? val : Object.values(val);
+        const freshLocal = getLocalDB();
+        freshLocal.users = freshLocal.users || {};
+        list.forEach(u => { if (u && (u.uid || u.email)) freshLocal.users[u.uid || u.email] = u; });
+        saveLocalDB(freshLocal);
+        return list;
+      }
+    } catch (err) {
+      console.error('dbGetUsers error fetching from cloud:', err);
     }
-  } catch (err) {
-    console.error('dbGetUsers error fetching from cloud:', err);
+    return Object.values(getLocalDB()?.users || {});
+  };
+
+  if (hasCache && !forceCloud) {
+    syncFromCloud();
+    return cached;
   }
 
-  const local = getLocalDB();
-  return Object.values(local.users || {});
+  return await syncFromCloud();
 }
 
 export async function dbSaveUser(userData) {
@@ -382,11 +429,9 @@ export async function dbSaveUser(userData) {
   local.users[uid] = record;
   saveLocalDB(local);
 
-  try {
+  queueCloudTask(async () => {
     await cloudSet(`users/${uid}`, record);
-  } catch (err) {
-    console.warn('dbSaveUser cloud sync warning:', err);
-  }
+  });
 
   return record;
 }
@@ -399,11 +444,9 @@ export async function dbDeleteUser(uid) {
     saveLocalDB(local);
   }
 
-  try {
+  queueCloudTask(async () => {
     await cloudRemove(`users/${uid}`);
-  } catch (err) {
-    console.warn('dbDeleteUser cloud sync warning:', err);
-  }
+  });
 
   return true;
 }
@@ -537,7 +580,7 @@ export function initRealtimeSync() {
 
 export async function dbForceSyncAll() {
   try {
-    const batches = await dbGetBatches();
+    const batches = await dbGetBatches(true);
     notifyBatchListeners();
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('kg_sync_completed', { detail: { timestamp: Date.now() } }));
@@ -549,48 +592,80 @@ export async function dbForceSyncAll() {
   }
 }
 
-export async function dbGetBatches() {
+export async function dbGetBatches(forceCloud = false) {
   const local = getLocalDB();
-  try {
-    const [batchesRes, dailyRes, feedRes, dispatchesRes, boxSetsRes] = await Promise.allSettled([
-      cloudGet('batches'),
-      cloudGet('dailyRecords'),
-      cloudGet('feedStocks'),
-      cloudGet('dispatches'),
-      cloudGet('boxSets')
-    ]);
+  const hasLocalBatches = Object.keys(local.batches || {}).length > 0;
 
-    if (batchesRes.status === 'fulfilled' && batchesRes.value && batchesRes.value.exists()) {
-      const cloudBatches = batchesRes.value.val() || {};
-      local.batches = { ...local.batches, ...cloudBatches };
+  const syncFromCloud = async () => {
+    try {
+      const [batchesRes, dailyRes, feedRes, dispatchesRes, boxSetsRes] = await Promise.allSettled([
+        cloudGet('batches'),
+        cloudGet('dailyRecords'),
+        cloudGet('feedStocks'),
+        cloudGet('dispatches'),
+        cloudGet('boxSets')
+      ]);
+
+      const freshLocal = getLocalDB();
+      let hasChanges = false;
+      if (batchesRes.status === 'fulfilled' && batchesRes.value && batchesRes.value.exists()) {
+        const cloudBatches = batchesRes.value.val() || {};
+        freshLocal.batches = { ...freshLocal.batches, ...cloudBatches };
+        hasChanges = true;
+      }
+      if (dailyRes.status === 'fulfilled' && dailyRes.value && dailyRes.value.exists()) {
+        freshLocal.dailyRecords = { ...freshLocal.dailyRecords, ...(dailyRes.value.val() || {}) };
+        hasChanges = true;
+      }
+      if (feedRes.status === 'fulfilled' && feedRes.value && feedRes.value.exists()) {
+        freshLocal.feedStocks = { ...freshLocal.feedStocks, ...(feedRes.value.val() || {}) };
+        hasChanges = true;
+      }
+      if (dispatchesRes.status === 'fulfilled' && dispatchesRes.value && dispatchesRes.value.exists()) {
+        freshLocal.dispatches = { ...freshLocal.dispatches, ...(dispatchesRes.value.val() || {}) };
+        hasChanges = true;
+      }
+      if (boxSetsRes.status === 'fulfilled' && boxSetsRes.value && boxSetsRes.value.exists()) {
+        freshLocal.boxSets = { ...freshLocal.boxSets, ...(boxSetsRes.value.val() || {}) };
+        hasChanges = true;
+      }
+      if (hasChanges) {
+        saveLocalDB(freshLocal);
+        notifyBatchListeners();
+      }
+    } catch (err) {
+      console.error('dbGetBatches background sync error:', err);
     }
-    if (dailyRes.status === 'fulfilled' && dailyRes.value && dailyRes.value.exists()) {
-      local.dailyRecords = { ...local.dailyRecords, ...(dailyRes.value.val() || {}) };
+  };
+
+  // Local-First SWR: If local batches exist and not forced, return INSTANTLY (0ms) and sync in background!
+  if (hasLocalBatches && !forceCloud) {
+    syncFromCloud(); // non-blocking background revalidation
+    try {
+      const localMapped = Object.values(local.batches || {}).map(b => ({
+        ...b,
+        remainingChickCount: recalculateBatchRemainingChickens(b.id, local),
+        feedStock: computeBatchFeedStock(b.id, local)
+      }));
+      return sortBatchesDescending(localMapped);
+    } catch (_e) {
+      return sortBatchesDescending(Object.values(local.batches || {}));
     }
-    if (feedRes.status === 'fulfilled' && feedRes.value && feedRes.value.exists()) {
-      local.feedStocks = { ...local.feedStocks, ...(feedRes.value.val() || {}) };
-    }
-    if (dispatchesRes.status === 'fulfilled' && dispatchesRes.value && dispatchesRes.value.exists()) {
-      local.dispatches = { ...local.dispatches, ...(dispatchesRes.value.val() || {}) };
-    }
-    if (boxSetsRes.status === 'fulfilled' && boxSetsRes.value && boxSetsRes.value.exists()) {
-      local.boxSets = { ...local.boxSets, ...(boxSetsRes.value.val() || {}) };
-    }
-    saveLocalDB(local);
-  } catch (err) {
-    console.error('dbGetBatches error fetching from cloud:', err);
   }
 
+  // If local store is empty or forced, await cloud sync
+  await syncFromCloud();
+  const refreshedLocal = getLocalDB();
   try {
-    const localMapped = Object.values(local.batches || {}).map(b => ({
+    const localMapped = Object.values(refreshedLocal.batches || {}).map(b => ({
       ...b,
-      remainingChickCount: recalculateBatchRemainingChickens(b.id, local),
-      feedStock: computeBatchFeedStock(b.id, local)
+      remainingChickCount: recalculateBatchRemainingChickens(b.id, refreshedLocal),
+      feedStock: computeBatchFeedStock(b.id, refreshedLocal)
     }));
     return sortBatchesDescending(localMapped);
   } catch (mapErr) {
     console.error('dbGetBatches mapping calculation error:', mapErr);
-    return sortBatchesDescending(Object.values(local.batches || {}));
+    return sortBatchesDescending(Object.values(refreshedLocal.batches || {}));
   }
 }
 
@@ -612,11 +687,11 @@ export async function dbSaveBatch(batchData) {
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { batchId } }));
+    window.dispatchEvent(new CustomEvent('kg_batches_updated'));
   }
 
-  // Async cloud sync with REST fallback
-  cloudSet(`batches/${batchId}`, record).catch((err) => {
-    console.warn('Background sync warning in dbSaveBatch:', err);
+  queueCloudTask(async () => {
+    await cloudSet(`batches/${batchId}`, record);
   });
 
   return record;
@@ -747,23 +822,39 @@ export async function dbDeleteBatch(batchId) {
   return true;
 }
 
-// DAILY FARM RECORDS
-export async function dbGetDailyRecords(batchId) {
+// DAILY FARM RECORDS (Local-First SWR & Optimistic Updates)
+export async function dbGetDailyRecords(batchId, forceCloud = false) {
   const local = getLocalDB();
-  try {
-    const snap = await cloudGet(`dailyRecords/${batchId}`);
-    if (snap.exists()) {
-      const data = snap.val() || {};
-      if (!local.dailyRecords) local.dailyRecords = {};
-      // Deep merge with existing local records so freshly saved edits are never dropped
-      local.dailyRecords[batchId] = { ...(local.dailyRecords[batchId] || {}), ...data };
-      saveLocalDB(local);
-      return local.dailyRecords[batchId];
+  const cached = local?.dailyRecords?.[batchId];
+  const hasCache = cached && Object.keys(cached).length > 0;
+
+  const syncFromCloud = async () => {
+    try {
+      const snap = await cloudGet(`dailyRecords/${batchId}`);
+      if (snap.exists()) {
+        const data = snap.val() || {};
+        const freshLocal = getLocalDB();
+        if (!freshLocal.dailyRecords) freshLocal.dailyRecords = {};
+        freshLocal.dailyRecords[batchId] = { ...(freshLocal.dailyRecords[batchId] || {}), ...data };
+        saveLocalDB(freshLocal);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { batchId } }));
+        }
+        return freshLocal.dailyRecords[batchId];
+      }
+    } catch (err) {
+      console.error(`dbGetDailyRecords error fetching for batch ${batchId}:`, err);
     }
-  } catch (err) {
-    console.error(`dbGetDailyRecords error fetching for batch ${batchId}:`, err);
+    return getLocalDB()?.dailyRecords?.[batchId] || {};
+  };
+
+  // Local-First SWR: Return cached records in 0ms! Silently revalidate in background.
+  if (hasCache && !forceCloud) {
+    syncFromCloud();
+    return cached;
   }
-  return local?.dailyRecords?.[batchId] || {};
+
+  return await syncFromCloud();
 }
 
 export async function dbSaveDailyRecord(batchId, recordDate, recordData) {
@@ -789,20 +880,19 @@ export async function dbSaveDailyRecord(batchId, recordDate, recordData) {
   saveLocalDB(local);
   notifyBatchListeners();
 
-  try {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { batchId, recordDate } }));
+    window.dispatchEvent(new CustomEvent('kg_batches_updated'));
+  }
+
+  // Optimistic Background Sync: screen never blocks on cloud network!
+  queueCloudTask(async () => {
     await cloudSet(`dailyRecords/${batchId}/${recordDate}`, record);
     if (remaining !== null && local.batches?.[batchId]) {
       await cloudSet(`batches/${batchId}/remainingChickCount`, remaining);
       await cloudSet(`batches/${batchId}/feedStock`, local.batches[batchId].feedStock);
     }
-  } catch (err) {
-    console.warn('dbSaveDailyRecord cloud sync warning:', err);
-  }
-
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { batchId, recordDate } }));
-    window.dispatchEvent(new CustomEvent('kg_batches_updated'));
-  }
+  });
 
   return record;
 }
@@ -821,42 +911,57 @@ export async function dbDeleteDailyRecord(batchId, recordDate) {
   saveLocalDB(local);
   notifyBatchListeners();
 
-  try {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { batchId, recordDate, deleted: true } }));
+    window.dispatchEvent(new CustomEvent('kg_batches_updated'));
+  }
+
+  queueCloudTask(async () => {
     await cloudRemove(`dailyRecords/${batchId}/${recordDate}`);
     if (remaining !== null && local.batches?.[batchId]) {
       await cloudSet(`batches/${batchId}/remainingChickCount`, remaining);
       await cloudSet(`batches/${batchId}/feedStock`, local.batches[batchId].feedStock);
     }
-  } catch (err) {
-    console.warn('dbDeleteDailyRecord cloud sync warning:', err);
-  }
-
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { batchId, recordDate, deleted: true } }));
-    window.dispatchEvent(new CustomEvent('kg_batches_updated'));
-  }
+  });
 }
 
-// FEED MANAGEMENT
-export async function dbGetFeedArrivals(batchId) {
+// FEED MANAGEMENT (Local-First SWR & Optimistic Updates)
+export async function dbGetFeedArrivals(batchId, forceCloud = false) {
   const local = getLocalDB();
-  try {
-    const snap = await cloudGet(`feedStocks/${batchId}`);
-    if (snap.exists()) {
-      const val = snap.val() || [];
-      const list = (Array.isArray(val) ? val : Object.values(val)).filter(Boolean);
-      if (!local.feedStocks) local.feedStocks = {};
-      local.feedStocks[batchId] = list;
-      if (local.batches && local.batches[batchId]) {
-        local.batches[batchId].feedStock = computeBatchFeedStock(batchId, local);
+  const cached = local?.feedStocks?.[batchId];
+  const hasCache = Array.isArray(cached) && cached.length > 0;
+
+  const syncFromCloud = async () => {
+    try {
+      const snap = await cloudGet(`feedStocks/${batchId}`);
+      if (snap.exists()) {
+        const val = snap.val() || [];
+        const list = (Array.isArray(val) ? val : Object.values(val)).filter(Boolean);
+        const freshLocal = getLocalDB();
+        if (!freshLocal.feedStocks) freshLocal.feedStocks = {};
+        freshLocal.feedStocks[batchId] = list;
+        if (freshLocal.batches && freshLocal.batches[batchId]) {
+          freshLocal.batches[batchId].feedStock = computeBatchFeedStock(batchId, freshLocal);
+        }
+        saveLocalDB(freshLocal);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { batchId } }));
+        }
+        return list;
       }
-      saveLocalDB(local);
-      return list;
+    } catch (err) {
+      console.error(`dbGetFeedArrivals error fetching for batch ${batchId}:`, err);
     }
-  } catch (err) {
-    console.error(`dbGetFeedArrivals error fetching for batch ${batchId}:`, err);
+    return getLocalDB()?.feedStocks?.[batchId] || [];
+  };
+
+  // Local-First SWR: Return cached feed arrivals in 0ms!
+  if (hasCache && !forceCloud) {
+    syncFromCloud();
+    return cached;
   }
-  return local?.feedStocks?.[batchId] || [];
+
+  return await syncFromCloud();
 }
 
 export async function dbAddFeedArrival(batchId, feedData) {
@@ -887,19 +992,17 @@ export async function dbAddFeedArrival(batchId, feedData) {
   saveLocalDB(local);
   notifyBatchListeners();
 
-  try {
-    await cloudSet(`feedStocks/${batchId}/${feedId}`, record);
-    if (local.batches?.[batchId]) {
-      await cloudSet(`batches/${batchId}/feedStock`, calculatedStock);
-    }
-  } catch (err) {
-    console.warn('dbAddFeedArrival cloud sync warning:', err);
-  }
-
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { batchId, feedId } }));
     window.dispatchEvent(new CustomEvent('kg_batches_updated'));
   }
+
+  queueCloudTask(async () => {
+    await cloudSet(`feedStocks/${batchId}/${feedId}`, record);
+    if (local.batches?.[batchId]) {
+      await cloudSet(`batches/${batchId}/feedStock`, calculatedStock);
+    }
+  });
 
   return record;
 }
@@ -917,19 +1020,17 @@ export async function dbDeleteFeedArrival(batchId, feedId) {
   saveLocalDB(local);
   notifyBatchListeners();
 
-  try {
-    await cloudRemove(`feedStocks/${batchId}/${feedId}`);
-    if (local.batches?.[batchId]) {
-      await cloudSet(`batches/${batchId}/feedStock`, calculatedStock);
-    }
-  } catch (err) {
-    console.warn('dbDeleteFeedArrival cloud sync warning:', err);
-  }
-
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { batchId, feedId, deleted: true } }));
     window.dispatchEvent(new CustomEvent('kg_batches_updated'));
   }
+
+  queueCloudTask(async () => {
+    await cloudRemove(`feedStocks/${batchId}/${feedId}`);
+    if (local.batches?.[batchId]) {
+      await cloudSet(`batches/${batchId}/feedStock`, calculatedStock);
+    }
+  });
 }
 
 export async function dbUpdateBatchFeedStockPool(batchId, updatedStock) {
@@ -940,35 +1041,49 @@ export async function dbUpdateBatchFeedStockPool(batchId, updatedStock) {
   }
   notifyBatchListeners();
 
-  try {
-    await cloudSet(`batches/${batchId}/feedStock`, updatedStock);
-  } catch (err) {
-    console.warn('dbUpdateBatchFeedStockPool cloud sync warning:', err);
-  }
-
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { batchId } }));
     window.dispatchEvent(new CustomEvent('kg_batches_updated'));
   }
+
+  queueCloudTask(async () => {
+    await cloudSet(`batches/${batchId}/feedStock`, updatedStock);
+  });
 }
 
-// MEDICINE & VACCINATION
-export async function dbGetMedicineRecords(batchId) {
+// MEDICINE & VACCINATION (Local-First SWR & Optimistic Updates)
+export async function dbGetMedicineRecords(batchId, forceCloud = false) {
   const local = getLocalDB();
-  try {
-    const snap = await cloudGet(`medicineRecords/${batchId}`);
-    if (snap.exists()) {
-      const val = snap.val();
-      const list = Array.isArray(val) ? val : Object.values(val || {});
-      if (!local.medicineRecords) local.medicineRecords = {};
-      local.medicineRecords[batchId] = list;
-      saveLocalDB(local);
-      return list;
+  const cached = local?.medicineRecords?.[batchId];
+  const hasCache = Array.isArray(cached) && cached.length > 0;
+
+  const syncFromCloud = async () => {
+    try {
+      const snap = await cloudGet(`medicineRecords/${batchId}`);
+      if (snap.exists()) {
+        const val = snap.val();
+        const list = Array.isArray(val) ? val : Object.values(val || {});
+        const freshLocal = getLocalDB();
+        if (!freshLocal.medicineRecords) freshLocal.medicineRecords = {};
+        freshLocal.medicineRecords[batchId] = list;
+        saveLocalDB(freshLocal);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { batchId, medicine: true } }));
+        }
+        return list;
+      }
+    } catch (err) {
+      console.error(`dbGetMedicineRecords error fetching for batch ${batchId}:`, err);
     }
-  } catch (err) {
-    console.error(`dbGetMedicineRecords error fetching for batch ${batchId}:`, err);
+    return getLocalDB()?.medicineRecords?.[batchId] || [];
+  };
+
+  if (hasCache && !forceCloud) {
+    syncFromCloud();
+    return cached;
   }
-  return local?.medicineRecords?.[batchId] || [];
+
+  return await syncFromCloud();
 }
 
 export async function dbAddMedicineRecord(batchId, recordData) {
@@ -981,6 +1096,7 @@ export async function dbAddMedicineRecord(batchId, recordData) {
   };
 
   const local = getLocalDB();
+  if (!local.medicineRecords) local.medicineRecords = {};
   if (!local.medicineRecords[batchId]) {
     local.medicineRecords[batchId] = [];
   }
@@ -992,59 +1108,36 @@ export async function dbAddMedicineRecord(batchId, recordData) {
   }
   saveLocalDB(local);
 
-  try {
-    await cloudSet(`medicineRecords/${batchId}/${recordId}`, record);
-  } catch (err) {
-    console.warn('dbAddMedicineRecord cloud sync warning:', err);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { batchId, medicineId: recordId } }));
   }
+
+  queueCloudTask(async () => {
+    await cloudSet(`medicineRecords/${batchId}/${recordId}`, record);
+  });
 
   return record;
 }
 
 export async function dbDeleteMedicineRecord(batchId, recordId) {
   const local = getLocalDB();
-  if (local.medicineRecords[batchId]) {
+  if (local.medicineRecords?.[batchId]) {
     local.medicineRecords[batchId] = local.medicineRecords[batchId].filter(m => m.id !== recordId);
   }
   saveLocalDB(local);
 
-  try {
-    await cloudRemove(`medicineRecords/${batchId}/${recordId}`);
-  } catch (err) {
-    console.warn('dbDeleteMedicineRecord cloud sync warning:', err);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { batchId, medicineId: recordId, deleted: true } }));
   }
+
+  queueCloudTask(async () => {
+    await cloudRemove(`medicineRecords/${batchId}/${recordId}`);
+  });
 }
 
 // DISPATCH & BOX SETS
-export async function dbGetDispatches() {
-  let list = [];
-  const local = getLocalDB();
-  try {
-    const [dispatchesSnap, boxSetsSnap] = await Promise.all([
-      cloudGet('dispatches'),
-      cloudGet('boxSets')
-    ]);
-
-    if (dispatchesSnap.exists()) {
-      const val = dispatchesSnap.val();
-      list = Array.isArray(val) ? val : Object.values(val || {});
-      local.dispatches = local.dispatches || {};
-      list.forEach(d => { if (d && d.id) local.dispatches[d.id] = d; });
-    }
-    if (boxSetsSnap.exists()) {
-      local.boxSets = boxSetsSnap.val() || {};
-    }
-    saveLocalDB(local);
-  } catch (err) {
-    console.error('dbGetDispatches error fetching from cloud:', err);
-  }
-
-  if (list.length === 0) {
-    list = Object.values(local.dispatches || {});
-  }
-
-  const boxSetsMap = local.boxSets || {};
-  return list.map(d => {
+function formatDispatchesList(list, boxSetsMap = {}) {
+  return (list || []).map(d => {
     try {
       const setsRaw = boxSetsMap[d.id] || d.boxSets || [];
       const sets = Array.isArray(setsRaw) ? setsRaw : Object.values(setsRaw);
@@ -1067,6 +1160,48 @@ export async function dbGetDispatches() {
       return d;
     }
   });
+}
+
+export async function dbGetDispatches(forceCloud = false) {
+  const local = getLocalDB();
+  const cachedList = Object.values(local.dispatches || {});
+
+  const fetchCloud = async () => {
+    try {
+      const [dispatchesSnap, boxSetsSnap] = await Promise.all([
+        cloudGet('dispatches'),
+        cloudGet('boxSets')
+      ]);
+      const currentLocal = getLocalDB();
+      currentLocal.dispatches = currentLocal.dispatches || {};
+      let cloudList = [];
+      if (dispatchesSnap.exists()) {
+        const val = dispatchesSnap.val();
+        cloudList = Array.isArray(val) ? val : Object.values(val || {});
+        cloudList.forEach(d => { if (d && d.id) currentLocal.dispatches[d.id] = d; });
+      }
+      if (boxSetsSnap.exists()) {
+        currentLocal.boxSets = boxSetsSnap.val() || {};
+      }
+      saveLocalDB(currentLocal);
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { dispatchesUpdated: true } }));
+      }
+      return formatDispatchesList(cloudList.length > 0 ? cloudList : Object.values(currentLocal.dispatches || {}), currentLocal.boxSets || {});
+    } catch (err) {
+      console.warn('dbGetDispatches background cloud sync warning:', err);
+      return formatDispatchesList(cachedList, local.boxSets || {});
+    }
+  };
+
+  // Local-First SWR: Return cached dispatches immediately (0ms)
+  if (!forceCloud && cachedList.length > 0) {
+    fetchCloud();
+    return formatDispatchesList(cachedList, local.boxSets || {});
+  }
+
+  return await fetchCloud();
 }
 
 export async function dbSaveDispatch(dispatchData) {
@@ -1093,22 +1228,27 @@ export async function dbSaveDispatch(dispatchData) {
   };
 
   const local = getLocalDB();
+  local.dispatches = local.dispatches || {};
   local.dispatches[id] = record;
 
   let remaining = null;
-  if (record.batchId && local.batches[record.batchId]) {
+  if (record.batchId && local.batches && local.batches[record.batchId]) {
     remaining = recalculateBatchRemainingChickens(record.batchId, local);
   }
   saveLocalDB(local);
+  notifyBatchListeners();
 
-  try {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { dispatchId: id } }));
+    window.dispatchEvent(new CustomEvent('kg_batches_updated'));
+  }
+
+  queueCloudTask(async () => {
     await cloudSet(`dispatches/${id}`, record);
-    if (remaining !== null) {
+    if (remaining !== null && record.batchId) {
       await cloudSet(`batches/${record.batchId}/remainingChickCount`, remaining);
     }
-  } catch (err) {
-    console.warn('dbSaveDispatch cloud sync warning:', err);
-  }
+  });
 
   return record;
 }
@@ -1157,7 +1297,12 @@ export async function dbDeleteDispatch(dispatchId) {
   saveLocalDB(local);
   notifyBatchListeners();
 
-  try {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { dispatchId, deleted: true } }));
+    window.dispatchEvent(new CustomEvent('kg_batches_updated'));
+  }
+
+  queueCloudTask(async () => {
     const ops = [
       cloudRemove(`dispatches/${dispatchId}`),
       cloudRemove(`boxSets/${dispatchId}`),
@@ -1167,32 +1312,38 @@ export async function dbDeleteDispatch(dispatchId) {
       ops.push(cloudSet(`batches/${batchId}/remainingChickCount`, remaining));
     }
     await Promise.allSettled(ops);
-  } catch (err) {
-    console.warn('dbDeleteDispatch cloud sync warning:', err);
-  }
-
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { dispatchId, deleted: true } }));
-    window.dispatchEvent(new CustomEvent('kg_batches_updated'));
-  }
+  });
 }
 
-export async function dbGetBoxSets(dispatchId) {
+export async function dbGetBoxSets(dispatchId, forceCloud = false) {
   const local = getLocalDB();
-  try {
-    const snap = await cloudGet(`boxSets/${dispatchId}`);
-    if (snap.exists()) {
-      const val = snap.val();
-      const list = Array.isArray(val) ? val : Object.values(val || {});
-      local.boxSets[dispatchId] = list;
-      saveLocalDB(local);
-      return list;
+  const cached = local.boxSets?.[dispatchId];
+
+  const fetchCloud = async () => {
+    try {
+      const snap = await cloudGet(`boxSets/${dispatchId}`);
+      if (snap.exists()) {
+        const val = snap.val();
+        const list = Array.isArray(val) ? val : Object.values(val || {});
+        const currentLocal = getLocalDB();
+        currentLocal.boxSets = currentLocal.boxSets || {};
+        currentLocal.boxSets[dispatchId] = list;
+        saveLocalDB(currentLocal);
+        return list;
+      }
+    } catch (err) {
+      console.warn(`dbGetBoxSets error fetching for dispatch ${dispatchId}:`, err);
     }
-  } catch (err) {
-    console.error(`dbGetBoxSets error fetching for dispatch ${dispatchId}:`, err);
+    return cached || [];
+  };
+
+  // Local-First SWR: Return cached immediately if available
+  if (!forceCloud && cached && cached.length > 0) {
+    fetchCloud();
+    return cached;
   }
 
-  return local?.boxSets?.[dispatchId] || [];
+  return await fetchCloud();
 }
 
 export async function dbSaveBoxSet(dispatchId, boxSetData) {
@@ -1205,6 +1356,9 @@ export async function dbSaveBoxSet(dispatchId, boxSetData) {
   };
 
   const local = getLocalDB();
+  if (!local.boxSets) {
+    local.boxSets = {};
+  }
   if (!local.boxSets[dispatchId]) {
     local.boxSets[dispatchId] = [];
   }
@@ -1235,13 +1389,19 @@ export async function dbSaveBoxSet(dispatchId, boxSetData) {
       dispatch.netWeight = setWeight;
     }
 
-    if (dispatch.batchId && local.batches[dispatch.batchId]) {
+    if (dispatch.batchId && local.batches && local.batches[dispatch.batchId]) {
       remaining = recalculateBatchRemainingChickens(dispatch.batchId, local);
     }
   }
   saveLocalDB(local);
+  notifyBatchListeners();
 
-  try {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { dispatchId, boxSetId: setId } }));
+    window.dispatchEvent(new CustomEvent('kg_batches_updated'));
+  }
+
+  queueCloudTask(async () => {
     await cloudSet(`boxSets/${dispatchId}/${boxSetData.boxSetNumber - 1}`, record);
     if (dispatch) {
       if (setBirds > 0) {
@@ -1256,9 +1416,7 @@ export async function dbSaveBoxSet(dispatchId, boxSetData) {
     if (remaining !== null && dispatch?.batchId) {
       await cloudSet(`batches/${dispatch.batchId}/remainingChickCount`, remaining);
     }
-  } catch (err) {
-    console.warn('dbSaveBoxSet cloud sync warning:', err);
-  }
+  });
 
   return record;
 }
@@ -1295,35 +1453,52 @@ export async function dbDeleteBoxSet(dispatchId, setId) {
   }
 
   saveLocalDB(local);
+  notifyBatchListeners();
 
-  try {
-    await cloudSet(`boxSets/${dispatchId}`, local.boxSets[dispatchId] || []);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { dispatchId, deletedBoxSetId: setId } }));
+    window.dispatchEvent(new CustomEvent('kg_batches_updated'));
+  }
+
+  queueCloudTask(async () => {
+    await cloudSet(`boxSets/${dispatchId}`, local.boxSets?.[dispatchId] || []);
     if (dispatch) {
       await cloudSet(`dispatches/${dispatchId}`, dispatch);
     }
     if (remaining !== null && dispatch?.batchId) {
       await cloudSet(`batches/${dispatch.batchId}/remainingChickCount`, remaining);
     }
-  } catch (err) {
-    console.warn('dbDeleteBoxSet cloud sync warning:', err);
-  }
+  });
 }
 
 // COMPANY TARGETS
-export async function dbGetCompanyTargets() {
+export async function dbGetCompanyTargets(forceCloud = false) {
   const local = getLocalDB();
-  try {
-    const snap = await cloudGet('targets');
-    if (snap.exists()) {
-      const targets = snap.val();
-      local.targets = targets;
-      saveLocalDB(local);
-      return targets;
+  const cached = local.targets;
+
+  const fetchCloud = async () => {
+    try {
+      const snap = await cloudGet('targets');
+      if (snap.exists()) {
+        const targets = snap.val();
+        const currentLocal = getLocalDB();
+        currentLocal.targets = targets;
+        saveLocalDB(currentLocal);
+        return targets;
+      }
+    } catch (err) {
+      console.warn('dbGetCompanyTargets background fetch error:', err);
     }
-  } catch (err) {
-    console.error('dbGetCompanyTargets error fetching from cloud:', err);
+    return cached || { feedConsumption: FEED_CONSUMPTION_TARGETS, averageWeight: AVERAGE_WEIGHT_TARGETS };
+  };
+
+  // Local-First SWR: Return cached immediately if available
+  if (!forceCloud && cached) {
+    fetchCloud();
+    return cached;
   }
-  return local.targets || { feedConsumption: FEED_CONSUMPTION_TARGETS, averageWeight: AVERAGE_WEIGHT_TARGETS };
+
+  return await fetchCloud();
 }
 
 export async function dbSaveCompanyTargets(targets) {
@@ -1331,33 +1506,44 @@ export async function dbSaveCompanyTargets(targets) {
   local.targets = targets;
   saveLocalDB(local);
 
-  try {
-    await cloudSet('targets', targets);
-  } catch (err) {
-    console.warn('dbSaveCompanyTargets cloud sync warning:', err);
-  }
-
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { targetsUpdated: true } }));
   }
+
+  queueCloudTask(async () => {
+    await cloudSet('targets', targets);
+  });
 }
 
 // INVOICE HISTORY
-export async function dbGetInvoices() {
+export async function dbGetInvoices(forceCloud = false) {
   const local = getLocalDB();
-  try {
-    const snap = await cloudGet('invoices');
-    if (snap.exists()) {
-      const val = snap.val();
-      const list = Array.isArray(val) ? val : Object.values(val || {});
-      local.invoices = list;
-      saveLocalDB(local);
-      return list;
+  const cached = local.invoices;
+
+  const fetchCloud = async () => {
+    try {
+      const snap = await cloudGet('invoices');
+      if (snap.exists()) {
+        const val = snap.val();
+        const list = Array.isArray(val) ? val : Object.values(val || {});
+        const currentLocal = getLocalDB();
+        currentLocal.invoices = list;
+        saveLocalDB(currentLocal);
+        return list;
+      }
+    } catch (err) {
+      console.warn('dbGetInvoices background sync error:', err);
     }
-  } catch (err) {
-    console.error('dbGetInvoices error fetching from cloud:', err);
+    return cached || [];
+  };
+
+  // Local-First SWR: Return cached invoices immediately (0ms)
+  if (!forceCloud && cached && cached.length > 0) {
+    fetchCloud();
+    return cached;
   }
-  return local.invoices || [];
+
+  return await fetchCloud();
 }
 
 export async function dbSaveInvoice(invoiceData) {
@@ -1399,31 +1585,46 @@ export async function dbSaveInvoice(invoiceData) {
   }
   saveLocalDB(local);
 
-  try {
-    await cloudSet(`invoices/${invId}`, record);
-  } catch (err) {
-    console.warn('dbSaveInvoice cloud sync warning:', err);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { invoiceId: invId } }));
   }
+
+  queueCloudTask(async () => {
+    await cloudSet(`invoices/${invId}`, record);
+  });
 
   return record;
 }
 
 // AUDIT LOGS
-export async function dbGetAuditLogs() {
+export async function dbGetAuditLogs(forceCloud = false) {
   const local = getLocalDB();
-  try {
-    const snap = await cloudGet('auditLogs');
-    if (snap.exists()) {
-      const val = snap.val();
-      const list = Array.isArray(val) ? val : Object.values(val || {});
-      local.auditLogs = list;
-      saveLocalDB(local);
-      return list;
+  const cached = local.auditLogs;
+
+  const fetchCloud = async () => {
+    try {
+      const snap = await cloudGet('auditLogs');
+      if (snap.exists()) {
+        const val = snap.val();
+        const list = Array.isArray(val) ? val : Object.values(val || {});
+        const currentLocal = getLocalDB();
+        currentLocal.auditLogs = list;
+        saveLocalDB(currentLocal);
+        return list;
+      }
+    } catch (err) {
+      console.warn('dbGetAuditLogs background sync error:', err);
     }
-  } catch (err) {
-    console.error('dbGetAuditLogs error fetching from cloud:', err);
+    return cached || [];
+  };
+
+  // Local-First SWR: Return cached audit logs immediately (0ms)
+  if (!forceCloud && cached && cached.length > 0) {
+    fetchCloud();
+    return cached;
   }
-  return local.auditLogs || [];
+
+  return await fetchCloud();
 }
 
 export async function dbLogAuditEvent(action, details, actorName = 'System User') {
@@ -1442,11 +1643,9 @@ export async function dbLogAuditEvent(action, details, actorName = 'System User'
   if (local.auditLogs.length > 100) local.auditLogs = local.auditLogs.slice(0, 100);
   saveLocalDB(local);
 
-  try {
+  queueCloudTask(async () => {
     await cloudSet(`auditLogs/${logId}`, record);
-  } catch (err) {
-    console.warn('dbLogAuditEvent cloud sync warning:', err);
-  }
+  });
 }
 
 // BATCH HISTORY AGGREGATION
