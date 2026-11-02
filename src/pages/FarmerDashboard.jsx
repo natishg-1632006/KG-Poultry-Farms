@@ -61,14 +61,12 @@ export const FarmerDashboard = () => {
     });
 
     window.addEventListener('kg_records_updated', handleDataUpdated);
-    window.addEventListener('kg_batches_updated', handleDataUpdated);
     window.addEventListener('kg_sync_completed', handleDataUpdated);
 
     return () => {
       isMounted = false;
       unsubscribe();
       window.removeEventListener('kg_records_updated', handleDataUpdated);
-      window.removeEventListener('kg_batches_updated', handleDataUpdated);
       window.removeEventListener('kg_sync_completed', handleDataUpdated);
     };
   }, [userProfile]);

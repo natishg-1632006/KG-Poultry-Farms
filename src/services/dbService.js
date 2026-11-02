@@ -646,11 +646,15 @@ export async function dbForceSyncAll() {
   }
 }
 
+let isSyncingBatchesFromCloud = false;
+
 export async function dbGetBatches(forceCloud = false) {
   const local = getLocalDB();
   const hasLocalBatches = Object.keys(local.batches || {}).length > 0;
 
   const syncFromCloud = async () => {
+    if (isSyncingBatchesFromCloud) return;
+    isSyncingBatchesFromCloud = true;
     try {
       const [batchesRes, dailyRes, feedRes, dispatchesRes, boxSetsRes] = await Promise.allSettled([
         cloudGet('batches'),
@@ -685,10 +689,11 @@ export async function dbGetBatches(forceCloud = false) {
       }
       if (hasChanges) {
         saveLocalDB(freshLocal);
-        notifyBatchListeners();
       }
     } catch (err) {
       console.error('dbGetBatches background sync error:', err);
+    } finally {
+      isSyncingBatchesFromCloud = false;
     }
   };
 

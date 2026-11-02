@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import {
@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 
 export const Sidebar = ({ isOpen, onClose }) => {
+  const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const { language, setLanguage, t } = useLanguage();
 
@@ -38,6 +39,12 @@ export const Sidebar = ({ isOpen, onClose }) => {
 
   const navItems = farmNav;
 
+  const handleNavClick = (e, path) => {
+    e.preventDefault();
+    navigate(path);
+    if (onClose) onClose();
+  };
+
   return (
     <>
       {/* Mobile backdrop */}
@@ -50,7 +57,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
 
       <aside
         className={`fixed inset-y-0 left-0 z-50 flex w-72 lg:w-64 flex-col border-r border-slate-200 bg-white transition-transform duration-300 lg:static lg:translate-x-0 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
+          isOpen ? 'translate-x-0 pointer-events-auto' : '-translate-x-full pointer-events-none lg:pointer-events-auto'
         }`}
       >
         <div className="flex h-16 items-center justify-between border-b border-slate-200 px-5 lg:hidden">
@@ -71,8 +78,8 @@ export const Sidebar = ({ isOpen, onClose }) => {
                 <NavLink
                   key={item.path}
                   to={item.path}
-                  onClick={() => {
-                    if (window.innerWidth < 1024) onClose();
+                  onClick={(e) => {
+                    handleNavClick(e, item.path);
                   }}
                   className={({ isActive }) =>
                     `flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs sm:text-xs font-extrabold transition-all ${

@@ -29,7 +29,6 @@ export const AdminDashboard = () => {
     };
 
     window.addEventListener('kg_records_updated', handleDataUpdated);
-    window.addEventListener('kg_batches_updated', handleDataUpdated);
     window.addEventListener('kg_sync_completed', handleDataUpdated);
 
     async function loadData() {
@@ -78,7 +77,6 @@ export const AdminDashboard = () => {
       isMounted = false;
       unsubscribe();
       window.removeEventListener('kg_records_updated', handleDataUpdated);
-      window.removeEventListener('kg_batches_updated', handleDataUpdated);
       window.removeEventListener('kg_sync_completed', handleDataUpdated);
     };
   }, []);
