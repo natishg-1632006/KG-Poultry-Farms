@@ -1,5 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { dbGetBatches, dbSaveBatch, dbDeleteBatch, dbSubscribeToBatches, dbForceSyncAll } from './dbService';
+import {
+  dbGetBatches,
+  dbSaveBatch,
+  dbDeleteBatch,
+  dbSubscribeToBatches,
+  dbForceSyncAll,
+  dbSaveDailyRecord,
+  dbDeleteDailyRecord,
+  dbAddFeedArrival,
+  dbDeleteFeedArrival,
+  dbSaveDispatch,
+  dbDeleteDispatch
+} from './dbService';
 
 describe('dbService Real-Time Synchronization', () => {
   beforeEach(() => {
@@ -163,5 +175,158 @@ describe('dbService Real-Time Synchronization', () => {
     expect(notifiedCount).toBeGreaterThan(initialCount);
 
     unsubscribe();
+  });
+
+  it('updates and rolls back remaining live birds and feed stock when daily records are added, edited, and deleted', async () => {
+    const testBatchId = 'KG-ROLLBACK-TEST';
+    await dbSaveBatch({
+      id: testBatchId,
+      batchNumber: testBatchId,
+      batchName: 'Rollback Batch',
+      status: 'Active',
+      initialChickCount: 5000,
+      chickArrivalDate: '2026-10-01'
+    });
+
+    // 1. Add 10 bags of Pre-Starter feed (700 kg)
+    await dbAddFeedArrival(testBatchId, {
+      id: 'feed-init-1',
+      feedType: 'Pre-Starter',
+      bagsReceived: 10,
+      quantityReceivedKg: 700,
+      date: '2026-10-01'
+    });
+
+    let batches = await dbGetBatches();
+    let batch = batches.find(b => b.id === testBatchId);
+    expect(batch.remainingChickCount).toBe(5000);
+    expect(batch.feedStock['Pre-Starter']).toBe(700);
+
+    // 2. Log Day 1 record: 20 mortality, 2 bags feed (140 kg)
+    await dbSaveDailyRecord(testBatchId, '2026-10-02', {
+      mortalityCount: 20,
+      feedConsumption: 140,
+      feedConsumptionBags: 2,
+      averageWeight: 75
+    });
+
+    batches = await dbGetBatches();
+    batch = batches.find(b => b.id === testBatchId);
+    expect(batch.remainingChickCount).toBe(4980); // 5000 - 20
+    expect(batch.feedStock['Pre-Starter']).toBe(560); // 700 - 140
+
+    // 3. EDIT Day 1 record: update mortality from 20 to 5, and feed from 140kg to 70kg (1 bag)
+    await dbSaveDailyRecord(testBatchId, '2026-10-02', {
+      mortalityCount: 5,
+      feedConsumption: 70,
+      feedConsumptionBags: 1,
+      averageWeight: 78
+    });
+
+    batches = await dbGetBatches();
+    batch = batches.find(b => b.id === testBatchId);
+    // Verified: Remaining live chicks roll back from 4980 to 4995!
+    expect(batch.remainingChickCount).toBe(4995); // 5000 - 5
+    // Verified: Feed stock rolls back from 560kg to 630kg!
+    expect(batch.feedStock['Pre-Starter']).toBe(630); // 700 - 70
+
+    // 4. DELETE Day 1 record: mortality and feed should roll back 100% to initial state!
+    await dbDeleteDailyRecord(testBatchId, '2026-10-02');
+
+    batches = await dbGetBatches();
+    batch = batches.find(b => b.id === testBatchId);
+    // Verified: Remaining live chicks roll back completely to 5000!
+    expect(batch.remainingChickCount).toBe(5000);
+    // Verified: Feed stock rolls back completely to 700kg!
+    expect(batch.feedStock['Pre-Starter']).toBe(700);
+
+    // Cleanup
+    await dbDeleteBatch(testBatchId);
+  });
+
+  it('updates and rolls back remaining live birds when dispatches are added and deleted', async () => {
+    const testBatchId = 'KG-DISPATCH-ROLLBACK';
+    await dbSaveBatch({
+      id: testBatchId,
+      batchNumber: testBatchId,
+      status: 'Active',
+      initialChickCount: 4000,
+      chickArrivalDate: '2026-10-01'
+    });
+
+    // Initial state: 4000 chicks
+    let batches = await dbGetBatches();
+    let batch = batches.find(b => b.id === testBatchId);
+    expect(batch.remainingChickCount).toBe(4000);
+
+    // 1. Create a dispatch of 500 birds
+    const dispatchId = 'disp-test-rb-1';
+    await dbSaveDispatch({
+      id: dispatchId,
+      batchId: testBatchId,
+      vehicleNumber: 'TN-01-AB-1234',
+      totalBirds: 500,
+      birdsCount: 500,
+      status: 'Completed'
+    });
+
+    batches = await dbGetBatches();
+    batch = batches.find(b => b.id === testBatchId);
+    expect(batch.remainingChickCount).toBe(3500); // 4000 - 500
+
+    // 2. Delete the dispatch -> remaining live birds roll back to 4000!
+    await dbDeleteDispatch(dispatchId);
+
+    batches = await dbGetBatches();
+    batch = batches.find(b => b.id === testBatchId);
+    expect(batch.remainingChickCount).toBe(4000);
+
+    // Cleanup
+    await dbDeleteBatch(testBatchId);
+  });
+
+  it('updates and rolls back feed stock when feed arrivals are edited and deleted', async () => {
+    const testBatchId = 'KG-FEED-ROLLBACK';
+    await dbSaveBatch({
+      id: testBatchId,
+      batchNumber: testBatchId,
+      status: 'Active',
+      initialChickCount: 3000
+    });
+
+    // 1. Add 5 bags (350 kg)
+    const feedId = 'feed-rb-1';
+    await dbAddFeedArrival(testBatchId, {
+      id: feedId,
+      feedType: 'Starter',
+      bagsReceived: 5,
+      quantityReceivedKg: 350
+    });
+
+    let batches = await dbGetBatches();
+    let batch = batches.find(b => b.id === testBatchId);
+    expect(batch.feedStock['Starter']).toBe(350);
+
+    // 2. Edit feed arrival: change from 5 bags (350kg) to 8 bags (560kg)
+    await dbAddFeedArrival(testBatchId, {
+      id: feedId,
+      feedType: 'Starter',
+      bagsReceived: 8,
+      quantityReceivedKg: 560
+    });
+
+    batches = await dbGetBatches();
+    batch = batches.find(b => b.id === testBatchId);
+    expect(batch.feedStock['Starter']).toBe(560);
+
+    // 3. Delete feed arrival -> feed stock rolls back to 0
+    await dbDeleteFeedArrival(testBatchId, feedId);
+
+    batches = await dbGetBatches();
+    batch = batches.find(b => b.id === testBatchId);
+    expect(batch.feedStock['Starter']).toBe(0);
+
+    // Cleanup
+    await dbDeleteBatch(testBatchId);
   });
 });

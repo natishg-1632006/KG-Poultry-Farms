@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -21,27 +21,55 @@ export const FarmerDashboard = () => {
   const [dispatches, setDispatches] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const activeBatchRef = useRef(activeBatch);
+  activeBatchRef.current = activeBatch;
+
   useEffect(() => {
     let isMounted = true;
     loadFarmerData();
+
+    const handleDataUpdated = () => {
+      if (isMounted) {
+        loadFarmerData(activeBatchRef.current?.id || null);
+      }
+    };
 
     const unsubscribe = dbSubscribeToBatches((updatedBatches) => {
       if (!isMounted) return;
       if (Array.isArray(updatedBatches) && updatedBatches.length > 0) {
         setAssignedBatches(updatedBatches);
-        setActiveBatch(prev => {
-          if (prev && updatedBatches.some(b => b.id === prev.id)) {
-            return updatedBatches.find(b => b.id === prev.id);
-          }
-          const liveActive = updatedBatches.find(b => (b.status || '').toLowerCase() === 'active');
-          return liveActive || updatedBatches[0];
-        });
+        const currentId = activeBatchRef.current?.id;
+        let selected = currentId ? updatedBatches.find(b => b.id === currentId) : null;
+        if (!selected) {
+          selected = updatedBatches.find(b => (b.status || '').toLowerCase() === 'active') || updatedBatches[0];
+        }
+        setActiveBatch(selected);
+        if (selected) {
+          Promise.all([
+            dbGetDailyRecords(selected.id),
+            dbGetFeedArrivals(selected.id),
+            dbGetDispatches()
+          ]).then(([rMap, fList, allDisp]) => {
+            if (!isMounted) return;
+            const recordsArr = rMap && typeof rMap === 'object' ? Object.values(rMap) : [];
+            setRecords(recordsArr.sort((a, b) => (b?.recordDate || '').localeCompare(a?.recordDate || '')));
+            setFeedArrivals(Array.isArray(fList) ? fList : []);
+            setDispatches((Array.isArray(allDisp) ? allDisp : []).filter(d => d && d.batchId === selected.id));
+          }).catch(err => console.warn('Realtime update load warning:', err));
+        }
       }
     });
+
+    window.addEventListener('kg_records_updated', handleDataUpdated);
+    window.addEventListener('kg_batches_updated', handleDataUpdated);
+    window.addEventListener('kg_sync_completed', handleDataUpdated);
 
     return () => {
       isMounted = false;
       unsubscribe();
+      window.removeEventListener('kg_records_updated', handleDataUpdated);
+      window.removeEventListener('kg_batches_updated', handleDataUpdated);
+      window.removeEventListener('kg_sync_completed', handleDataUpdated);
     };
   }, [userProfile]);
 
@@ -89,12 +117,6 @@ export const FarmerDashboard = () => {
     return <LoadingSpinner message="Loading Farmer Portal..." />;
   }
 
-  const initialChicks = activeBatch ? Number(activeBatch.initialChickCount || 0) : 0;
-  const totalMortality = (records || []).reduce((acc, r) => acc + Number(r?.mortalityCount || 0), 0);
-  const remainingChicks = activeBatch && activeBatch.remainingChickCount !== undefined
-    ? Number(activeBatch.remainingChickCount)
-    : Math.max(0, initialChicks - totalMortality);
-
   let totalDispatchedBirds = 0;
   let totalDispatchedWeight = 0;
 
@@ -112,6 +134,12 @@ export const FarmerDashboard = () => {
     totalDispatchedBirds += birds;
     totalDispatchedWeight += weight;
   }
+
+  const initialChicks = activeBatch ? Number(activeBatch.initialChickCount || 0) : 0;
+  const totalMortality = (records || []).reduce((acc, r) => acc + Number(r?.mortalityCount || 0), 0);
+  const remainingChicks = activeBatch && activeBatch.remainingChickCount !== undefined
+    ? Number(activeBatch.remainingChickCount)
+    : Math.max(0, initialChicks - totalMortality - totalDispatchedBirds);
 
   const rawConsumedBags = (records || []).reduce((acc, r) => {
     const bags = r?.feedConsumptionBags || kgToBags(r?.feedConsumption || 0, KG_PER_BAG);

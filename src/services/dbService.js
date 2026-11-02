@@ -310,12 +310,17 @@ export function computeBatchFeedStock(batchId, local = getLocalDB()) {
       eventType: 'DAILY_LOG',
       timeKey: r?.createdAt || r?.updatedAt || r?.recordDate || '2000-01-01',
       date: r?.recordDate || (r?.createdAt ? r.createdAt.split('T')[0] : '2000-01-01'),
+      feedType: r?.feedType || null,
       kg: Number(r?.feedConsumption || 0)
     }));
 
     const events = [...arrivals, ...dailyRecords].sort((a, b) => {
       if (a.date !== b.date) {
         return a.date.localeCompare(b.date);
+      }
+      // Process Arrivals before Daily Logs on the same day so stock is available before consumption
+      if (a.eventType !== b.eventType) {
+        return a.eventType === 'ARRIVAL' ? -1 : 1;
       }
       return (a.timeKey || '').localeCompare(b.timeKey || '');
     });
@@ -329,7 +334,7 @@ export function computeBatchFeedStock(batchId, local = getLocalDB()) {
           stock[fType] = (stock[fType] || 0) + evt.kg;
         }
       } else if (evt.eventType === 'DAILY_LOG' && evt.kg > 0) {
-        const deductionResult = deductFeedStock(stock, null, evt.kg);
+        const deductionResult = deductFeedStock(stock, evt.feedType, evt.kg);
         stock['Pre-Starter'] = deductionResult.updatedStock['Pre-Starter'];
         stock['Starter'] = deductionResult.updatedStock['Starter'];
         stock['Finisher'] = deductionResult.updatedStock['Finisher'];
@@ -377,6 +382,27 @@ export function recalculateBatchRemainingChickens(batchId, local = getLocalDB())
 
     const remaining = Math.max(0, initialChicks - totalMortality - totalDispatchedBirds);
     batch.remainingChickCount = remaining;
+
+    // 3. Chronologically re-synchronize remainingChickCount on each daily record
+    const sortedRecords = Object.values(dailyRecordsMap).sort((a, b) => (a.recordDate || '').localeCompare(b.recordDate || ''));
+    let runningBirds = initialChicks;
+    for (const rec of sortedRecords) {
+      const dispatchesOnOrBefore = dispatchesList.filter(d => {
+        const dDate = d.date || d.dispatchDate || (d.createdAt ? d.createdAt.split('T')[0] : '');
+        return dDate && dDate <= rec.recordDate;
+      });
+      let dispSoFar = 0;
+      for (const d of dispatchesOnOrBefore) {
+        const setsRaw = local?.boxSets?.[d.id] || d.boxSets || [];
+        const sets = Array.isArray(setsRaw) ? setsRaw : Object.values(setsRaw);
+        const loadedSets = sets.filter(s => Number(s?.loadedWeight) > 0 || Number(s?.totalChickenWeight) > 0);
+        const setBirds = loadedSets.reduce((sum, s) => sum + Number(s?.chickenCount || 0), 0);
+        dispSoFar += setBirds > 0 ? setBirds : Number(d.birdsCount || d.totalBirds || (d.status === 'Completed' ? d.totalChickens : 0) || 0);
+      }
+      runningBirds = Math.max(0, runningBirds - Number(rec.mortalityCount || 0));
+      rec.remainingChickCount = Math.max(0, runningBirds - dispSoFar);
+    }
+
     return remaining;
   } catch (err) {
     console.warn('recalculateBatchRemainingChickens calculation warning:', err);

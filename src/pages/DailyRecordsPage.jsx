@@ -64,8 +64,32 @@ export const DailyRecordsPage = () => {
     averageWeight: ''
   });
 
+  const selectedBatchIdRef = useRef(selectedBatchId);
+  selectedBatchIdRef.current = selectedBatchId;
+
   useEffect(() => {
+    let isMounted = true;
     loadBatches();
+
+    const handleDataUpdated = () => {
+      if (isMounted && selectedBatchIdRef.current) {
+        loadRecordsForBatch(selectedBatchIdRef.current);
+        dbGetBatches().then(bList => {
+          if (isMounted) setBatches(bList);
+        });
+      }
+    };
+
+    window.addEventListener('kg_records_updated', handleDataUpdated);
+    window.addEventListener('kg_batches_updated', handleDataUpdated);
+    window.addEventListener('kg_sync_completed', handleDataUpdated);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('kg_records_updated', handleDataUpdated);
+      window.removeEventListener('kg_batches_updated', handleDataUpdated);
+      window.removeEventListener('kg_sync_completed', handleDataUpdated);
+    };
   }, [userProfile]);
 
   useEffect(() => {
@@ -289,9 +313,6 @@ export const DailyRecordsPage = () => {
       else if (deductionResult.deductedByType['Starter'] > 0) autoFeedType = 'Starter';
       else if (deductionResult.deductedByType['Finisher'] > 0) autoFeedType = 'Finisher';
 
-      const prevRemaining = selectedBatch.remainingChickCount !== undefined ? Number(selectedBatch.remainingChickCount) : Number(selectedBatch.initialChickCount || 5000);
-      const calculatedRemaining = calculateRemainingChickens(prevRemaining, Number(formData.mortalityCount));
-
       const recordObj = {
         batchId: selectedBatch.id,
         recordDate: formData.recordDate,
@@ -301,13 +322,11 @@ export const DailyRecordsPage = () => {
         feedConsumptionBags: bags,
         additionalLooseKg: looseKg,
         averageWeight: weightVal,
-        remainingChickCount: calculatedRemaining,
         recordedBy: userProfile?.name || 'Farmer',
         updatedAt: new Date().toISOString()
       };
 
       await dbSaveDailyRecord(selectedBatch.id, formData.recordDate, recordObj);
-      await dbUpdateBatchFeedStockPool(selectedBatch.id, deductionResult.updatedStock);
       await syncDailyDataEntryReminders().catch(() => {});
 
       await dbLogAuditEvent(
@@ -333,6 +352,25 @@ export const DailyRecordsPage = () => {
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = Math.min(totalRecords, startIndex + pageSize);
   const paginatedRecords = recordsList.slice(startIndex, endIndex);
+
+  // Chronologically compute running live flock for each daily record
+  const chronologicalRecords = [...recordsList].sort((a, b) => a.recordDate.localeCompare(b.recordDate));
+  const initialFlockCount = Number(selectedBatch?.initialChickCount || 5000);
+  let runningFlockCount = initialFlockCount;
+  const runningFlockMap = {};
+
+  for (const rec of chronologicalRecords) {
+    const dispatchesBefore = dispatches.filter(d => (d.date || d.dispatchDate || '') <= rec.recordDate);
+    const dispBirds = dispatchesBefore.reduce((acc, d) => {
+      const setsRaw = d.boxSets || [];
+      const sets = Array.isArray(setsRaw) ? setsRaw : Object.values(setsRaw);
+      const loadedSets = sets.filter(s => Number(s?.loadedWeight) > 0 || Number(s?.totalChickenWeight) > 0);
+      const setBirds = loadedSets.reduce((sum, s) => sum + Number(s?.chickenCount || 0), 0);
+      return acc + (setBirds > 0 ? setBirds : Number(d.birdsCount || d.totalBirds || (d.status === 'Completed' ? d.totalChickens : 0) || 0));
+    }, 0);
+    runningFlockCount = Math.max(0, runningFlockCount - Number(rec.mortalityCount || 0));
+    runningFlockMap[rec.recordDate] = Math.max(0, runningFlockCount - dispBirds);
+  }
 
   const lastRecord = recordsList.length > 0 ? recordsList[0] : null;
 
@@ -387,7 +425,7 @@ export const DailyRecordsPage = () => {
     lastRecordBags = lastRecord.feedConsumptionBags !== undefined ? lastRecord.feedConsumptionBags : (lastRecord.feedConsumption ? Math.floor(lastRecord.feedConsumption / KG_PER_BAG) : 0);
     lastRecordLooseKg = lastRecord.additionalLooseKg !== undefined && lastRecord.additionalLooseKg !== null ? lastRecord.additionalLooseKg : (lastRecord.feedConsumption ? parseFloat((lastRecord.feedConsumption % KG_PER_BAG).toFixed(1)) : 0);
     lastRecordTotalKg = Number(lastRecord.feedConsumption || ((lastRecordBags * KG_PER_BAG) + lastRecordLooseKg));
-    const chicksCount = Number(lastRecord.remainingChickCount || selectedBatch?.remainingChickCount || selectedBatch?.initialChickCount || 5000);
+    const chicksCount = Number(runningFlockMap[lastRecord.recordDate] ?? lastRecord.remainingChickCount ?? selectedBatch?.remainingChickCount ?? selectedBatch?.initialChickCount ?? 5000);
     lastRecordPerBirdGram = chicksCount > 0 ? Math.round((lastRecordTotalKg * 1000) / chicksCount) : 0;
     lastRecordWeightDiff = Number(lastRecord.averageWeight || 0) - lastRecordTargetWeightGram;
   }
@@ -416,7 +454,7 @@ export const DailyRecordsPage = () => {
     viewingBags = viewingRecord.feedConsumptionBags !== undefined ? viewingRecord.feedConsumptionBags : (viewingRecord.feedConsumption ? Math.floor(viewingRecord.feedConsumption / KG_PER_BAG) : 0);
     viewingLooseKg = viewingRecord.additionalLooseKg || (viewingRecord.feedConsumption ? parseFloat((viewingRecord.feedConsumption % KG_PER_BAG).toFixed(1)) : 0);
     viewingTotalKg = Number(viewingRecord.feedConsumption || ((viewingBags * KG_PER_BAG) + viewingLooseKg));
-    viewingChicks = Number(viewingRecord.remainingChickCount || selectedBatch?.remainingChickCount || selectedBatch?.initialChickCount || 5000);
+    viewingChicks = Number(runningFlockMap[viewingRecord.recordDate] ?? viewingRecord.remainingChickCount ?? selectedBatch?.remainingChickCount ?? selectedBatch?.initialChickCount ?? 5000);
     viewingPerBirdEat = viewingChicks > 0 ? Math.round((viewingTotalKg * 1000) / viewingChicks) : 0;
     viewingEatDiff = viewingPerBirdEat - viewingTargetIntake;
     viewingWeightDiff = Number(viewingRecord.averageWeight || 0) - viewingTargetWeight;
@@ -1067,7 +1105,7 @@ export const DailyRecordsPage = () => {
                   const bags = r.feedConsumptionBags !== undefined ? r.feedConsumptionBags : (r.feedConsumption ? Math.floor(r.feedConsumption / KG_PER_BAG) : 0);
                   const looseKg = r.additionalLooseKg !== undefined && r.additionalLooseKg !== null ? r.additionalLooseKg : (r.feedConsumption ? parseFloat((r.feedConsumption % KG_PER_BAG).toFixed(1)) : 0);
                   const totalKg = Number(r.feedConsumption || ((bags * KG_PER_BAG) + looseKg));
-                  const chickCount = Number(r.remainingChickCount || selectedBatch?.remainingChickCount || selectedBatch?.initialChickCount || 5000);
+                  const chickCount = Number(runningFlockMap[r.recordDate] ?? r.remainingChickCount ?? selectedBatch?.remainingChickCount ?? selectedBatch?.initialChickCount ?? 5000);
                   const perBirdEat = chickCount > 0 ? Math.round((totalKg * 1000) / chickCount) : 0;
 
                   let rAgeDay = 1;
@@ -1155,7 +1193,7 @@ export const DailyRecordsPage = () => {
               const bags = r.feedConsumptionBags !== undefined ? r.feedConsumptionBags : (r.feedConsumption ? Math.floor(r.feedConsumption / KG_PER_BAG) : 0);
               const looseKg = r.additionalLooseKg !== undefined && r.additionalLooseKg !== null ? r.additionalLooseKg : (r.feedConsumption ? parseFloat((r.feedConsumption % KG_PER_BAG).toFixed(1)) : 0);
               const totalKg = Number(r.feedConsumption || ((bags * KG_PER_BAG) + looseKg));
-              const chickCount = Number(r.remainingChickCount || selectedBatch?.remainingChickCount || selectedBatch?.initialChickCount || 5000);
+              const chickCount = Number(runningFlockMap[r.recordDate] ?? r.remainingChickCount ?? selectedBatch?.remainingChickCount ?? selectedBatch?.initialChickCount ?? 5000);
 
               return (
                 <div

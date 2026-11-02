@@ -206,7 +206,6 @@ export const ReportsPage = () => {
   const isBatchDone = (selectedBatch?.status || '').toLowerCase() === 'completed';
   const totalMortality = dailyRecords.reduce((sum, r) => sum + (r.mortalityCount || 0), 0);
   const latestRecord = dailyRecords.length > 0 ? dailyRecords[dailyRecords.length - 1] : null;
-  const latestLiveBirds = latestRecord?.remainingChickCount ?? selectedBatch?.initialChickCount ?? 0;
 
   // Dispatches calculations for selected batch
   const batchDispatches = dispatches.filter(d => d.batchId === selectedBatchId);
@@ -217,6 +216,10 @@ export const ReportsPage = () => {
     const setBirds = loadedSets.reduce((sum, s) => sum + Number(s.chickenCount || 0), 0);
     return acc + (setBirds > 0 ? setBirds : Number(d.birdsCount || d.totalBirds || 0));
   }, 0);
+
+  const batchLiveBirds = selectedBatch?.remainingChickCount !== undefined
+    ? Number(selectedBatch.remainingChickCount)
+    : Math.max(0, (Number(selectedBatch?.initialChickCount) || 0) - totalMortality - totalDispatchedBirds);
 
   const totalDispatchedWeight = batchDispatches.reduce((acc, d) => {
     const setsRaw = d.boxSets || [];
@@ -256,8 +259,8 @@ export const ReportsPage = () => {
     : (latestRecord?.averageWeight || 0);
 
   const displayLiveBirdsVal = isBatchDone
-    ? (totalDispatchedBirds > 0 ? totalDispatchedBirds : latestLiveBirds)
-    : latestLiveBirds;
+    ? (totalDispatchedBirds > 0 ? totalDispatchedBirds : batchLiveBirds)
+    : batchLiveBirds;
 
   const displayLiveBirdsLabel = isBatchDone
     ? (language === 'ta' ? 'விற்பனை கோழிகள்' : 'DISPATCHED BIRDS')
@@ -294,7 +297,7 @@ export const ReportsPage = () => {
     const mortRate = initialChicks > 0 ? parseFloat(((bMortality / initialChicks) * 100).toFixed(2)) : 0;
 
     const bLatestRec = bDailyRecs.length > 0 ? bDailyRecs[bDailyRecs.length - 1] : null;
-    const liveBirds = bLatestRec?.remainingChickCount ?? initialChicks;
+    const liveBirds = b.remainingChickCount !== undefined ? Number(b.remainingChickCount) : (bLatestRec?.remainingChickCount ?? initialChicks);
 
     const bArrivedBags = bFeedArr.reduce((acc, f) => {
       const isReturn = f.transactionType === 'Return';

@@ -19,9 +19,19 @@ export const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
     const unsubscribe = dbSubscribeToBatches(() => {
-      loadData();
+      if (isMounted) loadData();
     });
+
+    const handleDataUpdated = () => {
+      if (isMounted) loadData();
+    };
+
+    window.addEventListener('kg_records_updated', handleDataUpdated);
+    window.addEventListener('kg_batches_updated', handleDataUpdated);
+    window.addEventListener('kg_sync_completed', handleDataUpdated);
+
     async function loadData() {
       try {
         const [bList, uList, dList, lList] = await Promise.all([
@@ -30,6 +40,7 @@ export const AdminDashboard = () => {
           dbGetDispatches(),
           dbGetAuditLogs()
         ]);
+        if (!isMounted) return;
         setBatches(bList);
         setUsers(uList);
         setDispatches(dList);
@@ -59,11 +70,17 @@ export const AdminDashboard = () => {
       } catch (err) {
         console.error('Failed loading admin dashboard data:', err);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     }
     loadData();
-    return () => unsubscribe();
+    return () => {
+      isMounted = false;
+      unsubscribe();
+      window.removeEventListener('kg_records_updated', handleDataUpdated);
+      window.removeEventListener('kg_batches_updated', handleDataUpdated);
+      window.removeEventListener('kg_sync_completed', handleDataUpdated);
+    };
   }, []);
 
   const activeBatches = batches.filter(b => b.status === 'Active');
