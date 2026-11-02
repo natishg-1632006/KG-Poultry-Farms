@@ -145,8 +145,8 @@ export const MedicinePage = () => {
 
     if (record.recordType === 'Medicine') {
       setMedicineName(record.medicineName || '');
-      setMedicineQty(record.medicineQuantity || '');
-      setMedicineUnit(record.medicineUnit || 'ml');
+      setMedicineQty(record.quantity ?? record.medicineQuantity ?? record.dosage ?? '');
+      setMedicineUnit(record.unit ?? record.medicineUnit ?? 'ml');
     } else {
       setVaccinesList(record.vaccines && record.vaccines.length > 0 ? record.vaccines : [{ name: '', quantity: '', unit: 'ml' }]);
       setVaccinatorsList(record.vaccinatorNames && record.vaccinatorNames.length > 0 ? record.vaccinatorNames : ['']);
@@ -230,6 +230,8 @@ export const MedicinePage = () => {
         recordObj.medicineName = medicineName.trim();
         recordObj.medicineQuantity = medicineQty;
         recordObj.medicineUnit = medicineUnit;
+        recordObj.quantity = medicineQty;
+        recordObj.unit = medicineUnit;
       } else {
         const validVaccines = vaccinesList.filter(v => v.name && v.name.trim() !== '');
         if (validVaccines.length === 0) {
@@ -556,7 +558,7 @@ export const MedicinePage = () => {
                 vaccineRecords.map((r) => {
                   const vaccineList = (r.vaccines && r.vaccines.length > 0)
                     ? r.vaccines
-                    : (r.medicineName ? [{ name: r.medicineName, quantity: r.dosage || r.medicineQuantity, unit: r.medicineUnit || '' }] : []);
+                    : (r.medicineName ? [{ name: r.medicineName, quantity: r.quantity ?? r.medicineQuantity ?? r.dosage, unit: r.unit ?? r.medicineUnit ?? '' }] : []);
                   const notesText = r.reason || r.notes || '';
 
                   return (
@@ -670,7 +672,7 @@ export const MedicinePage = () => {
                     vaccineRecords.map((r) => {
                       const vaccineList = (r.vaccines && r.vaccines.length > 0)
                         ? r.vaccines
-                        : (r.medicineName ? [{ name: r.medicineName, quantity: r.dosage || r.medicineQuantity, unit: r.medicineUnit || '' }] : []);
+                        : (r.medicineName ? [{ name: r.medicineName, quantity: r.quantity ?? r.medicineQuantity ?? r.dosage, unit: r.unit ?? r.medicineUnit ?? '' }] : []);
                       const notesText = r.reason || r.notes || '';
 
                       return (
@@ -797,7 +799,7 @@ export const MedicinePage = () => {
                           {language === 'ta' ? 'அளவு' : 'Quantity'}
                         </span>
                         <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200/60 inline-block">
-                          {r.quantity} {formatMedicineUnit(r.unit)}
+                          {(r.quantity ?? r.medicineQuantity ?? r.dosage) || '-'} {formatMedicineUnit(r.unit ?? r.medicineUnit)}
                         </span>
                       </div>
                     </div>
@@ -844,7 +846,7 @@ export const MedicinePage = () => {
                         <td className="py-3 px-2 font-bold text-slate-900">{r.date}</td>
                         <td className="py-3 px-2 font-bold text-teal-800">{r.medicineName}</td>
                         <td className="py-3 px-2 font-bold text-slate-700">
-                          {r.quantity} <span className="font-normal text-slate-500">{formatMedicineUnit(r.unit)}</span>
+                          {(r.quantity ?? r.medicineQuantity ?? r.dosage) || '-'} <span className="font-normal text-slate-500">{formatMedicineUnit(r.unit ?? r.medicineUnit)}</span>
                         </td>
                         <td className="py-3 px-2 text-slate-600">{r.reason}</td>
                         <td className="py-3 px-2 text-right">
@@ -997,7 +999,7 @@ export const MedicinePage = () => {
                       {language === 'ta' ? 'அளவு' : 'Dosage / Quantity'}
                     </span>
                     <span className="text-sm font-black text-emerald-950">
-                      {viewingRecordDetail.quantity} {formatMedicineUnit(viewingRecordDetail.unit)}
+                      {(viewingRecordDetail.quantity ?? viewingRecordDetail.medicineQuantity ?? viewingRecordDetail.dosage) || '-'} {formatMedicineUnit(viewingRecordDetail.unit ?? viewingRecordDetail.medicineUnit)}
                     </span>
                   </div>
                 </div>

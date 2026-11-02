@@ -1490,8 +1490,8 @@ export const BatchHistoryPage = () => {
                                       .filter(Boolean);
                                     if (dList.length > 0) dosageStr = dList.join(', ');
                                   }
-                                  if (dosageStr === '—' && (m.quantity || m.dosage)) {
-                                    dosageStr = `${m.quantity || m.dosage || ''} ${m.unit || ''}`.trim();
+                                  if (dosageStr === '—' && (m.quantity || m.dosage || m.medicineQuantity)) {
+                                    dosageStr = `${m.quantity || m.medicineQuantity || m.dosage || ''} ${m.unit || m.medicineUnit || ''}`.trim();
                                   }
 
                                   let adminStr = '—';
@@ -1551,8 +1551,8 @@ export const BatchHistoryPage = () => {
                                   .filter(Boolean);
                                 if (dList.length > 0) dosageStr = dList.join(', ');
                               }
-                              if (dosageStr === '—' && (m.quantity || m.dosage)) {
-                                dosageStr = `${m.quantity || m.dosage || ''} ${m.unit || ''}`.trim();
+                              if (dosageStr === '—' && (m.quantity || m.dosage || m.medicineQuantity)) {
+                                dosageStr = `${m.quantity || m.medicineQuantity || m.dosage || ''} ${m.unit || m.medicineUnit || ''}`.trim();
                               }
 
                               let adminStr = '—';

@@ -658,7 +658,7 @@ export const BatchReportModal = ({
                               <td style={{ color: '#0f172a' }} className="py-2.5 px-3 font-bold">{m.date || m.createdAt?.split('T')[0] || arrivalDate}</td>
                               <td className="py-2.5 px-3 font-semibold">{m.birdAge ? `Day ${m.birdAge}` : 'Day 1'}</td>
                               <td style={{ color: '#0f172a' }} className="py-2.5 px-3 font-extrabold">{m.name || m.medicineName || 'Vaccine'}</td>
-                              <td className="py-2.5 px-3 font-medium">{m.dosage || m.quantity || '100 ml'}</td>
+                              <td className="py-2.5 px-3 font-medium">{m.quantity ? `${m.quantity} ${m.unit || ''}`.trim() : (m.medicineQuantity ? `${m.medicineQuantity} ${m.medicineUnit || ''}`.trim() : (m.dosage || '100 ml'))}</td>
                               <td className="py-2.5 px-3 font-medium">{m.administeredBy || 'Authorized Staff'}</td>
                               <td style={{ color: '#475569' }} className="py-2.5 px-3 italic">{m.notes || m.clinicalNotes || 'Normal'}</td>
                             </tr>
