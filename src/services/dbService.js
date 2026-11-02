@@ -837,9 +837,6 @@ export async function dbGetDailyRecords(batchId, forceCloud = false) {
         if (!freshLocal.dailyRecords) freshLocal.dailyRecords = {};
         freshLocal.dailyRecords[batchId] = { ...(freshLocal.dailyRecords[batchId] || {}), ...data };
         saveLocalDB(freshLocal);
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { batchId } }));
-        }
         return freshLocal.dailyRecords[batchId];
       }
     } catch (err) {
@@ -944,9 +941,6 @@ export async function dbGetFeedArrivals(batchId, forceCloud = false) {
           freshLocal.batches[batchId].feedStock = computeBatchFeedStock(batchId, freshLocal);
         }
         saveLocalDB(freshLocal);
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { batchId } }));
-        }
         return list;
       }
     } catch (err) {
@@ -1067,9 +1061,6 @@ export async function dbGetMedicineRecords(batchId, forceCloud = false) {
         if (!freshLocal.medicineRecords) freshLocal.medicineRecords = {};
         freshLocal.medicineRecords[batchId] = list;
         saveLocalDB(freshLocal);
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { batchId, medicine: true } }));
-        }
         return list;
       }
     } catch (err) {
@@ -1184,10 +1175,6 @@ export async function dbGetDispatches(forceCloud = false) {
         currentLocal.boxSets = boxSetsSnap.val() || {};
       }
       saveLocalDB(currentLocal);
-
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('kg_records_updated', { detail: { dispatchesUpdated: true } }));
-      }
       return formatDispatchesList(cloudList.length > 0 ? cloudList : Object.values(currentLocal.dispatches || {}), currentLocal.boxSets || {});
     } catch (err) {
       console.warn('dbGetDispatches background cloud sync warning:', err);

@@ -2,27 +2,13 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Modal } from './Modal';
-import { LogOut, Menu, AlertTriangle, RefreshCw } from 'lucide-react';
-import { dbForceSyncAll } from '../../services/dbService';
+import { LogOut, Menu, AlertTriangle } from 'lucide-react';
 
 export const Header = ({ onToggleSidebar }) => {
   const { userProfile, logout } = useAuth();
   const { t } = useLanguage();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-
-  const handleCloudSync = async () => {
-    if (syncing) return;
-    setSyncing(true);
-    try {
-      await dbForceSyncAll();
-    } catch (_e) {
-      console.warn('Sync notice:', _e);
-    } finally {
-      setTimeout(() => setSyncing(false), 600);
-    }
-  };
 
   const handleConfirmLogout = async () => {
     setLoggingOut(true);
@@ -62,17 +48,6 @@ export const Header = ({ onToggleSidebar }) => {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          <button
-            type="button"
-            onClick={handleCloudSync}
-            disabled={syncing}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200/90 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700 transition-all active:scale-95 cursor-pointer shadow-2xs"
-            title="Sync live data with cloud"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 text-emerald-600 ${syncing ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">{syncing ? 'Syncing...' : 'Cloud Sync'}</span>
-          </button>
-
           {userProfile && (
             <button
               onClick={() => setShowLogoutModal(true)}

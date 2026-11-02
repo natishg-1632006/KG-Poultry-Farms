@@ -64,23 +64,6 @@ export const MedicinePage = () => {
     }
   }, [selectedBatchId]);
 
-  useEffect(() => {
-    const handleUpdates = () => {
-      if (selectedBatchId) {
-        loadRecords(selectedBatchId);
-      }
-    };
-    const handleBatchUpdates = () => {
-      loadBatches();
-    };
-    window.addEventListener('kg_records_updated', handleUpdates);
-    window.addEventListener('kg_batches_updated', handleBatchUpdates);
-    return () => {
-      window.removeEventListener('kg_records_updated', handleUpdates);
-      window.removeEventListener('kg_batches_updated', handleBatchUpdates);
-    };
-  }, [selectedBatchId]);
-
   async function loadBatches() {
     try {
       setLoading(true);

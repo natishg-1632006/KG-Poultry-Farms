@@ -39,18 +39,9 @@ export const FarmerDashboard = () => {
       }
     });
 
-    const handleRecordUpdated = () => {
-      if (isMounted) {
-        loadFarmerData();
-      }
-    };
-
-    window.addEventListener('kg_records_updated', handleRecordUpdated);
-
     return () => {
       isMounted = false;
       unsubscribe();
-      window.removeEventListener('kg_records_updated', handleRecordUpdated);
     };
   }, [userProfile]);
 
@@ -201,39 +192,39 @@ export const FarmerDashboard = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-        <div className="flex items-center justify-between">
-          <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900">{t('farmerPortal')}</h1>
-        </div>
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900 truncate shrink-0">
+          {t('farmerPortal')}
+        </h1>
 
-        {/* If Active Batch exists: Show exact badge just like before, NO dropdown! */}
+        {/* If Active Batch exists: Show compact badge */}
         {hasLiveActiveBatch && activeBatch && (
-          <div className="inline-flex items-center gap-1.5 sm:gap-2 rounded-xl bg-emerald-50 border border-emerald-200/80 px-2.5 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-bold text-emerald-900 shadow-2xs self-start sm:self-auto shrink-0">
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 rounded-xl bg-emerald-50 border border-emerald-200/80 px-2.5 py-1.5 text-[11px] sm:text-xs font-bold text-emerald-900 shadow-2xs shrink-0">
             <span>{t('batchNumber')}: <strong className="text-emerald-800 font-extrabold">{activeBatch.batchNumber}</strong> • Day {flockAgeDays}</span>
             <Badge variant={activeBatch.status} className="text-[10px] px-1.5 py-0.5">{activeBatch.status}</Badge>
           </div>
         )}
 
-        {/* If NO Active Batch exists: Show a beautifully styled, compact, mobile-friendly batch selector pill */}
+        {/* If NO Active Batch exists: Show a sleek, compact, elegant batch selector pill */}
         {!hasLiveActiveBatch && assignedBatches.length > 0 && (
-          <div className="inline-flex items-center gap-1.5 self-start sm:self-auto max-w-full rounded-xl bg-white border border-slate-200/90 py-1 px-2.5 shadow-2xs">
+          <div className="relative inline-flex items-center gap-1.5 rounded-xl bg-white border border-slate-200/90 py-1 px-2 shadow-2xs shrink-0 max-w-[55%] sm:max-w-xs">
             <Layers className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-            <div className="relative flex items-center min-w-0">
+            <div className="relative flex items-center min-w-0 flex-1">
               <select
                 value={activeBatch?.id || ''}
                 onChange={(e) => loadFarmerData(e.target.value)}
-                className="appearance-none bg-transparent pr-5 pl-0 py-0.5 text-xs font-extrabold text-slate-800 focus:outline-hidden cursor-pointer max-w-[185px] sm:max-w-xs truncate"
+                className="appearance-none bg-transparent pr-4 pl-0 py-0.5 text-xs font-extrabold text-slate-800 focus:outline-hidden cursor-pointer w-full truncate"
               >
                 {assignedBatches.map(b => (
                   <option key={b.id} value={b.id} className="text-slate-900 font-semibold bg-white">
-                    {b.batchNumber} {b.batchName ? `• ${b.batchName}` : ''}
+                    {b.batchNumber} {b.batchName ? `• ${b.batchName}` : ''} ({b.status === 'Completed' ? (language === 'ta' ? 'முடிந்தது' : 'Done') : b.status})
                   </option>
                 ))}
               </select>
-              <ChevronDown className="pointer-events-none absolute right-0 h-3.5 w-3.5 text-slate-400" />
+              <ChevronDown className="pointer-events-none absolute right-0 h-3 w-3 text-slate-400" />
             </div>
             {activeBatch && (
-              <Badge variant={activeBatch.status} className="shrink-0 text-[10px] px-1.5 py-0.5">
+              <Badge variant={activeBatch.status} className="hidden sm:inline-flex shrink-0 text-[10px] px-1.5 py-0.5">
                 {activeBatch.status === 'Completed' ? (language === 'ta' ? 'முடிந்தது' : 'Done') : activeBatch.status}
               </Badge>
             )}
