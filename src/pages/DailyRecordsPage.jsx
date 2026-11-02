@@ -128,26 +128,6 @@ export const DailyRecordsPage = () => {
       setRecordsMap(map || {});
       setDispatches((dispList || []).filter(d => d.batchId === bId));
       setFeedArrivals(feedList || []);
-      if (map && map[todayStr]) {
-        const r = map[todayStr];
-        const bags = r.feedConsumptionBags !== undefined ? r.feedConsumptionBags : (r.feedConsumption ? Math.floor(r.feedConsumption / KG_PER_BAG) : '');
-        const looseKg = r.additionalLooseKg !== undefined && r.additionalLooseKg !== null ? r.additionalLooseKg : (r.feedConsumption ? parseFloat((r.feedConsumption % KG_PER_BAG).toFixed(1)) : '');
-        setFormData({
-          recordDate: r.recordDate,
-          mortalityCount: r.mortalityCount !== undefined ? r.mortalityCount : '',
-          feedConsumptionBags: bags !== 0 ? bags : '',
-          additionalLooseKg: looseKg > 0 ? looseKg : '',
-          averageWeight: r.averageWeight !== undefined ? r.averageWeight : ''
-        });
-      } else {
-        setFormData({
-          recordDate: todayStr,
-          mortalityCount: '',
-          feedConsumptionBags: '',
-          additionalLooseKg: '',
-          averageWeight: ''
-        });
-      }
     } catch (err) {
       console.error('Failed loading daily records:', err);
     } finally {
@@ -161,13 +141,26 @@ export const DailyRecordsPage = () => {
   const handleOpenNewForm = () => {
     setErrorMsg('');
     setSuccessMsg('');
-    setFormData({
-      recordDate: todayStr,
-      mortalityCount: '',
-      feedConsumptionBags: '',
-      additionalLooseKg: '',
-      averageWeight: ''
-    });
+    if (recordsMap && recordsMap[todayStr]) {
+      const r = recordsMap[todayStr];
+      const bags = r.feedConsumptionBags !== undefined ? r.feedConsumptionBags : (r.feedConsumption ? Math.floor(r.feedConsumption / KG_PER_BAG) : '');
+      const looseKg = r.additionalLooseKg !== undefined && r.additionalLooseKg !== null ? r.additionalLooseKg : (r.feedConsumption ? parseFloat((r.feedConsumption % KG_PER_BAG).toFixed(1)) : '');
+      setFormData({
+        recordDate: r.recordDate,
+        mortalityCount: r.mortalityCount !== undefined ? r.mortalityCount : '',
+        feedConsumptionBags: bags !== 0 ? bags : '',
+        additionalLooseKg: looseKg > 0 ? looseKg : '',
+        averageWeight: r.averageWeight !== undefined ? r.averageWeight : ''
+      });
+    } else {
+      setFormData({
+        recordDate: todayStr,
+        mortalityCount: '',
+        feedConsumptionBags: '',
+        additionalLooseKg: '',
+        averageWeight: ''
+      });
+    }
     setShowForm(true);
   };
 
@@ -767,9 +760,11 @@ export const DailyRecordsPage = () => {
                 type="button"
                 disabled={isReadOnly || (Number(formData.mortalityCount || 0) <= 0)}
                 onClick={() => {
-                  const current = Number(formData.mortalityCount || 0);
-                  const nextVal = Math.max(0, current - 1);
-                  setFormData({ ...formData, mortalityCount: nextVal.toString() });
+                  setFormData(prev => {
+                    const current = Number(prev.mortalityCount || 0);
+                    const nextVal = Math.max(0, current - 1);
+                    return { ...prev, mortalityCount: nextVal.toString() };
+                  });
                 }}
                 className="flex items-center justify-center px-4 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-bold text-lg select-none"
                 aria-label="Decrease mortality"
@@ -782,7 +777,10 @@ export const DailyRecordsPage = () => {
                 min="0"
                 disabled={isReadOnly}
                 value={formData.mortalityCount}
-                onChange={(e) => setFormData({ ...formData, mortalityCount: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFormData(prev => ({ ...prev, mortalityCount: val }));
+                }}
                 placeholder={language === 'ta' ? 'எ.கா. 0' : 'e.g. 0'}
                 className="w-full text-center py-2.5 px-3 text-sm font-bold text-slate-900 border-x border-slate-200 focus:outline-none disabled:bg-slate-50"
               />
@@ -790,9 +788,11 @@ export const DailyRecordsPage = () => {
                 type="button"
                 disabled={isReadOnly}
                 onClick={() => {
-                  const current = Number(formData.mortalityCount || 0);
-                  const nextVal = current + 1;
-                  setFormData({ ...formData, mortalityCount: nextVal.toString() });
+                  setFormData(prev => {
+                    const current = Number(prev.mortalityCount || 0);
+                    const nextVal = current + 1;
+                    return { ...prev, mortalityCount: nextVal.toString() };
+                  });
                 }}
                 className="flex items-center justify-center px-4 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-bold text-lg select-none"
                 aria-label="Increase mortality"
@@ -818,9 +818,11 @@ export const DailyRecordsPage = () => {
                     type="button"
                     disabled={isReadOnly || (Number(formData.feedConsumptionBags || 0) <= 0)}
                     onClick={() => {
-                      const current = Number(formData.feedConsumptionBags || 0);
-                      const nextVal = Math.max(0, current - 1);
-                      setFormData({ ...formData, feedConsumptionBags: nextVal.toString() });
+                      setFormData(prev => {
+                        const current = Number(prev.feedConsumptionBags || 0);
+                        const nextVal = Math.max(0, current - 1);
+                        return { ...prev, feedConsumptionBags: nextVal.toString() };
+                      });
                     }}
                     className="flex items-center justify-center px-4 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-bold text-lg select-none"
                     aria-label="Decrease feed bags"
@@ -833,7 +835,10 @@ export const DailyRecordsPage = () => {
                     step="1"
                     disabled={isReadOnly}
                     value={formData.feedConsumptionBags}
-                    onChange={(e) => setFormData({ ...formData, feedConsumptionBags: e.target.value })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormData(prev => ({ ...prev, feedConsumptionBags: val }));
+                    }}
                     placeholder={language === 'ta' ? 'எ.கா. 2' : 'e.g. 2'}
                     className="w-full text-center py-2 px-3 text-sm font-bold text-slate-900 border-x border-slate-200 focus:outline-none disabled:bg-slate-50"
                   />
@@ -841,9 +846,11 @@ export const DailyRecordsPage = () => {
                     type="button"
                     disabled={isReadOnly}
                     onClick={() => {
-                      const current = Number(formData.feedConsumptionBags || 0);
-                      const nextVal = current + 1;
-                      setFormData({ ...formData, feedConsumptionBags: nextVal.toString() });
+                      setFormData(prev => {
+                        const current = Number(prev.feedConsumptionBags || 0);
+                        const nextVal = current + 1;
+                        return { ...prev, feedConsumptionBags: nextVal.toString() };
+                      });
                     }}
                     className="flex items-center justify-center px-4 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-bold text-lg select-none"
                     aria-label="Increase feed bags"
@@ -862,7 +869,10 @@ export const DailyRecordsPage = () => {
                   step="0.5"
                   disabled={isReadOnly}
                   value={formData.additionalLooseKg}
-                  onChange={(e) => setFormData({ ...formData, additionalLooseKg: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormData(prev => ({ ...prev, additionalLooseKg: val }));
+                  }}
                   placeholder={language === 'ta' ? 'எ.கா. 15' : 'e.g. 15'}
                   className="w-full rounded-xl border border-slate-200 py-2 px-3 text-sm font-bold text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
                 />
@@ -895,7 +905,10 @@ export const DailyRecordsPage = () => {
               step="1"
               disabled={isReadOnly}
               value={formData.averageWeight}
-              onChange={(e) => setFormData({ ...formData, averageWeight: e.target.value })}
+              onChange={(e) => {
+                const val = e.target.value;
+                setFormData(prev => ({ ...prev, averageWeight: val }));
+              }}
               placeholder={language === 'ta' ? 'எ.கா. 58' : 'e.g. 58'}
               className="w-full rounded-xl border border-slate-200 py-2.5 px-3 text-xs font-medium text-slate-900 focus:border-emerald-600 disabled:bg-slate-50"
             />

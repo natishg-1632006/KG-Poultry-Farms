@@ -523,9 +523,11 @@ export const FeedPage = () => {
                     type="button"
                     disabled={Number(formData.bagsReceived || 0) <= 0}
                     onClick={() => {
-                      const current = Number(formData.bagsReceived || 0);
-                      const nextVal = Math.max(0, current - 1);
-                      setFormData({ ...formData, bagsReceived: nextVal });
+                      setFormData(prev => {
+                        const current = Number(prev.bagsReceived || 0);
+                        const nextVal = Math.max(0, current - 1);
+                        return { ...prev, bagsReceived: nextVal };
+                      });
                     }}
                     className="flex items-center justify-center px-4 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-bold text-lg select-none"
                     aria-label="Decrease bags"
@@ -537,16 +539,21 @@ export const FeedPage = () => {
                     min="0"
                     step="1"
                     value={formData.bagsReceived}
-                    onChange={(e) => setFormData({ ...formData, bagsReceived: e.target.value !== '' ? Number(e.target.value) : '' })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormData(prev => ({ ...prev, bagsReceived: val !== '' ? Number(val) : '' }));
+                    }}
                     placeholder={language === 'ta' ? 'எ.கா. 7' : 'e.g. 7'}
                     className="w-full text-center py-2.5 px-3 text-sm font-bold text-slate-900 border-x border-slate-200 focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => {
-                      const current = Number(formData.bagsReceived || 0);
-                      const nextVal = current + 1;
-                      setFormData({ ...formData, bagsReceived: nextVal });
+                      setFormData(prev => {
+                        const current = Number(prev.bagsReceived || 0);
+                        const nextVal = current + 1;
+                        return { ...prev, bagsReceived: nextVal };
+                      });
                     }}
                     className="flex items-center justify-center px-4 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-bold text-lg select-none"
                     aria-label="Increase bags"
