@@ -348,7 +348,9 @@ export const FeedPage = () => {
           arrivedValue={`${totalArrivedBags} Bags`}
           subtext={totalReturnedBags > 0 ? (language === 'ta' ? `மொத்தம் • ${totalReturnedBags} திரும்பியது` : `Total • ${totalReturnedBags} Returned`) : (language === 'ta' ? 'அனைத்து வகைகளும் அடங்கிய மொத்த இருப்பு' : 'All feed categories combined')}
           icon={Wheat}
-          color="emerald"
+          color="purple"
+          highlighted={true}
+          badgeText={language === 'ta' ? 'முதன்மை இருப்பு' : 'Master Stock'}
         />
         <StatCard
           title={t('preStarterStock')}
