@@ -1819,15 +1819,22 @@ export async function dbGetBatchHistoryData(batchId) {
       if (!traderMap[traderName]) {
         traderMap[traderName] = {
           name: traderName,
+          traderName: traderName,
           birdsCount: 0,
+          totalBirds: 0,
           totalWeight: 0,
           cratesCount: 0,
+          totalCrates: 0,
+          dispatchCount: 0,
           totalAmount: 0
         };
       }
       traderMap[traderName].birdsCount += dBirds;
+      traderMap[traderName].totalBirds += dBirds;
       traderMap[traderName].totalWeight += dWeight;
       traderMap[traderName].cratesCount += dCrates;
+      traderMap[traderName].totalCrates += dCrates;
+      traderMap[traderName].dispatchCount += 1;
       if (inv && inv.totalAmount) {
         traderMap[traderName].totalAmount += Number(inv.totalAmount);
       }
@@ -1841,10 +1848,13 @@ export async function dbGetBatchHistoryData(batchId) {
       });
     }
 
-    const traderBreakdown = Object.values(traderMap).map(t => ({
-      ...t,
-      avgWeight: t.birdsCount > 0 ? parseFloat((t.totalWeight / t.birdsCount).toFixed(3)) : 0
-    }));
+    const traderBreakdown = Object.values(traderMap).map(t => {
+      const birds = t.totalBirds || t.birdsCount || 0;
+      return {
+        ...t,
+        avgWeight: birds > 0 ? parseFloat((t.totalWeight / birds).toFixed(3)) : 0
+      };
+    });
 
     const avgBirdWeight = totalDispatchedBirds > 0
       ? parseFloat((totalDispatchedWeight / totalDispatchedBirds).toFixed(3))

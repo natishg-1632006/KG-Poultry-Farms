@@ -276,7 +276,7 @@ export const BatchHistoryPage = () => {
   // Dispatches for selected trader in full-page detail view
   const traderDispatches = selectedTraderDetail
     ? (historyData?.dispatches || []).filter(
-        d => (d.vehicleName || d.customerName || d.traderName || 'General Trader') === selectedTraderDetail.traderName
+        d => (d.vehicleName || d.customerName || d.traderName || 'General Trader') === (selectedTraderDetail.traderName || selectedTraderDetail.name)
       )
     : [];
 
@@ -1157,49 +1157,59 @@ export const BatchHistoryPage = () => {
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-200 bg-white">
-                                {paginatedTraders.map((t, idx) => (
-                                  <tr
-                                    key={idx}
-                                    onClick={() => handleOpenTraderDetail(t)}
-                                    className="hover:bg-emerald-50/70 cursor-pointer transition-colors group"
-                                    title={language === 'ta' ? 'முழுமையான பெட்டிகள் விவரங்களை பார்க்க கிளிக் செய்க' : 'Click to view complete box & set breakdown'}
-                                  >
-                                    <td className="px-4 py-3.5 font-bold text-slate-900 flex items-center gap-2 whitespace-nowrap">
-                                      <div className="h-7 w-7 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-black text-xs group-hover:bg-emerald-600 group-hover:text-white transition-colors shrink-0">
-                                        {t.traderName.charAt(0).toUpperCase()}
-                                      </div>
-                                      <span className="group-hover:text-emerald-800 font-black truncate">{t.traderName}</span>
-                                    </td>
-                                    <td className="px-4 py-3.5 text-right font-semibold text-slate-600 whitespace-nowrap">{t.dispatchCount}</td>
-                                    <td className="px-4 py-3.5 text-right font-extrabold text-slate-900 whitespace-nowrap">{t.totalBirds.toLocaleString()}{language === 'ta' ? '' : ' birds'}</td>
-                                    <td className="px-4 py-3.5 text-right font-black text-emerald-800 whitespace-nowrap">{t.totalWeight.toLocaleString()} kg</td>
-                                    <td className="px-4 py-3.5 text-right font-extrabold text-purple-700 whitespace-nowrap">{t.avgWeight} kg</td>
-                                    <td className="px-4 py-3.5 text-right font-semibold text-slate-600 whitespace-nowrap">{t.totalCrates}</td>
-                                    <td className="px-4 py-3.5 text-center print:hidden whitespace-nowrap">
-                                      <div className="flex items-center justify-center gap-2">
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            const traderDisp = (historyData.dispatches || []).find(
-                                              d => (d.vehicleName || d.customerName || d.traderName || 'General Trader') === t.traderName
-                                            );
-                                            if (traderDisp) handleOpenInvoice(traderDisp);
-                                          }}
-                                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 hover:bg-emerald-600 hover:text-white px-2.5 py-1 text-[11px] font-extrabold text-emerald-900 transition-colors shadow-2xs cursor-pointer whitespace-nowrap"
-                                          title="Download Invoice PDF"
-                                        >
-                                          <FileText className="h-3.5 w-3.5 shrink-0" />
-                                          <span>{language === 'ta' ? 'ரசீது' : 'Invoice'}</span>
-                                        </button>
+                                {paginatedTraders.map((t, idx) => {
+                                  const displayName = t.traderName || t.name || 'General Trader';
+                                  const initialChar = ((displayName || 'T')[0] || 'T').toUpperCase();
+                                  const birds = t.totalBirds || t.birdsCount || 0;
+                                  const crates = t.totalCrates || t.cratesCount || 0;
+                                  const dispatchesCount = t.dispatchCount || 1;
+                                  const weight = t.totalWeight || 0;
+                                  const avgWeight = t.avgWeight || (birds > 0 ? (weight / birds).toFixed(3) : 0);
 
-                                        <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-extrabold text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white transition-colors whitespace-nowrap">
-                                          <span>{language === 'ta' ? 'பெட்டிகள் பார்' : 'View Sets'}</span>
-                                          <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-                                        </span>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                ))}
+                                  return (
+                                    <tr
+                                      key={idx}
+                                      onClick={() => handleOpenTraderDetail(t)}
+                                      className="hover:bg-emerald-50/70 cursor-pointer transition-colors group"
+                                      title={language === 'ta' ? 'முழுமையான பெட்டிகள் விவரங்களை பார்க்க கிளிக் செய்க' : 'Click to view complete box & set breakdown'}
+                                    >
+                                      <td className="px-4 py-3.5 font-bold text-slate-900 flex items-center gap-2 whitespace-nowrap">
+                                        <div className="h-7 w-7 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-black text-xs group-hover:bg-emerald-600 group-hover:text-white transition-colors shrink-0">
+                                          {initialChar}
+                                        </div>
+                                        <span className="group-hover:text-emerald-800 font-black truncate">{displayName}</span>
+                                      </td>
+                                      <td className="px-4 py-3.5 text-right font-semibold text-slate-600 whitespace-nowrap">{dispatchesCount}</td>
+                                      <td className="px-4 py-3.5 text-right font-extrabold text-slate-900 whitespace-nowrap">{birds.toLocaleString()}{language === 'ta' ? '' : ' birds'}</td>
+                                      <td className="px-4 py-3.5 text-right font-black text-emerald-800 whitespace-nowrap">{weight.toLocaleString()} kg</td>
+                                      <td className="px-4 py-3.5 text-right font-extrabold text-purple-700 whitespace-nowrap">{avgWeight} kg</td>
+                                      <td className="px-4 py-3.5 text-right font-semibold text-slate-600 whitespace-nowrap">{crates}</td>
+                                      <td className="px-4 py-3.5 text-center print:hidden whitespace-nowrap">
+                                        <div className="flex items-center justify-center gap-2">
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              const traderDisp = (historyData.dispatches || []).find(
+                                                d => (d.vehicleName || d.customerName || d.traderName || 'General Trader') === displayName
+                                              );
+                                              if (traderDisp) handleOpenInvoice(traderDisp);
+                                            }}
+                                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 hover:bg-emerald-600 hover:text-white px-2.5 py-1 text-[11px] font-extrabold text-emerald-900 transition-colors shadow-2xs cursor-pointer whitespace-nowrap"
+                                            title="Download Invoice PDF"
+                                          >
+                                            <FileText className="h-3.5 w-3.5 shrink-0" />
+                                            <span>{language === 'ta' ? 'ரசீது' : 'Invoice'}</span>
+                                          </button>
+
+                                          <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-extrabold text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white transition-colors whitespace-nowrap">
+                                            <span>{language === 'ta' ? 'பெட்டிகள் பார்' : 'View Sets'}</span>
+                                            <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                                          </span>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
                               </tbody>
                               <tfoot className="bg-slate-100 font-extrabold text-slate-900 border-t-2 border-slate-300">
                                 <tr>
@@ -1221,76 +1231,85 @@ export const BatchHistoryPage = () => {
 
                           {/* MOBILE VIEW CARDS DESIGN */}
                           <div className="block md:hidden space-y-3">
-                            {paginatedTraders.map((t, idx) => (
-                              <div
-                                key={idx}
-                                onClick={() => handleOpenTraderDetail(t)}
-                                className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-2xs hover:border-emerald-400 active:scale-98 transition-all cursor-pointer"
-                              >
-                                {/* Top Action Bar with Invoice & View Sets Buttons */}
-                                <div className="flex items-center justify-between gap-1.5 border-b border-slate-100 pb-2.5">
-                                  <span className="rounded-md bg-emerald-50 border border-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800 whitespace-nowrap min-w-0 truncate shrink">
-                                    {t.dispatchCount} {language === 'ta' ? 'அனுப்புதல்' : 'Dispatch'}{t.dispatchCount > 1 && language !== 'ta' ? 'es' : ''} • {t.totalCrates} {language === 'ta' ? 'பெட்டிகள்' : 'boxes'}
-                                  </span>
+                            {paginatedTraders.map((t, idx) => {
+                              const displayName = t.traderName || t.name || 'General Trader';
+                              const initialChar = ((displayName || 'T')[0] || 'T').toUpperCase();
+                              const birds = t.totalBirds || t.birdsCount || 0;
+                              const crates = t.totalCrates || t.cratesCount || 0;
+                              const dispatchesCount = t.dispatchCount || 1;
+                              const weight = t.totalWeight || 0;
 
-                                  <div className="flex items-center gap-1 shrink-0 whitespace-nowrap">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const traderDisp = (historyData.dispatches || []).find(
-                                          d => (d.vehicleName || d.customerName || d.traderName || 'General Trader') === t.traderName
-                                        );
-                                        if (traderDisp) handleOpenInvoice(traderDisp);
-                                      }}
-                                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 px-2 py-1 text-[10px] sm:text-[11px] font-extrabold text-emerald-900 active:scale-95 transition-all cursor-pointer whitespace-nowrap shrink-0"
-                                    >
-                                      <FileText className="h-3 w-3 shrink-0 text-emerald-700" />
-                                      <span className="whitespace-nowrap">{language === 'ta' ? 'ரசீது' : 'Invoice'}</span>
-                                    </button>
-                                    <span className="inline-flex items-center gap-0.5 rounded-lg bg-emerald-50 px-2 py-1 text-[10px] sm:text-[11px] font-extrabold text-emerald-700 whitespace-nowrap shrink-0">
-                                      <span className="whitespace-nowrap">{language === 'ta' ? 'செட் பார்' : 'View Sets'}</span>
-                                      <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                              return (
+                                <div
+                                  key={idx}
+                                  onClick={() => handleOpenTraderDetail(t)}
+                                  className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-2xs hover:border-emerald-400 active:scale-98 transition-all cursor-pointer"
+                                >
+                                  {/* Top Action Bar with Invoice & View Sets Buttons */}
+                                  <div className="flex items-center justify-between gap-1.5 border-b border-slate-100 pb-2.5">
+                                    <span className="rounded-md bg-emerald-50 border border-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800 whitespace-nowrap min-w-0 truncate shrink">
+                                      {dispatchesCount} {language === 'ta' ? 'அனுப்புதல்' : 'Dispatch'}{dispatchesCount > 1 && language !== 'ta' ? 'es' : ''} • {crates} {language === 'ta' ? 'பெட்டிகள்' : 'boxes'}
                                     </span>
-                                  </div>
-                                </div>
 
-                                {/* Trader Name Below Buttons */}
-                                <div className="flex items-center gap-2.5 py-0.5">
-                                  <div className="h-8.5 w-8.5 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-black text-xs shrink-0">
-                                    {t.traderName.charAt(0).toUpperCase()}
+                                    <div className="flex items-center gap-1 shrink-0 whitespace-nowrap">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const traderDisp = (historyData.dispatches || []).find(
+                                            d => (d.vehicleName || d.customerName || d.traderName || 'General Trader') === displayName
+                                          );
+                                          if (traderDisp) handleOpenInvoice(traderDisp);
+                                        }}
+                                        className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 px-2 py-1 text-[10px] sm:text-[11px] font-extrabold text-emerald-900 active:scale-95 transition-all cursor-pointer whitespace-nowrap shrink-0"
+                                      >
+                                        <FileText className="h-3 w-3 shrink-0 text-emerald-700" />
+                                        <span className="whitespace-nowrap">{language === 'ta' ? 'ரசீது' : 'Invoice'}</span>
+                                      </button>
+                                      <span className="inline-flex items-center gap-0.5 rounded-lg bg-emerald-50 px-2 py-1 text-[10px] sm:text-[11px] font-extrabold text-emerald-700 whitespace-nowrap shrink-0">
+                                        <span className="whitespace-nowrap">{language === 'ta' ? 'செட் பார்' : 'View Sets'}</span>
+                                        <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                                      </span>
+                                    </div>
                                   </div>
-                                  <div className="min-w-0 flex-1">
-                                    <h4 className="font-black text-slate-900 text-sm leading-snug break-words" title={t.traderName}>
-                                      {t.traderName}
-                                    </h4>
-                                  </div>
-                                </div>
 
-                                <div className="grid grid-cols-2 gap-2 text-xs">
-                                  <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100 min-w-0">
-                                    <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block whitespace-nowrap truncate">{language === 'ta' ? 'மொத்த கோழிகள்' : 'TOTAL BIRDS GIVEN'}</span>
-                                    <span className="font-black text-slate-900 text-xs mt-0.5 block whitespace-nowrap truncate">{t.totalBirds.toLocaleString()}{language === 'ta' ? '' : ' birds'}</span>
+                                  {/* Trader Name Below Buttons */}
+                                  <div className="flex items-center gap-2.5 py-0.5">
+                                    <div className="h-8.5 w-8.5 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-black text-xs shrink-0">
+                                      {initialChar}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <h4 className="font-black text-slate-900 text-sm leading-snug break-words" title={displayName}>
+                                        {displayName}
+                                      </h4>
+                                    </div>
                                   </div>
 
-                                  <div className="rounded-xl bg-emerald-50/80 p-2.5 border border-emerald-100 min-w-0">
-                                    <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-700 block whitespace-nowrap truncate">{language === 'ta' ? 'மொத்த எடை' : 'TOTAL WEIGHT'}</span>
-                                    <span className="font-black text-emerald-800 text-xs mt-0.5 block whitespace-nowrap truncate">{t.totalWeight.toLocaleString()} kg</span>
+                                  <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100 min-w-0">
+                                      <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 block whitespace-nowrap truncate">{language === 'ta' ? 'மொத்த கோழிகள்' : 'TOTAL BIRDS GIVEN'}</span>
+                                      <span className="font-black text-slate-900 text-xs mt-0.5 block whitespace-nowrap truncate">{birds.toLocaleString()}{language === 'ta' ? '' : ' birds'}</span>
+                                    </div>
+
+                                    <div className="rounded-xl bg-emerald-50/80 p-2.5 border border-emerald-100 min-w-0">
+                                      <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-700 block whitespace-nowrap truncate">{language === 'ta' ? 'மொத்த எடை' : 'TOTAL WEIGHT'}</span>
+                                      <span className="font-black text-emerald-800 text-xs mt-0.5 block whitespace-nowrap truncate">{weight.toLocaleString()} kg</span>
+                                    </div>
                                   </div>
-                                </div>
 
                                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-[11px] sm:text-xs font-bold text-slate-600">
                                   <div className="truncate whitespace-nowrap min-w-0">
                                     <span>{language === 'ta' ? 'சராசரி:' : 'Avg Wt:'} </span>
-                                    <strong className="text-purple-700 font-black">{t.avgWeight} kg/{language === 'ta' ? 'கோழி' : 'bird'}</strong>
+                                    <strong className="text-purple-700 font-black">{avgWeight} kg/{language === 'ta' ? 'கோழி' : 'bird'}</strong>
                                   </div>
                                   <div className="text-right truncate whitespace-nowrap min-w-0">
                                     <span>{language === 'ta' ? 'பெட்டிகள்:' : 'Crates:'} </span>
-                                    <strong className="text-slate-900 font-black">{t.totalCrates} {language === 'ta' ? 'பெட்டிகள்' : 'boxes'}</strong>
+                                    <strong className="text-slate-900 font-black">{crates} {language === 'ta' ? 'பெட்டிகள்' : 'boxes'}</strong>
                                   </div>
                                 </div>
                               </div>
-                            ))}
-                          </div>
+                            );
+                          })}
+                        </div>
 
                           <PaginationControls
                             currentPage={currentPageTraders}
