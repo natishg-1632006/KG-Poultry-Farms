@@ -234,6 +234,15 @@ function getLocalDB() {
       // In unit test environment, seed KG006 so offline test suite passes
       if (IS_TEST_ENV && !base.batches.KG006) {
         base.batches.KG006 = TEST_SEED_KG006;
+        if (!base.feedStocks.KG006) {
+          base.feedStocks.KG006 = [{
+            id: 'seed-feed-kg006',
+            feedType: 'Pre-Starter',
+            bagsReceived: 10,
+            quantityReceivedKg: 700,
+            date: '2026-10-22'
+          }];
+        }
       }
 
       if (typeof localStorage !== 'undefined') {
@@ -285,6 +294,15 @@ function getLocalDB() {
 
     if (IS_TEST_ENV && Object.keys(parsed.batches).length === 0) {
       parsed.batches.KG006 = TEST_SEED_KG006;
+      if (!parsed.feedStocks.KG006) {
+        parsed.feedStocks.KG006 = [{
+          id: 'seed-feed-kg006',
+          feedType: 'Pre-Starter',
+          bagsReceived: 10,
+          quantityReceivedKg: 700,
+          date: '2026-10-22'
+        }];
+      }
     }
 
     return parsed;
@@ -321,36 +339,37 @@ export function computeBatchFeedStock(batchId, local = getLocalDB()) {
       kg: Number(a?.quantityReceivedKg ?? a?.quantityReceived ?? ((Number(a?.bagsReceived || 0) * 70) + Number(a?.additionalKg || 0)))
     }));
 
+    // Step 1: Calculate net arrivals per feed category for the batch
+    arrivals.forEach(a => {
+      const fType = a.feedType || 'Pre-Starter';
+      if (a.transactionType === 'Return') {
+        stock[fType] = Math.max(0, (stock[fType] || 0) - a.kg);
+      } else {
+        stock[fType] = (stock[fType] || 0) + a.kg;
+      }
+    });
+
     const dailyMap = local?.dailyRecords?.[batchId] || {};
     const dailyRecords = Object.values(dailyMap).map(r => ({
       eventType: 'DAILY_LOG',
       timeKey: r?.createdAt || r?.updatedAt || r?.recordDate || '2000-01-01',
       date: r?.recordDate || (r?.createdAt ? r.createdAt.split('T')[0] : '2000-01-01'),
       feedType: r?.feedType || null,
-      kg: Number(r?.feedConsumption || 0)
+      kg: Number(r?.feedConsumptionKg ?? r?.feedConsumption ?? ((Number(r?.feedConsumptionBags || 0) * 70) + Number(r?.additionalLooseKg || 0)))
     }));
 
-    const events = [...arrivals, ...dailyRecords].sort((a, b) => {
+    // Step 2: Sort daily records chronologically
+    const sortedDaily = [...dailyRecords].sort((a, b) => {
       if (a.date !== b.date) {
         return a.date.localeCompare(b.date);
-      }
-      // Process Arrivals before Daily Logs on the same day so stock is available before consumption
-      if (a.eventType !== b.eventType) {
-        return a.eventType === 'ARRIVAL' ? -1 : 1;
       }
       return (a.timeKey || '').localeCompare(b.timeKey || '');
     });
 
-    events.forEach(evt => {
-      if (evt.eventType === 'ARRIVAL') {
-        const fType = evt.feedType || 'Pre-Starter';
-        if (evt.transactionType === 'Return') {
-          stock[fType] = Math.max(0, (stock[fType] || 0) - evt.kg);
-        } else {
-          stock[fType] = (stock[fType] || 0) + evt.kg;
-        }
-      } else if (evt.eventType === 'DAILY_LOG' && evt.kg > 0) {
-        const deductionResult = deductFeedStock(stock, evt.feedType, evt.kg);
+    // Step 3: Deduct daily consumption from available batch feed stock in priority order (Pre-Starter -> Starter -> Finisher)
+    sortedDaily.forEach(rec => {
+      if (rec.kg > 0) {
+        const deductionResult = deductFeedStock(stock, rec.feedType, rec.kg);
         stock['Pre-Starter'] = deductionResult.updatedStock['Pre-Starter'];
         stock['Starter'] = deductionResult.updatedStock['Starter'];
         stock['Finisher'] = deductionResult.updatedStock['Finisher'];
@@ -688,6 +707,12 @@ export async function dbGetBatches(forceCloud = false) {
         hasChanges = true;
       }
       if (hasChanges) {
+        for (const [bId, bVal] of Object.entries(freshLocal.batches || {})) {
+          if (bVal && bId) {
+            freshLocal.batches[bId].remainingChickCount = recalculateBatchRemainingChickens(bId, freshLocal);
+            freshLocal.batches[bId].feedStock = computeBatchFeedStock(bId, freshLocal);
+          }
+        }
         saveLocalDB(freshLocal);
       }
     } catch (err) {

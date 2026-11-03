@@ -382,4 +382,82 @@ describe('dbService Real-Time Synchronization', () => {
     // Cleanup
     await dbDeleteBatch(testBatchId);
   });
+
+  it('correctly calculates 7 bags remaining when 23 bags are consumed from 30 received bags across categories and arrival dates', async () => {
+    const testBatchId = 'KG-FEED-30-23-TEST';
+    await dbSaveBatch({
+      id: testBatchId,
+      batchNumber: testBatchId,
+      batchName: 'Feed 30-23 Test Batch',
+      status: 'Active',
+      initialChickCount: 4000,
+      chickArrivalDate: '2026-10-15'
+    });
+
+    // Receive 10 bags Pre-Starter (700 kg), 10 bags Starter (700 kg), 10 bags Finisher (700 kg) = 30 bags total
+    await dbAddFeedArrival(testBatchId, {
+      id: 'feed-arr-1',
+      feedType: 'Pre-Starter',
+      bagsReceived: 10,
+      quantityReceivedKg: 700,
+      date: '2026-10-15'
+    });
+    await dbAddFeedArrival(testBatchId, {
+      id: 'feed-arr-2',
+      feedType: 'Starter',
+      bagsReceived: 10,
+      quantityReceivedKg: 700,
+      date: '2026-10-20'
+    });
+    // Note: Finisher arrival recorded with a later date (e.g. 2026-11-03)
+    await dbAddFeedArrival(testBatchId, {
+      id: 'feed-arr-3',
+      feedType: 'Finisher',
+      bagsReceived: 10,
+      quantityReceivedKg: 700,
+      date: '2026-11-03'
+    });
+
+    let batches = await dbGetBatches();
+    let batch = batches.find(b => b.id === testBatchId);
+    expect(batch.feedStock['Pre-Starter']).toBe(700); // 10 bags
+    expect(batch.feedStock['Starter']).toBe(700); // 10 bags
+    expect(batch.feedStock['Finisher']).toBe(700); // 10 bags
+
+    // Log daily entries consuming 23 bags total:
+    // Day 1: 10 bags (700 kg) Pre-Starter consumed
+    await dbSaveDailyRecord(testBatchId, '2026-10-16', {
+      mortalityCount: 5,
+      feedConsumption: 700,
+      feedConsumptionBags: 10,
+      averageWeight: 80
+    });
+    // Day 2: 10 bags (700 kg) Starter consumed
+    await dbSaveDailyRecord(testBatchId, '2026-10-21', {
+      mortalityCount: 4,
+      feedConsumption: 700,
+      feedConsumptionBags: 10,
+      averageWeight: 150
+    });
+    // Day 3: 3 bags (210 kg) Finisher consumed (dated before 2026-11-03 arrival date)
+    await dbSaveDailyRecord(testBatchId, '2026-10-26', {
+      mortalityCount: 3,
+      feedConsumption: 210,
+      feedConsumptionBags: 3,
+      averageWeight: 250
+    });
+
+    batches = await dbGetBatches();
+    batch = batches.find(b => b.id === testBatchId);
+    expect(batch.feedStock['Pre-Starter']).toBe(0);
+    expect(batch.feedStock['Starter']).toBe(0);
+    expect(batch.feedStock['Finisher']).toBe(490); // 700 - 210 = 490 kg (7 bags remaining)
+
+    const totalRemainingKg = batch.feedStock['Pre-Starter'] + batch.feedStock['Starter'] + batch.feedStock['Finisher'];
+    expect(totalRemainingKg).toBe(490);
+    expect(totalRemainingKg / 70).toBe(7); // EXACTLY 7 BAGS REMAINING!
+
+    // Cleanup
+    await dbDeleteBatch(testBatchId);
+  });
 });

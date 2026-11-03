@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { dbGetBatches, dbGetFeedArrivals, dbAddFeedArrival, dbDeleteFeedArrival, dbLogAuditEvent } from '../services/dbService';
+import { dbGetBatches, dbGetFeedArrivals, dbGetDailyRecords, dbAddFeedArrival, dbDeleteFeedArrival, dbLogAuditEvent } from '../services/dbService';
 import { formatFeedStock, bagsToKg, kgToBags } from '../utils/calculations';
 import { KG_PER_BAG } from '../constants/companyTargets';
 import { StatCard } from '../components/common/StatCard';
@@ -100,7 +100,10 @@ export const FeedPage = () => {
 
   async function loadFeedArrivals(bId) {
     try {
-      const list = await dbGetFeedArrivals(bId);
+      const [list] = await Promise.all([
+        dbGetFeedArrivals(bId),
+        dbGetDailyRecords(bId)
+      ]);
       setFeedArrivals(list);
       const allBatches = await dbGetBatches();
       setBatches(allBatches);
@@ -159,6 +162,11 @@ export const FeedPage = () => {
   const preConsumedBags = Math.min(preNetArrivedBags, preConsumedRaw);
   const starterConsumedBags = Math.min(starterNetArrivedBags, starterConsumedRaw);
   const finisherConsumedBags = Math.min(finisherNetArrivedBags, finisherConsumedRaw);
+
+  const totalAvailableBags = parseFloat((preAvailableBags + starterAvailableBags + finisherAvailableBags).toFixed(1));
+  const totalArrivedBags = parseFloat((preArrivedBags + starterArrivedBags + finisherArrivedBags).toFixed(1));
+  const totalReturnedBags = parseFloat((preReturnedBags + starterReturnedBags + finisherReturnedBags).toFixed(1));
+  const totalConsumedBags = parseFloat((preConsumedBags + starterConsumedBags + finisherConsumedBags).toFixed(1));
 
   const handleEditArrival = (arrival) => {
     if (isReadOnly) return;
@@ -330,7 +338,18 @@ export const FeedPage = () => {
       )}
 
       {/* KPI Stock Cards in Bags */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title={language === 'ta' ? 'மொத்த தீவன இருப்பு' : 'Total Feed Stock'}
+          value={`${totalAvailableBags} Bags`}
+          valueLabel={language === 'ta' ? 'மொத்தக் கையிருப்பு' : 'Total Available Stock'}
+          availableValue={`${totalAvailableBags} Bags`}
+          consumedValue={`${totalConsumedBags} Bags`}
+          arrivedValue={`${totalArrivedBags} Bags`}
+          subtext={totalReturnedBags > 0 ? (language === 'ta' ? `மொத்தம் • ${totalReturnedBags} திரும்பியது` : `Total • ${totalReturnedBags} Returned`) : (language === 'ta' ? 'அனைத்து வகைகளும் அடங்கிய மொத்த இருப்பு' : 'All feed categories combined')}
+          icon={Wheat}
+          color="emerald"
+        />
         <StatCard
           title={t('preStarterStock')}
           value={`${preAvailableBags} Bags`}
@@ -351,7 +370,7 @@ export const FeedPage = () => {
           arrivedValue={`${starterArrivedBags} Bags`}
           subtext={`${t('secondDeductionPriority')}${starterReturnedBags > 0 ? ` • ${starterReturnedBags} ${t('returned')}` : ''}`}
           icon={Package}
-          color="emerald"
+          color="teal"
         />
         <StatCard
           title={t('finisherStock')}

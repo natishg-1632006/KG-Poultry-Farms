@@ -28,6 +28,11 @@ export const StatCard = ({
       icon: 'border-emerald-100 bg-emerald-50 text-emerald-600',
       dot: 'bg-emerald-500'
     },
+    teal: {
+      bar: 'from-teal-600 to-teal-400',
+      icon: 'border-teal-100 bg-teal-50 text-teal-600',
+      dot: 'bg-teal-500'
+    },
     rose: {
       bar: 'from-rose-600 to-rose-400',
       icon: 'border-rose-100 bg-rose-50 text-rose-600',
