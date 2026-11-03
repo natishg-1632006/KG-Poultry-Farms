@@ -1238,6 +1238,7 @@ export const BatchHistoryPage = () => {
                               const crates = t.totalCrates || t.cratesCount || 0;
                               const dispatchesCount = t.dispatchCount || 1;
                               const weight = t.totalWeight || 0;
+                              const avgWeight = t.avgWeight || (birds > 0 ? (weight / birds).toFixed(3) : 0);
 
                               return (
                                 <div
